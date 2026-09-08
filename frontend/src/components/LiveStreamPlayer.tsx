@@ -23,8 +23,10 @@ interface LiveStreamPlayerProps {
 
 export function LiveStreamPlayer({ telemetry }: LiveStreamPlayerProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
+  const [hasVideoError, setHasVideoError] = useState<boolean>(false);
   const [showAudioViz, setShowAudioViz] = useState<boolean>(true);
 
   const isOutage = telemetry?.is_outage ?? false;
@@ -36,8 +38,23 @@ export function LiveStreamPlayer({ telemetry }: LiveStreamPlayerProps) {
       ? `${telemetry.secondary_cdn} (${telemetry.secondary_traffic_pct}% Failover)`
       : `${telemetry?.primary_cdn || "Fastly Edge"} (100% Primary)`;
 
-  // Cinematic canvas render loop: Desert dunes, celestial planet, particle drift
+  // Video playback lifecycle tied to outage state and user toggle
   useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (isOutage) {
+      video.pause();
+    } else if (isPlaying) {
+      video.play().catch(() => {});
+    } else {
+      video.pause();
+    }
+  }, [isPlaying, isOutage]);
+
+  // Cinematic canvas render loop (fallback if video fails to load)
+  useEffect(() => {
+    if (!hasVideoError) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -239,12 +256,25 @@ export function LiveStreamPlayer({ telemetry }: LiveStreamPlayerProps) {
 
       {/* Video Viewport Area */}
       <div className="relative aspect-video w-full bg-black flex items-center justify-center overflow-hidden">
-        <canvas
-          ref={canvasRef}
-          width={800}
-          height={450}
-          className="w-full h-full object-cover"
-        />
+        {!hasVideoError ? (
+          <video
+            ref={videoRef}
+            src="/assets/premiere_stream.mp4"
+            autoPlay
+            loop
+            muted
+            playsInline
+            onError={() => setHasVideoError(true)}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <canvas
+            ref={canvasRef}
+            width={800}
+            height={450}
+            className="w-full h-full object-cover"
+          />
+        )}
 
         {/* DRM Security Overlay Pill */}
         <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-black/60 backdrop-blur-md border border-white/10 text-[11px] font-mono text-white/70">

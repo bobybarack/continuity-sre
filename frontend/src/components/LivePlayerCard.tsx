@@ -10,7 +10,9 @@ interface LivePlayerCardProps {
 
 export function LivePlayerCard({ telemetry }: LivePlayerCardProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
+  const [hasVideoError, setHasVideoError] = useState<boolean>(false);
 
   const isOutage = telemetry?.is_outage ?? false;
   const isRecovered = telemetry?.status_label === "RECOVERED";
@@ -21,7 +23,25 @@ export function LivePlayerCard({ telemetry }: LivePlayerCardProps) {
       ? `${telemetry.secondary_cdn} (${telemetry.secondary_traffic_pct}% Failover)`
       : `${telemetry?.primary_cdn || "Fastly"} (100% Primary)`;
 
+  // Video playback lifecycle tied to outage state and user toggle
   useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (isOutage) {
+      video.pause();
+    } else if (isPlaying) {
+      video.play().catch(() => {
+        // Autoplay may require user gesture on some browsers if unmuted
+      });
+    } else {
+      video.pause();
+    }
+  }, [isPlaying, isOutage]);
+
+  // Fallback procedural canvas rendering if video asset fails to load
+  useEffect(() => {
+    if (!hasVideoError) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -87,7 +107,7 @@ export function LivePlayerCard({ telemetry }: LivePlayerCardProps) {
 
     render();
     return () => cancelAnimationFrame(animId);
-  }, [isPlaying, isOutage]);
+  }, [hasVideoError, isPlaying, isOutage]);
 
   return (
     <div className="bg-white border border-gray-200/80 rounded-2xl p-5 subtle-card-shadow flex flex-col justify-between h-full">
@@ -107,14 +127,27 @@ export function LivePlayerCard({ telemetry }: LivePlayerCardProps) {
           </span>
         </div>
 
-        {/* Video Canvas Container */}
+        {/* Video Container */}
         <div className="relative aspect-video w-full rounded-xl overflow-hidden mt-3 bg-black">
-          <canvas
-            ref={canvasRef}
-            width={600}
-            height={340}
-            className="w-full h-full object-cover"
-          />
+          {!hasVideoError ? (
+            <video
+              ref={videoRef}
+              src="/assets/premiere_stream.mp4"
+              autoPlay
+              loop
+              muted
+              playsInline
+              onError={() => setHasVideoError(true)}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <canvas
+              ref={canvasRef}
+              width={600}
+              height={340}
+              className="w-full h-full object-cover"
+            />
+          )}
 
           {/* Outage Banner */}
           {isOutage && (
