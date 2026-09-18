@@ -14,6 +14,7 @@ from services.telemetry import telemetry_engine
 from services.grafana_client import grafana_client
 from services.mcp_service import (
     GEMINI_MCP_TOOLS,
+    dispatch_mcp_tool,
     grafana_query_prometheus,
     grafana_query_loki,
     grafana_create_annotation,
@@ -29,9 +30,9 @@ if GEMINI_API_KEY:
     os.environ["GOOGLE_API_KEY"] = GEMINI_API_KEY
 
 FALLBACK_MODELS = [
+    "models/gemini-3.6-flash",
     GEMINI_MODEL,
     "models/gemini-3.7-flash",
-    "models/gemini-3.6-flash",
     "models/gemini-3.5-flash"
 ]
 
@@ -134,7 +135,7 @@ class AgentCommander:
 
         prompt = f"""
 You are Continuity, the Lead Autonomous SRE AI Incident Commander for a tier-1 Hollywood OTT streaming platform.
-Analyze the live incident telemetry ingested via Grafana Cloud MCP:
+Analyze the live incident telemetry ingested via Grafana Cloud MCP and execute autonomous remediation:
 
 STREAM METADATA:
 - Title: {STREAM_TITLE}
@@ -150,28 +151,25 @@ OBSERVABILITY TELEMETRY (Prometheus & Loki via Grafana MCP):
 - Delivered Bitrate: {snapshot.avg_bitrate_mbps} Mbps
 - Recent Edge Log: "{snapshot.latest_log}"
 
-Task:
-1. Determine severity: CRITICAL or WARNING.
-2. Formulate Root Cause Analysis (RCA) based on the logs and metric signatures.
-3. Identify affected subsystems.
-4. Select the exact autonomous remediation action:
-   - "SHIFT_TRAFFIC_TO_AKAMAI" (for CDN transit failures or edge 502 storms)
-   - "FAILOVER_DRM_KEY_CLUSTER" (for DRM license timeouts)
-   - "REROUTE_BGP_TRANSIT" (for ISP peering drops)
-5. Generate an executive post-mortem summary and financial subscriber churn estimate prevented.
+AVAILABLE MCP TOOLS:
+- continuity_execute_remediation: Shift traffic or failover key cluster.
+- grafana_create_annotation: Drop annotation pin on live Grafana dashboard.
+- grafana_create_incident: Open incident in Grafana IRM.
+- continuity_verify_closed_loop_recovery: Verify closed-loop recovery.
 
-Respond ONLY with valid JSON matching this schema:
-{{
-  "severity": "CRITICAL",
-  "root_cause_analysis": "string describing the technical root cause",
-  "affected_subsystems": ["string", "string"],
-  "remediation_action": "SHIFT_TRAFFIC_TO_AKAMAI",
-  "estimated_subscriber_loss_prevented": "$1,450,000 USD (32,000 churn cancellations avoided)",
-  "executive_summary": "string concise executive summary"
-}}
+Call the necessary MCP tools to remediate this critical stream degradation.
 """
 
         decision = None
+        remediation_res = None
+        remediation_action = None
+        incident_res = None
+        grafana_incident_id = None
+        annotation_resp = None
+        annotation_id = None
+        verify_res = None
+        decision_rca = None
+
         for model in FALLBACK_MODELS:
             try:
                 def _sync_generate(m=model):
@@ -179,89 +177,114 @@ Respond ONLY with valid JSON matching this schema:
                         model=m,
                         contents=prompt,
                         config=types.GenerateContentConfig(
-                            response_mime_type="application/json",
+                            tools=GEMINI_MCP_TOOLS,
                             temperature=0.2
                         )
                     )
 
-                response = await asyncio.wait_for(asyncio.to_thread(_sync_generate), timeout=7.0)
-                decision = json.loads(response.text)
+                response = await asyncio.wait_for(asyncio.to_thread(_sync_generate), timeout=9.0)
                 trace.append(f"[{time.strftime('%H:%M:%S')}] Gemini Model [{model}] multi-step reasoning completed successfully.")
+
+                if response.function_calls:
+                    for fc in response.function_calls:
+                        tool_name = fc.name
+                        tool_args = fc.args or {}
+                        mcp_tools_called.append(tool_name)
+                        trace.append(f"[{time.strftime('%H:%M:%S')}] Gemini Autonomous MCP Call [{tool_name}]: {json.dumps(tool_args)}")
+                        tool_result = await dispatch_mcp_tool(tool_name, tool_args)
+                        trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [{tool_name}] Result: {str(tool_result)[:120]}")
+
+                        if tool_name == "continuity_execute_remediation":
+                            remediation_res = tool_result
+                            remediation_action = tool_args.get("action", "SHIFT_TRAFFIC_TO_AKAMAI")
+                            decision_rca = tool_args.get("reason")
+                        elif tool_name == "grafana_create_incident":
+                            incident_res = tool_result
+                            grafana_incident_id = tool_result.get("incident_id") or tool_result.get("id")
+                        elif tool_name == "grafana_create_annotation":
+                            annotation_resp = tool_result
+                            annotation_id = tool_result.get("id")
+                        elif tool_name == "continuity_verify_closed_loop_recovery":
+                            verify_res = tool_result
+
+                if response.text:
+                    try:
+                        decision = json.loads(response.text)
+                    except Exception:
+                        pass
+
                 break
             except Exception as e:
-                logger.warning(f"Model {model} generation attempt failed: {e}. Trying fallback...")
+                logger.warning(f"Model {model} tool calling attempt failed: {e}. Trying fallback...")
 
         if not decision:
-            # Deterministic SRE rule engine fallback if upstream AI endpoints are throttled
-            if state.current_mode == "DRM_TIMEOUT":
-                decision = {
-                    "severity": "CRITICAL",
-                    "root_cause_analysis": f"Widevine Key Authentication timeout identified via {snapshot.latest_log}",
-                    "affected_subsystems": ["DRM Auth Proxy", "Key Server Cluster"],
-                    "remediation_action": "FAILOVER_DRM_KEY_CLUSTER",
-                    "estimated_subscriber_loss_prevented": "$980,000 USD (21,000 churn cancellations avoided)",
-                    "executive_summary": "DRM handshake exceeded SLA threshold. Key server cluster failed over to backup pool."
-                }
-            elif state.current_mode == "ISP_PEERING_DROP":
-                decision = {
-                    "severity": "WARNING",
-                    "root_cause_analysis": f"Tier-1 BGP transit peering congestion identified via {snapshot.latest_log}",
-                    "affected_subsystems": ["ASN 3356 Transit", "Edge Routing"],
-                    "remediation_action": "REROUTE_BGP_TRANSIT",
-                    "estimated_subscriber_loss_prevented": "$650,000 USD (14,000 churn cancellations avoided)",
-                    "executive_summary": "BGP route degraded. Transit egress rerouted via alternative peering interconnects."
-                }
-            else:
-                decision = {
-                    "severity": "CRITICAL",
-                    "root_cause_analysis": f"Edge POP transit failure detected via {snapshot.latest_log}",
-                    "affected_subsystems": ["Fastly Edge POP", "Transit ASN 3356"],
-                    "remediation_action": "SHIFT_TRAFFIC_TO_AKAMAI",
-                    "estimated_subscriber_loss_prevented": "$1,450,000 USD (32,000 churn cancellations avoided)",
-                    "executive_summary": "Primary edge CDN node collapsed. Autonomous traffic failover triggered."
-                }
+            if not remediation_action:
+                if state.current_mode == "DRM_TIMEOUT":
+                    remediation_action = "FAILOVER_DRM_KEY_CLUSTER"
+                    decision_rca = f"Widevine Key Authentication timeout identified via {snapshot.latest_log}"
+                elif state.current_mode == "ISP_PEERING_DROP":
+                    remediation_action = "REROUTE_BGP_TRANSIT"
+                    decision_rca = f"Tier-1 BGP transit peering congestion identified via {snapshot.latest_log}"
+                else:
+                    remediation_action = "SHIFT_TRAFFIC_TO_AKAMAI"
+                    decision_rca = f"Edge POP transit failure detected via {snapshot.latest_log}"
 
-        remediation_action = decision.get("remediation_action", "SHIFT_TRAFFIC_TO_AKAMAI")
+            decision = {
+                "severity": "CRITICAL" if state.current_mode != "ISP_PEERING_DROP" else "WARNING",
+                "root_cause_analysis": decision_rca or f"Edge degradation detected via {snapshot.latest_log}",
+                "affected_subsystems": ["Edge CDN", "Transit ASN 3356"] if "CDN" in remediation_action else ["DRM Auth Proxy"],
+                "remediation_action": remediation_action,
+                "estimated_subscriber_loss_prevented": "$1,450,000 USD (32,000 churn cancellations avoided)",
+                "executive_summary": f"Autonomous remediation policy '{remediation_action}' executed via official Grafana MCP tools."
+            }
+
+        if not remediation_action:
+            remediation_action = decision.get("remediation_action", "SHIFT_TRAFFIC_TO_AKAMAI")
+
         trace.append(f"[{time.strftime('%H:%M:%S')}] Gemini Root Cause Analysis: {decision.get('root_cause_analysis')}")
 
-        # Step 3: Apply Autonomous Remediation via MCP Tool
-        mcp_tools_called.append("continuity_execute_remediation")
-        trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [continuity_execute_remediation]: Executing policy '{remediation_action}'...")
-        remediation_res = await continuity_execute_remediation(
-            action=remediation_action,
-            primary_cdn_pct=20,
-            secondary_cdn_pct=80,
-            reason=decision.get("root_cause_analysis", "Autonomous failover")
-        )
+        # Step 3: Apply Autonomous Remediation via MCP Tool if not yet applied
+        if not remediation_res:
+            mcp_tools_called.append("continuity_execute_remediation")
+            trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [continuity_execute_remediation]: Executing policy '{remediation_action}'...")
+            remediation_res = await continuity_execute_remediation(
+                action=remediation_action,
+                primary_cdn_pct=20,
+                secondary_cdn_pct=80,
+                reason=decision.get("root_cause_analysis", "Autonomous failover")
+            )
         trace.append(
             f"[{time.strftime('%H:%M:%S')}] Failover Applied: Primary CDN egress throttled to {remediation_res['primary_cdn_traffic_pct']}%, "
             f"Secondary CDN egress scaled to {remediation_res['secondary_cdn_traffic_pct']}%."
         )
 
-        # Step 4: Open Incident in Grafana Cloud IRM via MCP Tool
-        mcp_tools_called.append("grafana_create_incident")
-        incident_res = await grafana_create_incident(
-            title=f"Premiere Streaming Incident: {remediation_action}",
-            severity=decision.get("severity", "CRITICAL"),
-            summary=decision.get("executive_summary", "Autonomous remediation executed.")
-        )
-        grafana_incident_id = incident_res.get("incident_id")
-        trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [grafana_create_incident]: Opened Grafana IRM incident {grafana_incident_id}.")
+        # Step 4: Open Incident in Grafana Cloud IRM via MCP Tool if not yet opened
+        if not incident_res:
+            mcp_tools_called.append("grafana_create_incident")
+            incident_res = await grafana_create_incident(
+                title=f"Premiere Streaming Incident: {remediation_action}",
+                severity=decision.get("severity", "CRITICAL"),
+                summary=decision.get("executive_summary", "Autonomous remediation executed.")
+            )
+            grafana_incident_id = incident_res.get("incident_id")
+            trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [grafana_create_incident]: Opened Grafana IRM incident {grafana_incident_id}.")
 
-        # Step 5: Write visual annotation to Grafana live dashboard via MCP Tool
-        mcp_tools_called.append("grafana_create_annotation")
-        annotation_text = f"[CONTINUITY MCP Auto-Fix]: {remediation_action} - {decision.get('root_cause_analysis')}"
-        trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [grafana_create_annotation]: Placing vertical timestamp pin on live dashboard...")
-        annotation_resp = await grafana_create_annotation(
-            text=annotation_text,
-            tags=["continuity", "mcp-grafana", "gemini-sre", "autonomous-remediation"]
-        )
-        annotation_id = annotation_resp.get("id") if isinstance(annotation_resp, dict) else None
+        # Step 5: Write visual annotation to Grafana live dashboard via MCP Tool if not yet written
+        if not annotation_resp:
+            mcp_tools_called.append("grafana_create_annotation")
+            annotation_text = f"[CONTINUITY MCP Auto-Fix]: {remediation_action} - {decision.get('root_cause_analysis')}"
+            trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [grafana_create_annotation]: Placing vertical timestamp pin on live dashboard...")
+            annotation_resp = await grafana_create_annotation(
+                text=annotation_text,
+                tags=["continuity", "mcp-grafana", "gemini-sre", "autonomous-remediation"]
+            )
+            annotation_id = annotation_resp.get("id") if isinstance(annotation_resp, dict) else None
 
         # Step 6: Closed-Loop Verification Gate (Falsifiable Proof of Recovery)
-        mcp_tools_called.append("continuity_verify_closed_loop_recovery")
-        trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [continuity_verify_closed_loop_recovery]: Executing closed-loop verification check...")
-        verify_res = await continuity_verify_closed_loop_recovery()
+        if not verify_res:
+            mcp_tools_called.append("continuity_verify_closed_loop_recovery")
+            trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [continuity_verify_closed_loop_recovery]: Executing closed-loop verification check...")
+            verify_res = await continuity_verify_closed_loop_recovery()
         verified_snapshot = telemetry_engine.generate_current_snapshot()
         
         trace.append(
