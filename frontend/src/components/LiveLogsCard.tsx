@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useEffect } from "react";
-import { DatabaseIcon, CheckmarkCircle01Icon, Alert01Icon } from "hugeicons-react";
+import { DatabaseIcon } from "hugeicons-react";
 import { TelemetrySnapshot } from "../types/telemetry";
 
 interface LiveLogsCardProps {
@@ -11,11 +11,12 @@ interface LiveLogsCardProps {
 
 export function LiveLogsCard({ telemetry, history }: LiveLogsCardProps) {
   const isOutage = telemetry?.is_outage ?? false;
-  const logsEndRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (logsEndRef.current) {
-      logsEndRef.current.scrollIntoView({ behavior: "smooth" });
+    const container = scrollContainerRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
     }
   }, [telemetry]);
 
@@ -43,7 +44,10 @@ export function LiveLogsCard({ telemetry, history }: LiveLogsCardProps) {
         </div>
 
         {/* Live Structured Logs Feed */}
-        <div className="mt-3.5 p-3 bg-gray-50 rounded-xl border border-gray-200/60 font-mono text-[11px] space-y-2 max-h-48 overflow-y-auto">
+        <div
+          ref={scrollContainerRef}
+          className="mt-3.5 p-3 bg-gray-50 rounded-xl border border-gray-200/60 font-mono text-[11px] space-y-2 max-h-48 overflow-y-auto"
+        >
           <div className="flex items-start gap-2 text-gray-600">
             <span className="text-gray-400 shrink-0">[14:04:15]</span>
             <span className="text-emerald-600 font-bold shrink-0">200 OK</span>
@@ -69,7 +73,6 @@ export function LiveLogsCard({ telemetry, history }: LiveLogsCardProps) {
               {telemetry?.latest_log || "All edge delivery streams nominal"}
             </span>
           </div>
-          <div ref={logsEndRef} />
         </div>
       </div>
 

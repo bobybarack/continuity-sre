@@ -31,11 +31,12 @@ export function GeminiAgentTerminal({
   onTriggerInvestigation,
   isOutage,
 }: GeminiAgentTerminalProps) {
-  const terminalEndRef = useRef<HTMLDivElement | null>(null);
+  const terminalContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (terminalEndRef.current) {
-      terminalEndRef.current.scrollIntoView({ behavior: "smooth" });
+    const container = terminalContainerRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
     }
   }, [latestInvestigation, isInvestigating]);
 
@@ -185,7 +186,10 @@ export function GeminiAgentTerminal({
         </AnimatePresence>
 
         {/* Terminal Reasoning Output Log */}
-        <div className="mt-3.5 p-4 rounded-xl bg-black/80 border border-white/[0.08] font-mono text-xs text-white/80 space-y-2 max-h-56 overflow-y-auto">
+        <div
+          ref={terminalContainerRef}
+          className="mt-3.5 p-4 rounded-xl bg-black/80 border border-white/[0.08] font-mono text-xs text-white/80 space-y-2 max-h-56 overflow-y-auto"
+        >
           {trace.map((line, idx) => {
             const isAlert = line.includes("ALERT") || line.includes("CRITICAL");
             const isMcp = line.includes("MCP") || line.includes("Grafana");
@@ -225,7 +229,6 @@ export function GeminiAgentTerminal({
               </span>
             </div>
           )}
-          <div ref={terminalEndRef} />
         </div>
       </div>
 

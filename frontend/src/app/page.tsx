@@ -49,6 +49,11 @@ export default function ContinuityDashboard() {
     fetchInitialData();
   }, [fetchInitialData]);
 
+  // Ensure window stays at top on initial link visit
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   // Connect 1Hz SSE Real-Time Stream with fallback polling
   useEffect(() => {
     const unsub = ApiService.createTelemetryEventSource(
@@ -165,25 +170,29 @@ export default function ContinuityDashboard() {
         {/* 1. Top 5 Real-Time Metric Cards */}
         <MetricCardsRow current={telemetry} />
 
-        {/* 2. Central Row: Playback Failure Chart (65%) + Live Player Viewport (35%) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          <div className="lg:col-span-7">
-            <PlaybackChartCard telemetry={telemetry} history={history} />
-          </div>
-          <div className="lg:col-span-5">
+        {/* 2. Central Row: Option 2 Command Center - Video Hero (8 cols / 66.7%) + Stacked Telemetry (4 cols / 33.3%) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+          <div className="lg:col-span-8 flex flex-col">
             <LivePlayerCard telemetry={telemetry} />
+          </div>
+          <div className="lg:col-span-4 flex flex-col gap-5 justify-between">
+            <div className="flex-1">
+              <PlaybackChartCard telemetry={telemetry} history={history} />
+            </div>
+            <div className="flex-1">
+              <CdnSplitCard telemetry={telemetry} />
+            </div>
           </div>
         </div>
 
-        {/* 3. Bottom Row: SRE Commander (33%) + CDN Traffic Split (33%) + Live Logs Stream (33%) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {/* 3. Bottom Row: SRE Commander (50%) + Live Logs Stream (50%) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <SreCommanderCard
             latestInvestigation={latestInvestigation}
             isInvestigating={isInvestigating}
             onTriggerInvestigation={handleTriggerAutonomousInvestigation}
             isOutage={isOutage}
           />
-          <CdnSplitCard telemetry={telemetry} />
           <LiveLogsCard telemetry={telemetry} history={history} />
         </div>
 

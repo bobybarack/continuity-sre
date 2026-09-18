@@ -133,18 +133,20 @@ export function LivePlayerCard({ telemetry }: LivePlayerCardProps) {
             <video
               ref={videoRef}
               src="/assets/premiere_stream.mp4"
+              poster="/assets/premiere_poster.jpg"
               autoPlay
               loop
               muted
               playsInline
+              preload="auto"
               onError={() => setHasVideoError(true)}
               className="w-full h-full object-cover"
             />
           ) : (
             <canvas
               ref={canvasRef}
-              width={600}
-              height={340}
+              width={800}
+              height={450}
               className="w-full h-full object-cover"
             />
           )}

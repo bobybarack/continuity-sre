@@ -10,6 +10,7 @@ import {
   File01Icon,
   Settings01Icon,
 } from "hugeicons-react";
+import { ContinuityLogo } from "./ContinuityLogo";
 
 interface SidebarProps {
   activeTab: string;
@@ -36,8 +37,8 @@ export function Sidebar({
       <div>
         {/* Logo & Brand */}
         <div className="flex items-center gap-2.5 px-2 py-3 mb-6 border-b border-gray-100">
-          <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
-            <Shield01Icon className="w-5 h-5 text-emerald-600" />
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-cyan-400 p-1.5 flex items-center justify-center text-white shadow-sm shadow-sky-500/20">
+            <ContinuityLogo className="w-full h-full text-white" />
           </div>
           <div>
             <h1 className="text-sm font-bold text-gray-900 tracking-tight">
