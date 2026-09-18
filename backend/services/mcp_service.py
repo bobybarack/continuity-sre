@@ -98,32 +98,51 @@ official_mcp_bridge = OfficialGrafanaMCPBridge()
 async def grafana_query_prometheus(promql: str) -> Dict[str, Any]:
     """Queries real-time OpenMetrics and Prometheus telemetry via official Grafana Cloud MCP Server."""
     logger.info(f"[MCP Tool] Executing PromQL: {promql}")
-    res = await official_mcp_bridge.call_official_tool("query_prometheus", {"query": promql})
-    if res is not None and isinstance(res, dict) and "status" in res:
+    res = await official_mcp_bridge.call_official_tool("query_prometheus", {
+        "datasourceUid": "grafanacloud-prom",
+        "expr": promql,
+        "endTime": "now",
+        "queryType": "instant"
+    })
+    if res is not None and isinstance(res, dict) and ("data" in res or "status" in res):
         return res
     return await grafana_client.query_prometheus(promql)
 
 async def grafana_query_loki(logql: str, limit: int = 20) -> Dict[str, Any]:
     """Queries distributed edge router and transcode logs via official Grafana Cloud MCP Server."""
     logger.info(f"[MCP Tool] Executing LogQL: {logql} (limit={limit})")
-    res = await official_mcp_bridge.call_official_tool("query_loki_logs", {"query": logql, "limit": limit})
-    if res is not None:
-        return res if isinstance(res, dict) else {"result": res}
+    res = await official_mcp_bridge.call_official_tool("query_loki_logs", {
+        "datasourceUid": "grafanacloud-logs",
+        "logql": logql,
+        "limit": limit
+    })
+    if res is not None and isinstance(res, dict) and ("data" in res or "lines" in res):
+        return res
     return await grafana_client.query_loki_logs(logql, limit=limit)
 
 async def grafana_create_annotation(text: str, tags: Optional[List[str]] = None) -> Dict[str, Any]:
     """Drops a visible timestamped vertical annotation pin on live Grafana dashboard via official MCP Server."""
     logger.info(f"[MCP Tool] Creating dashboard annotation: {text}")
-    res = await official_mcp_bridge.call_official_tool("create_annotation", {"text": text, "tags": tags or []})
-    if res is not None and isinstance(res, dict) and "id" in res:
-        return res
+    res = await official_mcp_bridge.call_official_tool("create_annotation", {
+        "text": text,
+        "tags": tags or []
+    })
+    if res is not None and isinstance(res, dict):
+        if "Payload" in res and isinstance(res["Payload"], dict) and "id" in res["Payload"]:
+            return {"id": res["Payload"]["id"], "message": res["Payload"].get("message", "Annotation added")}
+        if "id" in res:
+            return res
     return await grafana_client.create_annotation(text, tags)
 
 async def grafana_create_incident(title: str, severity: str, summary: str) -> Dict[str, Any]:
     """Opens a structured P1/P2 incident record in Grafana Cloud IRM via official MCP Server."""
     logger.info(f"[MCP Tool] Opening Grafana IRM incident: {title} [{severity}]")
-    res = await official_mcp_bridge.call_official_tool("create_incident", {"title": title, "severity": severity, "summary": summary})
-    if res is not None and isinstance(res, dict) and "incident_id" in res:
+    res = await official_mcp_bridge.call_official_tool("create_incident", {
+        "title": title,
+        "severity": severity,
+        "roomPrefix": "stream-incident"
+    })
+    if res is not None and isinstance(res, dict) and ("incident_id" in res or "id" in res):
         return res
     return await grafana_client.create_incident(title, severity, summary)
 
