@@ -11,6 +11,9 @@ __pycache__/
 venv/
 ENV/
 
+# Binaries
+backend/bin/
+
 # Node / Frontend
 node_modules/
 dist/
