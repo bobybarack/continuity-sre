@@ -1,0 +1,26 @@
+.gcloudignore
+.git
+.gitignore
+
+# Python Virtualenv & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+.pytest_cache/
+
+# Binaries (Dockerfile copies mcp-grafana directly from official image)
+backend/bin/
+
+# Heavy video production and gallery media (not needed in API container)
+video-production/
+devpost-gallery/
+videos/
+
+# Node / Frontend build artifacts
+node_modules/
+dist/
+.next/
+out/
