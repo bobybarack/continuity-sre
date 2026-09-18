@@ -1,5 +1,6 @@
 # Multi-stage production container for Continuity (FastAPI + Gemini + Grafana Cloud MCP)
-FROM python:3.11-slim as production
+FROM grafana/mcp-grafana:latest AS grafana-mcp
+FROM python:3.11-slim AS production
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -13,6 +14,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# Copy official Grafana MCP binary from Grafana Labs official image
+COPY --from=grafana-mcp /app/mcp-grafana /usr/local/bin/mcp-grafana
+RUN chmod +x /usr/local/bin/mcp-grafana || true
 
 # Install Python requirements
 COPY backend/requirements.txt /app/backend/requirements.txt

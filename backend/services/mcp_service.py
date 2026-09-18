@@ -28,6 +28,7 @@ class OfficialGrafanaMCPBridge:
     def get_binary_path(self) -> Optional[str]:
         candidates = [
             Path(__file__).resolve().parent.parent / "bin" / "mcp-grafana",
+            Path("/usr/local/bin/mcp-grafana"),
             Path("/tmp/mcp-grafana"),
             Path("/opt/homebrew/bin/mcp-grafana"),
         ]

@@ -7,7 +7,7 @@ set -euo pipefail
 
 PROJECT_ID="premiereshield-cinema"
 REGION="us-central1"
-SERVICE_NAME="continuity"
+SERVICE_NAME="continuity-api"
 IMAGE_TAG="gcr.io/${PROJECT_ID}/${SERVICE_NAME}:latest"
 
 echo "=== Step 1: Validating Environment Configuration ==="
