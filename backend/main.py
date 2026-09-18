@@ -42,6 +42,7 @@ async def root_info():
         "status": "OPERATIONAL",
         "endpoints": {
             "agent_status": "/api/agent/status",
+            "agent_mcp_tools": "/api/agent/mcp-tools",
             "agent_investigate_and_remediate": "/api/agent/investigate-and-remediate",
             "agent_history": "/api/agent/history",
             "telemetry_current": "/api/telemetry/current",
