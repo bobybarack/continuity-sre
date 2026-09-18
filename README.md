@@ -15,11 +15,11 @@ During major blockbuster film releases on premium streaming platforms (e.g., Dis
 
 Traditional observability tools (Conviva, Mux Data, Datadog) are **purely passive**: they generate noisy alert storms that human SRE engineers take 30–45 minutes to triage and remediate.
 
-**CONTINUITY** is an autonomous AI SRE Incident Commander powered by **Gemini Enterprise** and the official **Grafana Cloud Model Context Protocol (MCP) Server**. It bridges the gap between telemetry and automated action:
-1. Continuously queries streaming telemetry across 60+ Grafana MCP tools.
-2. Identifies anomalous drops in video bitrates and spikes in VPF via PromQL.
-3. Performs root-cause log isolation in Loki across distributed edge CDN nodes.
-4. Auto-annotates live Grafana dashboards and creates structured IRM incidents.
+**CONTINUITY** is an autonomous AI SRE Incident Commander powered by **Gemini Enterprise** and the official **Grafana Cloud Model Context Protocol (MCP) Server** (`grafana/mcp-grafana`). It bridges the gap between telemetry and automated action:
+1. Dynamically discovers 80+ tools from the official `grafana/mcp-grafana` server runtime over stdio JSON-RPC.
+2. Identifies anomalous drops in video bitrates and spikes in VPF via PromQL using official `query_prometheus`.
+3. Performs root-cause log isolation in Loki across distributed edge CDN nodes using official `query_loki_logs`.
+4. Auto-annotates live Grafana dashboards (`create_annotation`) and creates structured IRM incidents (`create_incident`).
 5. Autonomously triggers edge traffic shift webhooks to healthy CDN providers via Cloud Run.
 6. Shrinks Mean Time to Resolution (MTTR) from **42 minutes to under 5 seconds**, saving millions in potential subscriber churn.
 
@@ -34,9 +34,9 @@ Traditional observability tools (Conviva, Mux Data, Datadog) are **purely passiv
 | Capability          | Legacy Tools (Conviva/Mux)  | Standard SRE (Datadog/PagerDuty)   | CONTINUITY (AI)       |
 +---------------------+-----------------------------+------------------------------------+----------------------+
 | Data Ingestion      | Client SDK Player telemetry | Server/Infra metrics               | Unified Grafana Stack|
-| Telemetry Access    | Proprietary Dashboards      | Isolated metric graphs             | 60+ Grafana MCP Tools|
-| Root-Cause Analysis | Manual human correlation    | Static alert rule triggers         | Gemini 3.1 Pro Multi-|
-|                     | across multiple tabs        |                                    | Step Log & Metric RAG|
+| Telemetry Access    | Proprietary Dashboards      | Isolated metric graphs             | 80+ Grafana MCP Tools|
+| Root-Cause Analysis | Manual human correlation    | Static alert rule triggers         | Gemini Multi-Step    |
+|                     | across multiple tabs        |                                    | Log & Metric RAG     |
 | Remediation         | ❌ None (Human manual fix)   | ❌ None (Page on-call engineer)    | ⚡ Autonomous Edge   |
 |                     | (30-60 min latency)         | (15-45 min latency)                | Failover (<5 seconds)|
 | Executive Reporting | Manual post-mortem writing  | Static post-incident template      | Instant synthesized  |
@@ -64,20 +64,20 @@ Traditional observability tools (Conviva, Mux Data, Datadog) are **purely passiv
 |  |  • Grafana Live Dashboard with Real-Time Incident Annotations                              |  |
 |  +---------------------------------------------------------------------------------------------+  |
 |                                 |                                                                 |
-|                                 v (MCP Protocol over SSE/HTTP: 60+ Tools)                         |
+|                                 v (Official Model Context Protocol over stdio: 80+ Tools)         |
 |  +---------------------------------------------------------------------------------------------+  |
 |  |                      GEMINI ENTERPRISE AUTONOMOUS SRE INCIDENT COMMANDER                    |  |
-|  |                        (Powered by Google ADK / Gemini 3.1 Pro)                             |  |
+|  |                        (Powered by Google GenAI SDK / Gemini 3.6 & 3.7 Flash)               |  |
 |  |                                                                                             |  |
-|  |  Step 1: Polls / Receives Alert -> Calls `grafana_query_metrics` (PromQL)                   |  |
-|  |  Step 2: Deep Dives into Loki -> Calls `grafana_search_logs` (Finds saturated transit ISP) |  |
-|  |  Step 3: Documents Incident  -> Calls `grafana_create_annotation` & `grafana_create_incident`|
-|  |  Step 4: Autonomous Healing   -> Calls Cloud Run Edge API to shift traffic to Akamai CDN    |  |
-|  |  Step 5: Synthesizes Post-Mortem -> Generates executive root-cause PDF summary             |  |
+|  |  Step 1: Metric Ingestion   -> Calls `query_prometheus` (Detects VPF surge)                |  |
+|  |  Step 2: Root Cause Log RAG -> Calls `query_loki_logs` (Isolates ASN transit drop)          |  |
+|  |  Step 3: Documents Incident  -> Calls `create_annotation` & `create_incident`               |  |
+|  |  Step 4: Autonomous Healing   -> Calls `continuity_execute_remediation` (Multi-CDN Shift)  |  |
+|  |  Step 5: Closed-Loop Gate   -> Calls `continuity_verify_closed_loop_recovery`              |  |
 |  +---------------------------------------------------------------------------------------------+  |
 |                                 |                                                                 |
 |                                 v (Immediate Stream Recovery)                                     |
-|  [CONTINUITY COMMAND CENTER WEB APP (Hosted on Cloudflare / Cloud Run)]                             |
+|  [CONTINUITY COMMAND CENTER WEB APP (Hosted on Cloudflare / Cloud Run)]                           |
 |                                                                                                   |
 +---------------------------------------------------------------------------------------------------+
 ```
@@ -86,18 +86,18 @@ Traditional observability tools (Conviva, Mux Data, Datadog) are **purely passiv
 
 ## 4. Grafana Cloud MCP Tool Bindings & Telemetry Schema
 
-CONTINUITY directly binds to Grafana's official MCP tool suite:
+CONTINUITY integrates directly with the official `grafana/mcp-grafana` runtime server:
 
-1. `grafana_query_metrics(promql)`:
+1. `query_prometheus`:
    * Queries real-time Video Playback Failures: `rate(ott_video_playback_failures_total[1m])`
    * Queries CDN edge latency percentiles: `histogram_quantile(0.99, sum(rate(ott_cdn_request_duration_seconds_bucket[1m])) by (le))`
    * Queries DRM token timeouts: `rate(ott_drm_handshake_errors_total[1m])`
-2. `grafana_search_logs(query, limit)`:
-   * Isolates edge server error streams: `{service="ott-edge-cdn", region="us-east-2"} |= "502 Bad Gateway"`
-3. `grafana_create_annotation(text, tags)`:
+2. `query_loki_logs`:
+   * Isolates edge server error streams: `{service="ott-edge-router"} |= "502 Bad Gateway"`
+3. `create_annotation`:
    * Drops a visual annotation timestamp on live Grafana dashboards indicating agent diagnosis and failover execution.
-4. `grafana_create_incident(title, severity, summary)`:
-   * Programmatically opens a P1 incident in Grafana Cloud IRM.
+4. `create_incident`:
+   * Programmatically opens a structured P1 incident in Grafana Cloud IRM.
 
 ---
 
