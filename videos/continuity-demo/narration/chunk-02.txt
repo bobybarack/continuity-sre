@@ -1,5 +1,0 @@
-Now we inject a simulated collapse on the primary Fastly edge in US East. The failure rate crosses the SLA. Latency spikes. Loki surfaces repeated five-oh-two responses and sixty-eight percent packet loss. The stream begins to stall.
-
-CONTINUITY invokes Gemini Enterprise with the metric vector, the active chaos state, and the latest edge log. The reasoning chain isolates an edge transit failure affecting the Fastly point of presence and transit ASN three three five six, then selects the exact remediation action.
-
-No ticket handoff. No human approval queue. CONTINUITY executes shift traffic to Akamai. Primary egress drops to twenty percent. Secondary egress scales to eighty. Playback returns, and the incident record preserves the full reasoning trace.

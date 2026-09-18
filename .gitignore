@@ -20,3 +20,26 @@ out/
 # OS Specific
 .DS_Store
 Thumbs.db
+
+# Internal AI agent tooling (skills, hyperframes, prompt configs)
+.agents/
+
+# Video production pipeline (HyperFrames, capture states, render pipeline)
+videos/
+
+# Internal build & utility scripts (gallery builder, screen capture, audio gen,
+# arch diagram renderer, live demo recorder, credential inspector, etc.)
+backend/scripts/
+
+# Devpost submission draft and internal demo script
+docs/DEVPOST_SUBMISSION.md
+docs/DEMO_SCRIPT.md
+
+# Raw exported arch diagram (published via Devpost, not judge-source-of-truth)
+devpost_arch_diagram_*.jpg
+devpost_arch_diagram_*.png
+
+# Internal AI instruction files inside frontend subtree
+frontend/CLAUDE.md
+frontend/AGENTS.md
+frontend/current_app_preview.png
