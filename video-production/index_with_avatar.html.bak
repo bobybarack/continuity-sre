@@ -1,0 +1,864 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>CONTINUITY: Autonomous Stream Incident Commander</title>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: #06090e;
+      color: #f8fafc;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+      width: 1920px;
+      height: 1080px;
+      user-select: none;
+    }
+
+    #root {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: radial-gradient(circle at 15% 20%, rgba(14, 165, 233, 0.08) 0%, transparent 40%),
+                  radial-gradient(circle at 85% 80%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+                  #06090e;
+    }
+
+    /* Ambient animated grid overlay */
+    .cyber-grid {
+      position: absolute;
+      inset: 0;
+      background-image: linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Top Broadcast Header */
+    .broadcast-header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 74px;
+      background: rgba(10, 15, 24, 0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 40px;
+      z-index: 50;
+    }
+
+    .brand-cluster {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand-shield {
+      width: 42px;
+      height: 42px;
+      background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(14, 165, 233, 0.5);
+    }
+
+    .brand-shield svg {
+      width: 24px;
+      height: 24px;
+      fill: #ffffff;
+    }
+
+    .brand-title {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(180deg, #ffffff 0%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-subtitle {
+      font-size: 13px;
+      font-weight: 600;
+      color: #38bdf8;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.5px;
+    }
+
+    .target-stream-pill {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 999px;
+      padding: 8px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 10px #22c55e;
+    }
+
+    .header-badges {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .status-badge {
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-badge.normal {
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid rgba(34, 197, 94, 0.4);
+      color: #4ade80;
+    }
+
+    .status-badge.critical {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #f87171;
+    }
+
+    .status-badge.recovered {
+      background: rgba(14, 165, 233, 0.15);
+      border: 1px solid rgba(14, 165, 233, 0.4);
+      color: #38bdf8;
+    }
+
+    .model-badge {
+      background: rgba(168, 85, 247, 0.15);
+      border: 1px solid rgba(168, 85, 247, 0.4);
+      color: #c084fc;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Main Viewport Grid */
+    .viewport-container {
+      position: absolute;
+      top: 90px;
+      left: 36px;
+      width: 1330px;
+      height: 730px;
+      background: #090d16;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8);
+      overflow: hidden;
+      z-index: 10;
+    }
+
+    .screen-video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0;
+    }
+
+    /* Presenter Avatar Dock */
+    .presenter-dock {
+      position: absolute;
+      top: 90px;
+      right: 36px;
+      width: 500px;
+      height: 730px;
+      background: rgba(12, 18, 30, 0.9);
+      backdrop-filter: blur(24px);
+      border-radius: 24px;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9), 0 0 30px rgba(14, 165, 233, 0.15);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      z-index: 30;
+    }
+
+    .avatar-video-wrapper {
+      position: relative;
+      width: 100%;
+      height: 570px;
+      overflow: hidden;
+      background: #000;
+    }
+
+    .avatar-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center 15%;
+    }
+
+    .avatar-reflection {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 90px;
+      background: linear-gradient(to top, rgba(12, 18, 30, 1) 0%, transparent 100%);
+      pointer-events: none;
+    }
+
+    .presenter-meta {
+      padding: 16px 24px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      background: rgba(15, 23, 42, 0.8);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .presenter-tag {
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      color: #38bdf8;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .presenter-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+
+    .presenter-sub {
+      font-size: 12px;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .engine-chip {
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: #7dd3fc;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+    }
+
+    /* Motion Graphic Callout Cards */
+    .callout-overlay {
+      position: absolute;
+      top: 40px;
+      left: 40px;
+      max-width: 580px;
+      background: rgba(10, 15, 28, 0.92);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
+      z-index: 20;
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+
+    .callout-tag {
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      color: #38bdf8;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .callout-heading {
+      font-size: 24px;
+      font-weight: 800;
+      color: #ffffff;
+      line-height: 1.25;
+      margin-bottom: 8px;
+    }
+
+    .callout-desc {
+      font-size: 14px;
+      color: #94a3b8;
+      line-height: 1.5;
+    }
+
+    .callout-metrics-row {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .callout-metric-cell {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+
+    .callout-metric-label {
+      font-size: 11px;
+      color: #64748b;
+      font-family: 'JetBrains Mono', monospace;
+      margin-bottom: 4px;
+    }
+
+    .callout-metric-val {
+      font-size: 18px;
+      font-weight: 700;
+      color: #ffffff;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .metric-red {
+      color: #f87171 !important;
+    }
+
+    .metric-green {
+      color: #4ade80 !important;
+    }
+
+    .metric-cyan {
+      color: #38bdf8 !important;
+    }
+
+    /* Lower Thirds HUD & Subtitles */
+    .lower-third-dock {
+      position: absolute;
+      bottom: 24px;
+      left: 36px;
+      right: 36px;
+      height: 180px;
+      display: grid;
+      grid-template-columns: 460px 1fr 400px;
+      gap: 24px;
+      z-index: 40;
+    }
+
+    .hud-card {
+      background: rgba(12, 18, 30, 0.9);
+      backdrop-filter: blur(20px);
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 18px 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+    }
+
+    .hud-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 700;
+      color: #64748b;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.5px;
+    }
+
+    .hud-stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 8px;
+    }
+
+    .hud-stat-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .hud-stat-num {
+      font-size: 26px;
+      font-weight: 800;
+      font-family: 'JetBrains Mono', monospace;
+      color: #ffffff;
+    }
+
+    .hud-stat-desc {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+
+    /* Subtitle Card (Center) */
+    .subtitle-card {
+      background: rgba(10, 15, 26, 0.92);
+      backdrop-filter: blur(20px);
+      border-radius: 18px;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      padding: 20px 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+    }
+
+    .subtitle-speaker-label {
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      color: #38bdf8;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .subtitle-text {
+      font-size: 19px;
+      font-weight: 600;
+      line-height: 1.45;
+      color: #f1f5f9;
+      min-height: 56px;
+    }
+
+    .subtitle-text .highlight {
+      color: #38bdf8;
+      font-weight: 700;
+    }
+
+    .subtitle-progress-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #0ea5e9, #6366f1);
+      width: 0%;
+    }
+
+    /* SRE Terminal Stream Card (Right) */
+    .terminal-card {
+      background: rgba(6, 10, 18, 0.95);
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 16px 20px;
+      font-family: 'JetBrains Mono', monospace;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .terminal-title {
+      font-size: 11px;
+      color: #64748b;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .terminal-line {
+      font-size: 11px;
+      line-height: 1.4;
+      color: #94a3b8;
+      margin-top: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .terminal-line.success {
+      color: #4ade80;
+    }
+
+    .terminal-line.alert {
+      color: #f87171;
+    }
+
+    .terminal-line.action {
+      color: #38bdf8;
+    }
+  </style>
+</head>
+<body>
+  <div
+    id="root"
+    data-composition-id="continuity_demo"
+    data-start="0"
+    data-width="1920"
+    data-height="1080"
+    data-duration="111"
+  >
+    <div class="cyber-grid"></div>
+
+    <!-- Audio Tracks -->
+    <audio id="audio-voice" src="audio/narration_master.mp3" data-start="0" data-duration="111" data-volume="1.0"></audio>
+    <audio id="audio-ambient" src="audio/ambient_bed.mp3" data-start="0" data-duration="111" data-volume="0.12"></audio>
+
+    <!-- Top Broadcast Header -->
+    <header class="broadcast-header">
+      <div class="brand-cluster">
+        <div class="brand-shield">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">CONTINUITY</div>
+          <div class="brand-subtitle">AUTONOMOUS STREAM INCIDENT COMMANDER</div>
+        </div>
+      </div>
+
+      <div class="target-stream-pill">
+        <span class="live-dot"></span>
+        <span>Spider-Man: Brand New Day (World Premiere 4K)</span>
+      </div>
+
+      <div class="header-badges">
+        <div id="header-status-badge" class="status-badge normal">
+          <span id="header-status-dot" class="live-dot"></span>
+          <span id="header-status-text">SLA OPERATIONAL (99.98%)</span>
+        </div>
+        <div class="model-badge">GOOGLE CLOUD GEMINI 3.7 FLASH</div>
+      </div>
+    </header>
+
+    <!-- Main Viewport (Screen Recordings) -->
+    <main class="viewport-container">
+      <!-- Clip 1: Baseline 4K Playback (0s - 31s) -->
+      <video
+        id="video-baseline"
+        class="screen-video"
+        data-start="0"
+        data-duration="31"
+        src="assets/screen_baseline.mp4"
+        muted
+        playsinline
+      ></video>
+
+      <!-- Clip 2: Chaos Outage Injection (31s - 73s) -->
+      <video
+        id="video-outage"
+        class="screen-video"
+        data-start="31"
+        data-duration="42"
+        src="assets/screen_outage.mp4"
+        muted
+        playsinline
+      ></video>
+
+      <!-- Clip 3: Autonomous Remediation & Recovery (73s - 111s) -->
+      <video
+        id="video-recovery"
+        class="screen-video"
+        data-start="73"
+        data-duration="38"
+        src="assets/screen_recovery.mp4"
+        muted
+        playsinline
+      ></video>
+
+      <!-- Callout Card 1: Outage Breach Alert (appears at 33s) -->
+      <div id="callout-breach" class="callout-overlay">
+        <div class="callout-tag">
+          <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#ef4444;"></span>
+          TELEMETRY ANOMALY DETECTED
+        </div>
+        <div class="callout-heading">Edge POP Transit Failure (502 Outage)</div>
+        <div class="callout-desc">
+          Primary Fastly Edge in US-East reports upstream transit drop. 4.28M viewers experience immediate playback buffer stall.
+        </div>
+        <div class="callout-metrics-row">
+          <div class="callout-metric-cell">
+            <div class="callout-metric-label">PLAYBACK FAILURES (VPF)</div>
+            <div class="callout-metric-val metric-red">5.16% (SLA BREACH)</div>
+          </div>
+          <div class="callout-metric-cell">
+            <div class="callout-metric-label">FORWARD BUFFER</div>
+            <div class="callout-metric-val metric-red">3.2 SEC (CRITICAL)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Callout Card 2: Gemini Reasoning & RCA (appears at 52s) -->
+      <div id="callout-gemini" class="callout-overlay">
+        <div class="callout-tag">
+          <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#a855f7;"></span>
+          GEMINI 3.7 FLASH REASONING ENGINE
+        </div>
+        <div class="callout-heading">Root Cause: ASN 3356 Transit Drop</div>
+        <div class="callout-desc">
+          Analyzed OpenMetrics time series and Loki error logs in 1.28 seconds. Initiating multi-CDN traffic shift.
+        </div>
+        <div class="callout-metrics-row">
+          <div class="callout-metric-cell">
+            <div class="callout-metric-label">MEAN TIME TO RESOLUTION</div>
+            <div class="callout-metric-val metric-cyan">1.28s MTTR</div>
+          </div>
+          <div class="callout-metric-cell">
+            <div class="callout-metric-label">FAILOVER TARGET</div>
+            <div class="callout-metric-val metric-green">Akamai Cloud (80%)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Callout Card 3: Agentic Production Stack (appears at 80s) -->
+      <div id="callout-pipeline" class="callout-overlay">
+        <div class="callout-tag">
+          <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#0ea5e9;"></span>
+          SELF-PRODUCING MEDIA PIPELINE
+        </div>
+        <div class="callout-heading">Fully Automated by Antigravity</div>
+        <div class="callout-desc">
+          Scripted, voiced, and rendered deterministically using ElevenLabs neural voice cloning, HeyGen Avatar v5, and HyperFrames.
+        </div>
+        <div class="callout-metrics-row">
+          <div class="callout-metric-cell">
+            <div class="callout-metric-label">VOICE CHUNKING</div>
+            <div class="callout-metric-val metric-cyan">&lt; 60s Zero Drift</div>
+          </div>
+          <div class="callout-metric-cell">
+            <div class="callout-metric-label">COMPOSITION ENGINE</div>
+            <div class="callout-metric-val metric-green">HyperFrames 60FPS</div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Presenter Dock (HeyGen Avatar) -->
+    <aside class="presenter-dock">
+      <div class="avatar-video-wrapper">
+        <video
+          id="video-avatar"
+          class="avatar-video"
+          data-start="0"
+          data-duration="111"
+          src="assets/avatar_dock_continuous.mp4"
+          muted
+          playsinline
+        ></video>
+        <div class="avatar-reflection"></div>
+      </div>
+      <div class="presenter-meta">
+        <div class="presenter-tag">AUTONOMOUS SRE PRESENTER</div>
+        <div class="presenter-title">Digital Twin Avatar</div>
+        <div class="presenter-sub">
+          <span>ElevenLabs Neural Voice</span>
+          <span>•</span>
+          <span class="engine-chip">HeyGen Avatar</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Lower Thirds Dock -->
+    <footer class="lower-third-dock">
+      <!-- Live Metrics HUD -->
+      <div class="hud-card">
+        <div class="hud-header">
+          <span>REAL-TIME STREAM QOS HUD</span>
+          <span id="hud-status-indicator" style="color:#4ade80;">HEALTHY</span>
+        </div>
+        <div class="hud-stat-grid">
+          <div class="hud-stat-item">
+            <div id="hud-vpf-val" class="hud-stat-num" style="color:#4ade80;">0.20%</div>
+            <div class="hud-stat-desc">Playback Failure Rate (VPF)</div>
+          </div>
+          <div class="hud-stat-item">
+            <div id="hud-buffer-val" class="hud-stat-num" style="color:#ffffff;">28.5s</div>
+            <div class="hud-stat-desc">Forward Buffer Health</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Subtitles & Narration HUD -->
+      <div class="subtitle-card">
+        <div class="subtitle-speaker-label">INCIDENT COMMANDER VOICE TRACK</div>
+        <div id="caption-box" class="subtitle-text">
+          Loading broadcast stream...
+        </div>
+        <div id="caption-progress" class="subtitle-progress-bar"></div>
+      </div>
+
+      <!-- Terminal Log Stream -->
+      <div class="terminal-card">
+        <div class="terminal-title">
+          <span style="width:6px; height:6px; border-radius:50%; background:#0ea5e9;"></span>
+          AGENT REASONING STREAM
+        </div>
+        <div id="term-line-1" class="terminal-line">[14:04:15] OpenMetrics QoS Ingest: 100% OK</div>
+        <div id="term-line-2" class="terminal-line">[14:04:16] Stream Spider-Man 4K @ 14.5 Mbps</div>
+        <div id="term-line-3" class="terminal-line success">[14:04:17] Egress routed to Fastly Edge POP</div>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    // Register exactly one paused GSAP timeline for HyperFrames
+    const tl = gsap.timeline({ paused: true });
+
+    // Video clip opacity switches
+    tl.set("#video-baseline", { opacity: 1 }, 0);
+    tl.set("#video-baseline", { opacity: 0 }, 31);
+    tl.set("#video-outage", { opacity: 1 }, 31);
+    tl.set("#video-outage", { opacity: 0 }, 73);
+    tl.set("#video-recovery", { opacity: 1 }, 73);
+
+    // Callout 1: Outage Breach (31s to 50s)
+    tl.fromTo("#callout-breach", { opacity: 0, y: -20 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 33);
+    tl.to("#callout-breach", { opacity: 0, y: -10, duration: 0.4 }, 50);
+
+    // Callout 2: Gemini Reasoning (52s to 72s)
+    tl.fromTo("#callout-gemini", { opacity: 0, y: -20 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 52);
+    tl.to("#callout-gemini", { opacity: 0, y: -10, duration: 0.4 }, 72);
+
+    // Callout 3: Agentic Pipeline Stack (75s to 105s)
+    tl.fromTo("#callout-pipeline", { opacity: 0, y: -20 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 75);
+    tl.to("#callout-pipeline", { opacity: 0, y: -10, duration: 0.4 }, 105);
+
+    // Subtitle track timing
+    const subtitles = [
+      { start: 0, end: 7, text: "After months of nonstop engineering work, Friday night was the one release I had blocked off all summer: the midnight premiere of <span class='highlight'>Spider-Man: Brand New Day</span>." },
+      { start: 7, end: 15, text: "But five minutes in, four million viewers hit a frozen screen: <span class='highlight'>Error 502</span>." },
+      { start: 15, end: 22.5, text: "For 40 agonizing minutes, human SREs scrambled across dozens of dashboard tabs trying to isolate the failure." },
+      { start: 22.5, end: 27, text: "In Hollywood, continuity is the sacred craft of making sure no flaw breaks the cinematic illusion. In streaming, <span class='highlight'>continuity is zero downtime</span>." },
+      { start: 27, end: 31, text: "That is why I built <span class='highlight'>CONTINUITY</span>: an autonomous incident commander powered by Google Cloud Gemini 3.7 Flash." },
+      { start: 31, end: 41, text: "When an edge transit link collapses on our primary Fastly POP, Prometheus telemetry immediately catches the breach: video playback failures surge past <span class='highlight'>5%</span>, and player buffers collapse to under three seconds." },
+      { start: 41, end: 51, text: "<span class='highlight'>CONTINUITY</span> activates instantly. Ingesting live Prometheus metric streams and Loki edge logs, the Google Cloud Gemini 3.7 Flash reasoning engine diagnoses the root cause in just <span class='highlight'>1.28 seconds</span>: an upstream transit peering drop on ASN 3356." },
+      { start: 51, end: 63, text: "Without waiting for a human on-call engineer, the agent autonomously executes a traffic failover, rerouting <span class='highlight'>80% of egress to our secondary Akamai edge</span> and logging the incident signature for Grafana Cloud telemetry." },
+      { start: 63, end: 72.5, text: "<span class='highlight'>Mean Time to Resolution: 1.28 seconds</span>. Millions in subscriber churn prevented." },
+      { start: 72.5, end: 81, text: "Now, here is the secret behind what you are watching right now: this entire demo video was <span class='highlight'>autonomously scripted, voiced, and edited by our AI agent, Antigravity</span>." },
+      { start: 81, end: 91, text: "To guarantee broadcast audio fidelity, Antigravity synthesized my cloned voice using ElevenLabs, splitting the teleprompter into <span class='highlight'>precise sixty-second chunks</span> to completely eliminate acoustic drift and model fatigue." },
+      { start: 91, end: 103, text: "The voice stems were coupled with my digital twin avatar via HeyGen, and the entire production was assembled using <span class='highlight'>HyperFrames</span>, HeyGen's open-source HTML-to-video framework, rendering seekable GSAP motion graphics, telemetry cards, and multi-track audio at 60 frames per second." },
+      { start: 103, end: 111, text: "Self-healing infrastructure. Self-producing media. <span class='highlight'>This is CONTINUITY</span>." }
+    ];
+
+    const captionBox = document.getElementById("caption-box");
+    const headerBadge = document.getElementById("header-status-badge");
+    const headerText = document.getElementById("header-status-text");
+    const hudVpf = document.getElementById("hud-vpf-val");
+    const hudBuffer = document.getElementById("hud-buffer-val");
+    const hudStatus = document.getElementById("hud-status-indicator");
+    const termLine1 = document.getElementById("term-line-1");
+    const termLine2 = document.getElementById("term-line-2");
+    const termLine3 = document.getElementById("term-line-3");
+    const captionProgress = document.getElementById("caption-progress");
+
+    // Unified state engine that runs on every tick and seek
+    function updateState(t) {
+      // 1. Update Subtitles
+      const currentSub = subtitles.find(s => t >= s.start && t < s.end);
+      if (currentSub) {
+        captionBox.innerHTML = currentSub.text;
+      } else if (t >= 110) {
+        captionBox.innerHTML = "Self-healing infrastructure. Self-producing media. <span class='highlight'>This is CONTINUITY</span>.";
+      }
+      
+      // Progress bar
+      captionProgress.style.width = Math.min(100, (t / 111) * 100) + "%";
+
+      // 2. State Machine: Normal (0-31s), Outage (31-73s), Recovered (73-111s)
+      if (t < 31) {
+        headerBadge.className = "status-badge normal";
+        headerText.innerText = "SLA OPERATIONAL (99.98%)";
+        hudVpf.innerText = "0.20%";
+        hudVpf.style.color = "#4ade80";
+        hudBuffer.innerText = "28.5s";
+        hudBuffer.style.color = "#ffffff";
+        hudStatus.innerText = "HEALTHY";
+        hudStatus.style.color = "#4ade80";
+        termLine1.innerText = "[14:04:15] OpenMetrics QoS Ingest: 100% OK";
+        termLine1.className = "terminal-line";
+        termLine2.innerText = "[14:04:16] Stream Spider-Man 4K @ 14.5 Mbps";
+        termLine2.className = "terminal-line";
+        termLine3.innerText = "[14:04:17] Egress routed to Fastly Edge POP";
+        termLine3.className = "terminal-line success";
+      } else if (t >= 31 && t < 73) {
+        headerBadge.className = "status-badge critical";
+        headerText.innerText = "CRITICAL EDGE OUTAGE";
+        hudVpf.innerText = "5.16%";
+        hudVpf.style.color = "#f87171";
+        hudBuffer.innerText = "3.2s";
+        hudBuffer.style.color = "#f87171";
+        hudStatus.innerText = "CRITICAL BREACH";
+        hudStatus.style.color = "#f87171";
+        termLine1.innerText = "[14:04:17] 502 BAD GATEWAY Upstream failure";
+        termLine1.className = "terminal-line alert";
+        termLine2.innerText = "[14:04:17] VPF surged to 5.16% (SLA breach)";
+        termLine2.className = "terminal-line alert";
+        termLine3.innerText = "[14:04:18] Gemini 3.7 Flash triage: ASN 3356 drop";
+        termLine3.className = "terminal-line action";
+      } else {
+        headerBadge.className = "status-badge recovered";
+        headerText.innerText = "FAILOVER RESTORED (AKAMAI 80%)";
+        hudVpf.innerText = "0.20%";
+        hudVpf.style.color = "#38bdf8";
+        hudBuffer.innerText = "27.8s";
+        hudBuffer.style.color = "#4ade80";
+        hudStatus.innerText = "FAILOVER RESTORED";
+        hudStatus.style.color = "#38bdf8";
+        termLine1.innerText = "[14:04:19] Gemini: Root Cause ASN 3356 drop";
+        termLine1.className = "terminal-line action";
+        termLine2.innerText = "[14:04:19] Failover: 80% traffic -> Akamai Edge";
+        termLine2.className = "terminal-line action";
+        termLine3.innerText = "[14:04:20] MTTR: 1.28s. Zero buffer stalls.";
+        termLine3.className = "terminal-line success";
+      }
+    }
+
+    tl.eventCallback("onUpdate", () => {
+      updateState(tl.time());
+    });
+
+    // Dummy tween across total duration so timeline has continuous length
+    tl.to({}, { duration: 111 }, 0);
+
+    // Initial state
+    updateState(0);
+
+    // Expose updateState for external seeks
+    window.__updateState = updateState;
+
+    // Register with HyperFrames runtime
+    window.__timelines = window.__timelines || {};
+    window.__timelines["continuity_demo"] = tl;
+  </script>
+</body>
+</html>

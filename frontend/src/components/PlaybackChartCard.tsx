@@ -122,7 +122,7 @@ export function PlaybackChartCard({
     <div className="bg-white border border-gray-200/80 rounded-2xl p-5 subtle-card-shadow flex flex-col justify-between h-full">
       <div>
         {/* Chart Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 pb-3 border-b border-gray-100">
           <div>
             <h3 className="text-sm font-bold text-gray-900 tracking-tight">
               Playback Quality & Failure Rate
@@ -132,21 +132,21 @@ export function PlaybackChartCard({
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 ml-auto">
             <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl text-xs font-semibold">
               <button
                 onClick={() => setActiveMetric("vpf")}
-                className={`px-3 py-1 rounded-lg transition-all ${
+                className={`px-2.5 py-1 rounded-lg transition-all text-[11px] ${
                   activeMetric === "vpf"
                     ? "bg-white text-gray-900 shadow-sm"
                     : "text-gray-500 hover:text-gray-900"
                 }`}
               >
-                VPF Rate (%)
+                VPF (%)
               </button>
               <button
                 onClick={() => setActiveMetric("latency")}
-                className={`px-3 py-1 rounded-lg transition-all ${
+                className={`px-2.5 py-1 rounded-lg transition-all text-[11px] ${
                   activeMetric === "latency"
                     ? "bg-white text-gray-900 shadow-sm"
                     : "text-gray-500 hover:text-gray-900"
@@ -156,12 +156,12 @@ export function PlaybackChartCard({
               </button>
             </div>
 
-            <div className="text-right">
-              <span className="text-xs text-gray-400 block font-medium">
+            <div className="text-right pl-1">
+              <span className="text-[10px] text-gray-400 block font-medium leading-none">
                 Current
               </span>
               <span
-                className={`text-sm font-bold ${
+                className={`text-sm font-bold leading-tight ${
                   isOutage ? "text-red-600" : "text-emerald-700"
                 }`}
               >
@@ -174,14 +174,14 @@ export function PlaybackChartCard({
         </div>
 
         {/* Chart Canvas */}
-        <div className="relative mt-4">
+        <div className="relative mt-3">
           <canvas
             ref={canvasRef}
             width={620}
-            height={200}
-            className="w-full h-48 block"
+            height={180}
+            className="w-full h-36 sm:h-40 block"
           />
-          <div className="flex items-center justify-between text-[11px] text-gray-400 font-medium px-8 mt-1">
+          <div className="flex items-center justify-between text-[11px] text-gray-400 font-medium px-4 sm:px-8 mt-1">
             <span>60s ago</span>
             <span>45s</span>
             <span>30s</span>

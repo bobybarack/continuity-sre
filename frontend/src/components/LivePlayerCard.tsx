@@ -128,7 +128,7 @@ export function LivePlayerCard({ telemetry }: LivePlayerCardProps) {
         </div>
 
         {/* Video Container */}
-        <div className="relative aspect-video w-full rounded-xl overflow-hidden mt-3 bg-black">
+        <div className="relative aspect-video max-h-[360px] w-full rounded-xl overflow-hidden mt-3 bg-black">
           {!hasVideoError ? (
             <video
               ref={videoRef}

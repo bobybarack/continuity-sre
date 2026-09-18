@@ -2,12 +2,13 @@
 
 import React from "react";
 import {
-  Shield01Icon,
   Notification01Icon,
   CheckmarkCircle01Icon,
   Alert01Icon,
   Clock01Icon,
+  CpuIcon,
 } from "hugeicons-react";
+import { ContinuityLogo } from "./ContinuityLogo";
 import { TelemetrySnapshot } from "../types/telemetry";
 
 interface TopBarProps {
@@ -28,8 +29,8 @@ export function TopBar({
     <header className="bg-white border border-gray-200/80 rounded-2xl px-5 py-3.5 subtle-card-shadow flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
       {/* Brand & Stream Selector */}
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
-          <Shield01Icon className="w-5 h-5 text-emerald-600" />
+        <div className="w-8 h-8 flex items-center justify-center">
+          <ContinuityLogo className="w-8 h-8" />
         </div>
 
         <div>
@@ -72,6 +73,12 @@ export function TopBar({
               ? "Failover Restored"
               : "SLA Operational (99.98%)"}
           </span>
+        </div>
+
+        {/* Gemini Engine Badge */}
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+          <CpuIcon className="w-3.5 h-3.5 text-purple-600" />
+          <span>Google Cloud Gemini 3.7 Flash</span>
         </div>
 
         {/* Live Incident Notification Bell Button */}

@@ -1,0 +1,7 @@
+Premiere night. Four point two eight million viewers press play. Then a transit peer collapses. Screens freeze, buffers empty, and every second becomes visible.
+
+A five-oh-two storm does not wait for a war room. Playback failures jump beyond five percent. Edge latency passes four hundred milliseconds. Forward buffer drops toward three seconds. Viewers do what dashboards cannot stop: they leave.
+
+This is CONTINUITY: an autonomous stream continuity incident commander. It turns live evidence into a closed remediation loop, while keeping operators inside one command surface.
+
+At baseline, CONTINUITY watches player quality once per second: playback failures, CDN latency, DRM handshake time, active viewers, bitrate, and buffer health. Grafana Cloud Prometheus carries the signals. Loki carries the edge story.

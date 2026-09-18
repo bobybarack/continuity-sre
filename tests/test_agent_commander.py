@@ -47,6 +47,17 @@ async def test_agent_autonomous_outage_remediation_live():
     assert "churn" in result.estimated_subscriber_loss_prevented.lower() or "$" in result.estimated_subscriber_loss_prevented
     assert len(result.reasoning_trace) >= 5
     
+    # Assert Official Grafana MCP Tool Execution
+    assert "grafana_query_prometheus" in result.mcp_tools_executed
+    assert "grafana_query_loki" in result.mcp_tools_executed
+    assert "continuity_execute_remediation" in result.mcp_tools_executed
+    assert "grafana_create_annotation" in result.mcp_tools_executed
+    assert "continuity_verify_closed_loop_recovery" in result.mcp_tools_executed
+    
+    # Assert Falsifiable Closed-Loop Recovery Verification
+    assert result.closed_loop_verified is True
+    assert result.verified_vpf_rate <= 0.5
+    
     # 4. Verify system state recovered
     state = chaos_manager.get_state()
     assert state.current_mode == "REMEDIATED"

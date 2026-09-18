@@ -1,0 +1,5 @@
+The last step is accountability. CONTINUITY writes a timestamped annotation into Grafana Cloud, returns an incident record, and measures the actual resolution time. A prior benchmarked run completed in one point two eight seconds; the live record remains the source of truth.
+
+This demonstration is itself automated. The narration uses my ElevenLabs voice clone in sub-minute segments to protect vocal consistency. Each segment drives HeyGen Avatar version five, while HyperFrames composes the product capture, captions, motion, and final mix.
+
+CONTINUITY turns observability from a place you look into a system that acts. Protect the premiere. Preserve the audience. Keep the story playing.

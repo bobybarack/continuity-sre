@@ -1,0 +1,225 @@
+{
+  "typography": [
+    {
+      "role": "display",
+      "fontFamily": "Geist",
+      "fontSize": "16px",
+      "fontWeight": "700",
+      "lineHeight": "24px",
+      "letterSpacing": "-0.4px",
+      "color": "lab(8.11897 0.811279 -12.254)",
+      "sampleText": "CONTINUITY"
+    },
+    {
+      "role": "code",
+      "fontFamily": "-apple-system",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "lineHeight": "24px",
+      "letterSpacing": "normal",
+      "color": "#000000",
+      "sampleText": "CONTINUITY // Autonomous Stream Incident CommanderCONTINUITY"
+    },
+    {
+      "role": "heading",
+      "fontFamily": "Geist",
+      "fontSize": "14px",
+      "fontWeight": "700",
+      "lineHeight": "20px",
+      "letterSpacing": "-0.35px",
+      "color": "lab(8.11897 0.811279 -12.254)",
+      "sampleText": "Playback Quality & Failure Rate"
+    },
+    {
+      "role": "body",
+      "fontFamily": "Geist",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "16px",
+      "letterSpacing": "normal",
+      "color": "lab(47.7841 -0.393182 -10.0268)",
+      "sampleText": "Autonomous Stream Continuity Incident Commander"
+    }
+  ],
+  "spacing": {
+    "observed": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12,
+      14,
+      16,
+      20,
+      32
+    ],
+    "baseUnit": 4
+  },
+  "radius": [
+    "8px",
+    "12px",
+    "16px"
+  ],
+  "shadows": [
+    {
+      "value": "rgba(0, 0, 0, 0.04) 0px 1px 3px 0px, rgba(0, 0, 0, 0.04) 0px 1px 2px -1px",
+      "count": 12
+    },
+    {
+      "value": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px",
+      "count": 3
+    }
+  ],
+  "buttons": [
+    {
+      "label": "Incident Logs6",
+      "background": "lab(98.2596 -0.247031 -0.706708)",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "lab(27.1134 -0.956401 -12.3224)",
+      "padding": "6px 14px",
+      "borderRadius": "12px",
+      "border": "1px solid oklab(0.927998 -0.000581443 -0.00595063 / 0.8)",
+      "boxShadow": "none",
+      "fontSize": "12px",
+      "fontWeight": "600",
+      "height": "31.3281px"
+    },
+    {
+      "label": "VPF Rate (%)",
+      "background": "#FFFFFF",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "lab(8.11897 0.811279 -12.254)",
+      "padding": "4px 12px",
+      "borderRadius": "8px",
+      "border": "0px solid lab(8.11897 0.811279 -12.254)",
+      "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px",
+      "fontSize": "12px",
+      "fontWeight": "600",
+      "height": "24px"
+    },
+    {
+      "label": "Latency (ms)",
+      "background": "transparent",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "lab(47.7841 -0.393182 -10.0268)",
+      "padding": "4px 12px",
+      "borderRadius": "8px",
+      "border": "0px solid lab(47.7841 -0.393182 -10.0268)",
+      "boxShadow": "none",
+      "fontSize": "12px",
+      "fontWeight": "600",
+      "height": "24px"
+    },
+    {
+      "label": "button",
+      "background": "oklab(0.999994 0.0000455678 0.0000200868 / 0.2)",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "#FFFFFF",
+      "padding": "4px",
+      "borderRadius": "4px",
+      "border": "0px solid rgb(255, 255, 255)",
+      "boxShadow": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "height": "22px"
+    },
+    {
+      "label": "Trigger Autonomous SRE Failover",
+      "background": "lab(55.0481 -49.9246 15.93)",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "#FFFFFF",
+      "padding": "10px 16px",
+      "borderRadius": "12px",
+      "border": "0px solid rgb(255, 255, 255)",
+      "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px",
+      "fontSize": "12px",
+      "fontWeight": "700",
+      "height": "36px"
+    },
+    {
+      "label": "Inject CDN Outage",
+      "background": "lab(98.2596 -0.247031 -0.706708)",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "lab(27.1134 -0.956401 -12.3224)",
+      "padding": "6px 12px",
+      "borderRadius": "12px",
+      "border": "1px solid lab(91.6229 -0.159115 -2.26791)",
+      "boxShadow": "none",
+      "fontSize": "12px",
+      "fontWeight": "600",
+      "height": "30px"
+    }
+  ],
+  "cards": [
+    {
+      "label": "card",
+      "background": "#FFFFFF",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "#111827",
+      "padding": "16px",
+      "borderRadius": "16px",
+      "border": "1px solid oklab(0.927998 -0.000581443 -0.00595063 / 0.8)",
+      "boxShadow": "rgba(0, 0, 0, 0.04) 0px 1px 3px 0px, rgba(0, 0, 0, 0.04) 0px 1px 2px -1px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "height": "120.5px"
+    }
+  ],
+  "nav": {
+    "label": "navigation",
+    "background": "#FFFFFF",
+    "backgroundImage": "",
+    "backdropFilter": "",
+    "color": "#111827",
+    "padding": "14px 20px",
+    "borderRadius": "16px",
+    "border": "1px solid oklab(0.927998 -0.000581443 -0.00595063 / 0.8)",
+    "boxShadow": "rgba(0, 0, 0, 0.04) 0px 1px 3px 0px, rgba(0, 0, 0, 0.04) 0px 1px 2px -1px",
+    "fontSize": "16px",
+    "fontWeight": "400",
+    "height": "72px"
+  },
+  "chips": [
+    {
+      "label": "6",
+      "background": "lab(55.0481 -49.9246 15.93)",
+      "color": "#FFFFFF",
+      "padding": "2px 6px",
+      "borderRadius": "3.35544e+07px",
+      "border": "0px solid rgb(255, 255, 255)",
+      "boxShadow": "none",
+      "fontSize": "10px",
+      "fontWeight": "700",
+      "height": "17.3281px"
+    },
+    {
+      "label": "+0.02%",
+      "background": "lab(97.8462 -6.94966 1.85487)",
+      "color": "lab(44.4871 -41.0396 11.0361)",
+      "padding": "2px 8px",
+      "borderRadius": "3.35544e+07px",
+      "border": "1px solid lab(90.2247 -31.039 9.47084)",
+      "boxShadow": "none",
+      "fontSize": "11px",
+      "fontWeight": "700",
+      "height": "22.5px"
+    }
+  ],
+  "statCells": [],
+  "tabs": [],
+  "backgrounds": [
+    {
+      "value": "linear-gradient(to top, oklab(0 0 0 / 0.8) 0%, rgba(0, 0, 0, 0) 100%)",
+      "area": 24626
+    }
+  ],
+  "glass": []
+}

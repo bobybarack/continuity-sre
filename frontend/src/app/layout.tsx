@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "CONTINUITY // Autonomous Stream Incident Commander",
   description:
-    "Autonomous stream continuity and SRE incident commander powered by Gemini Enterprise and Grafana Cloud MCP. Detects, diagnoses, and self-heals live 4K premiere streams in real time.",
+    "Autonomous stream continuity and SRE incident commander powered by Google Cloud Gemini 3.7 Flash and Grafana Cloud MCP. Detects, diagnoses, and self-heals live 4K premiere streams in real time.",
 };
 
 export default function RootLayout({

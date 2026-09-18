@@ -1,0 +1,561 @@
+<template>
+  <div id="root" data-composition-id="04-live-evidence">
+    <div id="04-live-evidence-ground" class="clip" data-start="0" data-duration="14" data-track-index="0"></div>
+
+    <div id="04-live-evidence-scene" class="clip" data-start="0" data-duration="14" data-track-index="1">
+      <header id="04-live-evidence-header">
+        <div id="04-live-evidence-eyebrow">LIVE OPERATIONS</div>
+        <div id="04-live-evidence-tag">BASELINE · 1 HZ</div>
+      </header>
+
+      <section id="04-live-evidence-window" aria-label="CONTINUITY live command center">
+        <div id="04-live-evidence-window-chrome">
+          <span class="04-live-evidence-dot"></span>
+          <span class="04-live-evidence-dot"></span>
+          <span class="04-live-evidence-dot"></span>
+          <span id="04-live-evidence-window-label">CONTINUITY / COMMAND CENTER</span>
+          <span id="04-live-evidence-live"><i></i> LIVE</span>
+        </div>
+
+        <div id="04-live-evidence-surface">
+          <img id="04-live-evidence-dashboard" src="assets/continuity-baseline.png" alt="Healthy CONTINUITY command center with operational telemetry" />
+          <div id="04-live-evidence-title-mask">GLOBAL PREMIERE BROADCAST</div>
+
+          <div class="04-live-evidence-target" data-target="playback" aria-hidden="true"></div>
+          <div class="04-live-evidence-target" data-target="latency" aria-hidden="true"></div>
+          <div class="04-live-evidence-target" data-target="drm" aria-hidden="true"></div>
+          <div class="04-live-evidence-target" data-target="viewers" aria-hidden="true"></div>
+          <div class="04-live-evidence-target" data-target="bitrate" aria-hidden="true"></div>
+          <div class="04-live-evidence-target" data-target="buffer" aria-hidden="true"></div>
+
+          <svg id="04-live-evidence-connectors" viewBox="0 0 1370 690" preserveAspectRatio="none" aria-hidden="true">
+            <path data-line="playback" d="M230 192 C 765 192, 1020 55, 1362 55" />
+            <path data-line="latency" d="M510 192 C 840 192, 1060 151, 1362 151" />
+            <path data-line="drm" d="M790 192 C 1010 192, 1120 247, 1362 247" />
+            <path data-line="viewers" d="M1070 192 C 1160 192, 1210 343, 1362 343" />
+            <path data-line="bitrate" d="M765 422 C 1050 422, 1160 439, 1362 439" />
+            <path data-line="buffer" d="M1048 422 C 1180 422, 1230 535, 1362 535" />
+          </svg>
+        </div>
+      </section>
+
+      <aside id="04-live-evidence-signal-rail" aria-label="Monitored signals">
+        <div class="04-live-evidence-signal" data-signal="playback"><span>01</span><b>PLAYBACK<br />FAILURES</b></div>
+        <div class="04-live-evidence-signal" data-signal="latency"><span>02</span><b>CDN<br />LATENCY</b></div>
+        <div class="04-live-evidence-signal" data-signal="drm"><span>03</span><b>DRM<br />HANDSHAKE</b></div>
+        <div class="04-live-evidence-signal" data-signal="viewers"><span>04</span><b>ACTIVE<br />VIEWERS</b></div>
+        <div class="04-live-evidence-signal" data-signal="bitrate"><span>05</span><b>BITRATE</b></div>
+        <div class="04-live-evidence-signal" data-signal="buffer"><span>06</span><b>BUFFER<br />HEALTH</b></div>
+      </aside>
+
+      <div id="04-live-evidence-prometheus" class="04-live-evidence-source">
+        <span class="04-live-evidence-source-kicker">SIGNAL SOURCE</span>
+        <div class="04-live-evidence-source-phrase">
+          <span class="04-live-evidence-word" data-word="grafana">GRAFANA</span>
+          <span class="04-live-evidence-word" data-word="cloud">CLOUD</span>
+          <span class="04-live-evidence-word" data-word="prometheus">PROMETHEUS</span>
+        </div>
+      </div>
+
+      <div id="04-live-evidence-loki" class="04-live-evidence-source">
+        <span class="04-live-evidence-source-kicker">EDGE SOURCE</span>
+        <div class="04-live-evidence-source-phrase">
+          <span class="04-live-evidence-word" data-word="loki">LOKI</span>
+          <span class="04-live-evidence-word" data-word="edge">EDGE STORY</span>
+        </div>
+      </div>
+
+      <svg id="04-live-evidence-evidence-rail" viewBox="0 0 1728 110" preserveAspectRatio="none" aria-hidden="true">
+        <path id="04-live-evidence-prometheus-line" d="M0 24 H1288 Q1320 24 1320 54 H1464" />
+        <path id="04-live-evidence-loki-line" d="M0 86 H1332 Q1364 86 1364 54 H1464" />
+      </svg>
+
+      <div id="04-live-evidence-resolve">
+        <span class="04-live-evidence-resolve-dot"></span>
+        <b>METRICS + EDGE STORY</b>
+      </div>
+
+      <div id="04-live-evidence-progress"><span></span></div>
+    </div>
+
+    <style>
+      @font-face {
+        font-family: "Geist";
+        src: url("capture/assets/fonts/caa3a2e1cccd8315-s.p.0wgildi0cnwt9.woff2") format("woff2");
+        font-style: normal;
+        font-weight: 100 900;
+        font-display: block;
+      }
+
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        container-type: size;
+        font-family: "Geist", sans-serif;
+        color: #111827;
+      }
+
+      [id="04-live-evidence-ground"] {
+        position: absolute;
+        inset: 0;
+        background: #ffffff;
+      }
+
+      [id="04-live-evidence-ground"]::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: linear-gradient(rgba(0, 153, 102, 0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 153, 102, 0.035) 1px, transparent 1px);
+        background-size: 4.2cqw 4.2cqw;
+        mask-image: linear-gradient(to bottom, black, transparent 82%);
+      }
+
+      [id="04-live-evidence-scene"] {
+        position: absolute;
+        inset: 0;
+      }
+
+      [id="04-live-evidence-header"] {
+        position: absolute;
+        left: 5cqw;
+        right: 5cqw;
+        top: 3.6cqh;
+        height: 5.5cqh;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      [id="04-live-evidence-eyebrow"] {
+        color: #009966;
+        font-size: 0.8cqw;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+      }
+
+      [id="04-live-evidence-tag"] {
+        padding: 0.75cqh 0.8cqw;
+        border-radius: 100px;
+        background: rgba(0, 153, 102, 0.08);
+        color: #009966;
+        font-size: 0.72cqw;
+        font-weight: 600;
+        letter-spacing: 0.07em;
+      }
+
+      [id="04-live-evidence-window"] {
+        position: absolute;
+        left: 5cqw;
+        top: 10.7cqh;
+        width: 71.35cqw;
+        height: 63.9cqh;
+        overflow: hidden;
+        border: 1.5px solid rgba(0, 153, 102, 0.2);
+        border-radius: 14px;
+        background: rgba(0, 153, 102, 0.04);
+      }
+
+      [id="04-live-evidence-window-chrome"] {
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 4.65cqh;
+        z-index: 9;
+        display: flex;
+        align-items: center;
+        gap: 0.45cqw;
+        padding: 0 1.05cqw;
+        background: #ffffff;
+        border-bottom: 1px solid rgba(0, 153, 102, 0.15);
+      }
+
+      [class~="04-live-evidence-dot"] {
+        width: 0.48cqw;
+        height: 0.48cqw;
+        border-radius: 50%;
+        background: rgba(0, 153, 102, 0.2);
+      }
+
+      [id="04-live-evidence-window-label"] {
+        margin-left: 0.55cqw;
+        color: #9a9a9a;
+        font-size: 0.64cqw;
+        font-weight: 500;
+        letter-spacing: 0.06em;
+      }
+
+      [id="04-live-evidence-live"] {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 0.4cqw;
+        color: #009966;
+        font-size: 0.64cqw;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+      }
+
+      [id="04-live-evidence-live"] i {
+        width: 0.38cqw;
+        height: 0.38cqw;
+        border-radius: 50%;
+        background: #009966;
+      }
+
+      [id="04-live-evidence-surface"] {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 4.65cqh;
+        bottom: 0;
+        overflow: hidden;
+        background: #111827;
+      }
+
+      [id="04-live-evidence-dashboard"] {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center top;
+      }
+
+      [id="04-live-evidence-title-mask"] {
+        position: absolute;
+        z-index: 5;
+        left: 1.6cqw;
+        top: 1.9cqh;
+        min-width: 15.2cqw;
+        padding: 0.62cqh 0.7cqw;
+        border-radius: 7px;
+        background: rgba(17, 24, 39, 0.93);
+        border: 1px solid rgba(0, 153, 102, 0.42);
+        color: #ffffff;
+        font-size: 0.67cqw;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+      }
+
+      [class~="04-live-evidence-target"] {
+        position: absolute;
+        z-index: 6;
+        width: 11.2cqw;
+        height: 10.5cqh;
+        border: 2px solid #00bc7d;
+        border-radius: 10px;
+        background: rgba(0, 153, 102, 0.035);
+      }
+
+      [class~="04-live-evidence-target"]::before,
+      [class~="04-live-evidence-target"]::after {
+        content: "";
+        position: absolute;
+        width: 1.05cqw;
+        height: 1.85cqh;
+        border-top: 3px solid #00bc7d;
+        border-bottom: 3px solid #00bc7d;
+      }
+
+      [class~="04-live-evidence-target"]::before {
+        left: -3px;
+      }
+
+      [class~="04-live-evidence-target"]::after {
+        right: -3px;
+      }
+
+      [class~="04-live-evidence-target"][data-target="playback"] { left: 5.2cqw; top: 10.6cqh; }
+      [class~="04-live-evidence-target"][data-target="latency"] { left: 18.9cqw; top: 10.6cqh; }
+      [class~="04-live-evidence-target"][data-target="drm"] { left: 32.8cqw; top: 10.6cqh; }
+      [class~="04-live-evidence-target"][data-target="viewers"] { left: 46.6cqw; top: 10.6cqh; }
+      [class~="04-live-evidence-target"][data-target="bitrate"] { left: 31.6cqw; top: 31.8cqh; }
+      [class~="04-live-evidence-target"][data-target="buffer"] { left: 45.8cqw; top: 31.8cqh; }
+
+      [id="04-live-evidence-connectors"] {
+        position: absolute;
+        z-index: 4;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        overflow: visible;
+        pointer-events: none;
+      }
+
+      [id="04-live-evidence-connectors"] path {
+        fill: none;
+        stroke: rgba(0, 188, 125, 0.9);
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-dasharray: 8 8;
+        vector-effect: non-scaling-stroke;
+      }
+
+      [id="04-live-evidence-signal-rail"] {
+        position: absolute;
+        left: 78.3cqw;
+        top: 14.9cqh;
+        width: 16.7cqw;
+        height: 53.3cqh;
+        display: grid;
+        grid-template-rows: repeat(6, 1fr);
+        gap: 0.75cqh;
+      }
+
+      [class~="04-live-evidence-signal"] {
+        display: grid;
+        grid-template-columns: 2.55cqw 1fr;
+        align-items: center;
+        min-height: 0;
+        padding: 0.7cqh 0.75cqw;
+        border: 1.5px solid rgba(0, 153, 102, 0.2);
+        border-radius: 12px;
+        background: rgba(0, 153, 102, 0.04);
+      }
+
+      [class~="04-live-evidence-signal"] span {
+        color: #009966;
+        font-size: 1.15cqw;
+        font-weight: 700;
+      }
+
+      [class~="04-live-evidence-signal"] b {
+        color: #111827;
+        font-size: 0.76cqw;
+        line-height: 1.15;
+        font-weight: 600;
+        letter-spacing: 0.055em;
+      }
+
+      [class~="04-live-evidence-source"] {
+        position: absolute;
+        z-index: 12;
+        top: 76.1cqh;
+        height: 6.6cqh;
+        padding: 0.8cqh 0.82cqw;
+        border: 1.5px solid rgba(0, 153, 102, 0.2);
+        border-radius: 12px;
+        background: #ffffff;
+      }
+
+      [id="04-live-evidence-prometheus"] {
+        left: 5cqw;
+        width: 24.8cqw;
+      }
+
+      [id="04-live-evidence-loki"] {
+        left: 30.75cqw;
+        width: 17.4cqw;
+      }
+
+      [class~="04-live-evidence-source-kicker"] {
+        display: block;
+        margin-bottom: 0.45cqh;
+        color: #9a9a9a;
+        font-size: 0.57cqw;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+      }
+
+      [class~="04-live-evidence-source-phrase"] {
+        display: flex;
+        align-items: center;
+        gap: 0.42cqw;
+        min-height: 2.3cqh;
+      }
+
+      [class~="04-live-evidence-word"] {
+        display: inline-block;
+        transform-origin: 50% 50%;
+        color: #9a9a9a;
+        font-size: 0.84cqw;
+        font-weight: 700;
+        letter-spacing: 0.045em;
+        text-shadow: 0 0 0 rgba(0, 188, 125, 0);
+      }
+
+      [id="04-live-evidence-evidence-rail"] {
+        position: absolute;
+        z-index: 10;
+        left: 5cqw;
+        top: 72.4cqh;
+        width: 90cqw;
+        height: 10.2cqh;
+        pointer-events: none;
+      }
+
+      [id="04-live-evidence-evidence-rail"] path {
+        fill: none;
+        stroke: #009966;
+        stroke-width: 2;
+        stroke-linecap: round;
+        vector-effect: non-scaling-stroke;
+      }
+
+      [id="04-live-evidence-resolve"] {
+        position: absolute;
+        z-index: 12;
+        right: 5cqw;
+        top: 75.95cqh;
+        height: 6.9cqh;
+        min-width: 20.2cqw;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75cqw;
+        padding: 0 1.2cqw;
+        border-radius: 100px;
+        background: #009966;
+        color: #ffffff;
+      }
+
+      [class~="04-live-evidence-resolve-dot"] {
+        width: 0.62cqw;
+        height: 0.62cqw;
+        border: 2px solid #ffffff;
+        border-radius: 50%;
+      }
+
+      [id="04-live-evidence-resolve"] b {
+        font-size: 0.85cqw;
+        font-weight: 700;
+        letter-spacing: 0.075em;
+      }
+
+      [id="04-live-evidence-progress"] {
+        position: absolute;
+        left: 5cqw;
+        top: 83.25cqh;
+        width: 90cqw;
+        height: 3px;
+        overflow: hidden;
+        background: rgba(0, 153, 102, 0.08);
+      }
+
+      [id="04-live-evidence-progress"] span {
+        display: block;
+        width: 0%;
+        height: 100%;
+        background: #009966;
+      }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+    <script>
+      (() => {
+        const id = "04-live-evidence";
+        const tl = gsap.timeline({ paused: true });
+        window.__timelines = window.__timelines || {};
+        window.__timelines[id] = tl;
+
+        const dashboardWindow = document.getElementById("04-live-evidence-window");
+        const header = document.getElementById("04-live-evidence-header");
+        const titleMask = document.getElementById("04-live-evidence-title-mask");
+        const signalRail = document.getElementById("04-live-evidence-signal-rail");
+        const targets = Array.from(document.querySelectorAll('[class~="04-live-evidence-target"]'));
+        const signals = Array.from(document.querySelectorAll('[class~="04-live-evidence-signal"]'));
+        const connectorLines = Array.from(document.querySelectorAll('[id="04-live-evidence-connectors"] path'));
+        const prometheus = document.getElementById("04-live-evidence-prometheus");
+        const loki = document.getElementById("04-live-evidence-loki");
+        const prometheusLine = document.getElementById("04-live-evidence-prometheus-line");
+        const lokiLine = document.getElementById("04-live-evidence-loki-line");
+        const resolve = document.getElementById("04-live-evidence-resolve");
+        const progress = document.querySelector('[id="04-live-evidence-progress"] span');
+
+        gsap.set([targets, signals, connectorLines, prometheus, loki, resolve], { opacity: 0 });
+        gsap.set(connectorLines, { strokeDasharray: "8 8", strokeDashoffset: 18 });
+        gsap.set([prometheusLine, lokiLine], { strokeDasharray: 1800, strokeDashoffset: 1800, opacity: 0 });
+
+        tl.fromTo(dashboardWindow, { opacity: 0.78, y: 18, scale: 0.992 }, { opacity: 1, y: 0, scale: 1, duration: 0.72, ease: "power2.out" }, 0);
+        tl.fromTo(header, { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.52, ease: "power2.out" }, 0.12);
+        tl.fromTo(titleMask, { opacity: 0, x: -14 }, { opacity: 1, x: 0, duration: 0.5, ease: "power2.out" }, 0.7);
+        tl.fromTo(signalRail, { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "none" }, 2.72);
+
+        const SIGNALS = [
+          { key: "playback", label: "PLAYBACK FAILURES", weight: 17 },
+          { key: "latency", label: "CDN LATENCY", weight: 11 },
+          { key: "drm", label: "DRM HANDSHAKE", weight: 13 },
+          { key: "viewers", label: "ACTIVE VIEWERS", weight: 14 },
+          { key: "bitrate", label: "BITRATE", weight: 7 },
+          { key: "buffer", label: "BUFFER HEALTH", weight: 13 }
+        ];
+        const revealSpan = 4.85;
+        const totalWeight = SIGNALS.reduce((sum, item) => sum + item.weight, 0);
+        let cursor = 3.0;
+        const signalTimeline = SIGNALS.map((item) => {
+          const share = revealSpan * (item.weight / totalWeight);
+          const entry = { ...item, start: cursor, end: cursor + share };
+          cursor += share;
+          return entry;
+        });
+
+        signalTimeline.forEach((entry) => {
+          const target = document.querySelector(`[class~="04-live-evidence-target"][data-target="${entry.key}"]`);
+          const signal = document.querySelector(`[class~="04-live-evidence-signal"][data-signal="${entry.key}"]`);
+          const line = document.querySelector(`[id="04-live-evidence-connectors"] path[data-line="${entry.key}"]`);
+          tl.fromTo(signal, { opacity: 0, x: 16 }, { opacity: 1, x: 0, duration: 0.34, ease: "power2.out" }, entry.start);
+          tl.fromTo(target, { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 0.36, ease: "power2.out" }, entry.start + 0.08);
+          tl.fromTo(line, { opacity: 0, strokeDashoffset: 18 }, { opacity: 0.9, strokeDashoffset: 0, duration: 0.42, ease: "none" }, entry.start + 0.16);
+        });
+
+        tl.fromTo(prometheus, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.48, ease: "power2.out" }, 8.2);
+        tl.fromTo(prometheusLine, { opacity: 0, strokeDashoffset: 1800 }, { opacity: 1, strokeDashoffset: 0, duration: 1.25, ease: "power1.inOut" }, 9.0);
+        tl.fromTo(loki, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.48, ease: "power2.out" }, 11.3);
+        tl.fromTo(lokiLine, { opacity: 0, strokeDashoffset: 1800 }, { opacity: 1, strokeDashoffset: 0, duration: 0.86, ease: "power1.inOut" }, 11.72);
+        tl.fromTo(resolve, { opacity: 0, scale: 0.93 }, { opacity: 1, scale: 1, duration: 0.62, ease: "back.out(1.35)" }, 12.45);
+
+        const WORD_TIMINGS = {
+          grafana: { start: 8.45, end: 8.82 },
+          cloud: { start: 8.88, end: 9.24 },
+          prometheus: { start: 9.34, end: 10.35 },
+          loki: { start: 11.45, end: 12.15 },
+          edge: { start: 12.22, end: 13.05 }
+        };
+        const wordDriver = { t: 0 };
+        const words = Array.from(document.querySelectorAll('[class~="04-live-evidence-word"]'));
+        let lastWordStyles = "";
+
+        function envelope(time, start, end) {
+          const attack = 0.18;
+          const release = 0.42;
+          const rest = 0.1;
+          if (time < start) return 0;
+          if (time < end) return Math.min((time - start) / attack, 1);
+          if (time < end + release) return 1 - ((time - end) / release) * (1 - rest);
+          return rest;
+        }
+
+        function mixChannel(a, b, amount) {
+          return Math.round(a + (b - a) * amount);
+        }
+
+        tl.to(wordDriver, {
+          t: 14,
+          duration: 14,
+          ease: "none",
+          onUpdate: () => {
+            const values = words.map((word) => {
+              const timing = WORD_TIMINGS[word.dataset.word];
+              const env = timing ? envelope(wordDriver.t, timing.start, timing.end) : 0;
+              return { word, env };
+            });
+            const styleKey = values.map((value) => Math.round(value.env * 1000)).join("-");
+            if (styleKey === lastWordStyles) return;
+            values.forEach(({ word, env }) => {
+              const r = mixChannel(154, 0, env);
+              const g = mixChannel(154, 188, env);
+              const b = mixChannel(154, 125, env);
+              word.style.color = `rgb(${r}, ${g}, ${b})`;
+              word.style.textShadow = `0 0 ${34 * env}px rgba(0, 188, 125, ${0.34 * env})`;
+              word.style.transform = `scale(${1 + 0.16 * env})`;
+            });
+            lastWordStyles = styleKey;
+          }
+        }, 0);
+
+        tl.to(progress, { width: "100%", duration: 14, ease: "none" }, 0);
+      })();
+    </script>
+  </div>
+</template>

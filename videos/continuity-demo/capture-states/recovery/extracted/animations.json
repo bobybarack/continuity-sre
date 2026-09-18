@@ -1,0 +1,52 @@
+{
+  "summary": {
+    "webAnimations": 1,
+    "cssDeclarations": 0,
+    "scrollTargets": 0,
+    "cdpAnimations": 14,
+    "canvases": 2
+  },
+  "namedAnimations": [],
+  "scrollTriggeredElements": 0,
+  "representativeAnimations": [
+    {
+      "type": "CSSTransition",
+      "playState": "running",
+      "animationName": null,
+      "targetSelector": "div.h-full.transition-all.duration-300",
+      "targetRect": {
+        "x": 1121.65625,
+        "y": 711.296875,
+        "width": 533.0625,
+        "height": 6,
+        "top": 711.296875,
+        "right": 1654.71875,
+        "bottom": 717.296875,
+        "left": 1121.65625
+      },
+      "keyframes": [
+        {
+          "offset": 0,
+          "easing": "linear",
+          "composite": "auto",
+          "width": "89.3333%",
+          "computedOffset": 0
+        },
+        {
+          "offset": 1,
+          "easing": "linear",
+          "composite": "auto",
+          "width": "91.3333%",
+          "computedOffset": 1
+        }
+      ],
+      "timing": {
+        "duration": 300,
+        "delay": 0,
+        "iterations": 1,
+        "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+        "direction": "normal"
+      }
+    }
+  ]
+}

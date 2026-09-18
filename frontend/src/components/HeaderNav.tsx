@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { ContinuityLogo } from "./ContinuityLogo";
 import {
-  Shield01Icon,
   Radio01Icon,
   CpuIcon,
   CloudIcon,
@@ -65,15 +65,15 @@ export function HeaderNav({
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           {/* Brand & Mission */}
           <div className="flex items-center gap-3.5">
-            <div className="relative p-2 rounded-xl bg-gradient-to-br from-white/10 to-white/[0.02] border border-white/15 shadow-[0_0_20px_rgba(0,210,255,0.15)] flex items-center justify-center">
-              <Shield01Icon className="w-6 h-6 text-[#00d2ff]" />
+            <div className="relative p-2 rounded-xl bg-gradient-to-br from-sky-500/20 to-cyan-500/10 border border-sky-500/30 shadow-[0_0_20px_rgba(0,210,255,0.2)] flex items-center justify-center">
+              <ContinuityLogo className="w-6 h-6 text-[#00d2ff]" />
               <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[#00f5a0] ring-2 ring-[#07090e] animate-pulse" />
             </div>
 
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
-                  PREMIERESHIELD
+                  CONTINUITY
                   <span className="text-xs font-mono font-normal px-2 py-0.5 rounded-md bg-white/[0.06] border border-white/10 text-white/70">
                     v2.4-PROD
                   </span>

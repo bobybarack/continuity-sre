@@ -1,0 +1,664 @@
+<template>
+  <div id="root" data-composition-id="03-closed-loop">
+    <div
+      class="clip"
+      data-frame03-layer="background"
+      data-start="0"
+      data-duration="12"
+      data-track-index="0"
+    >
+      <div data-frame03-grid></div>
+      <div data-frame03-wash></div>
+    </div>
+
+    <div
+      class="clip"
+      data-frame03-layer="main"
+      data-start="0"
+      data-duration="12"
+      data-track-index="1"
+    >
+      <div id="03-closed-loop-zoom-outer">
+        <div id="03-closed-loop-zoom-inner">
+          <div id="03-closed-loop-world">
+            <header data-frame03-header>
+              <div data-frame03-eyebrow>03 / AUTONOMOUS COMMAND</div>
+              <div id="03-closed-loop-title">CONTINUITY</div>
+              <div id="03-closed-loop-title-rule"></div>
+            </header>
+
+            <div id="03-closed-loop-capture">
+              <img
+                src="assets/continuity-baseline.png"
+                alt="CONTINUITY healthy command center"
+              />
+              <div data-frame03-capture-tint></div>
+              <div id="03-closed-loop-broadcast-mask">
+                <span data-frame03-live-dot></span>
+                GLOBAL PREMIERE BROADCAST
+              </div>
+              <div data-frame03-surface-chip>LIVE COMMAND SURFACE</div>
+            </div>
+
+            <svg
+              id="03-closed-loop-network"
+              viewBox="0 0 1920 1080"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <path id="03-closed-loop-spoke-observe" d="M807 537 C650 510 520 410 344 353" />
+              <path id="03-closed-loop-spoke-reason" d="M807 537 C875 470 940 405 1007 353" />
+              <path id="03-closed-loop-spoke-act" d="M807 537 C880 590 947 651 1007 704" />
+              <path id="03-closed-loop-spoke-prove" d="M807 537 C650 570 505 645 344 704" />
+
+              <path id="03-closed-loop-ring-observe-reason" d="M344 353 C560 245 795 245 1007 353" />
+              <path id="03-closed-loop-ring-reason-act" d="M1007 353 C1115 470 1110 590 1007 704" />
+              <path id="03-closed-loop-ring-act-prove" d="M1007 704 C795 810 560 810 344 704" />
+              <path id="03-closed-loop-ring-prove-observe" d="M344 704 C240 590 240 470 344 353" />
+            </svg>
+
+            <div id="03-closed-loop-node-observe" data-frame03-node>
+              <span data-frame03-node-icon>
+                <svg viewBox="0 0 32 32" aria-hidden="true">
+                  <path d="M4 16c3.2-5 7.2-7.5 12-7.5S24.8 11 28 16c-3.2 5-7.2 7.5-12 7.5S7.2 21 4 16Z" />
+                  <circle cx="16" cy="16" r="3.2" />
+                </svg>
+              </span>
+              <span data-frame03-node-label>OBSERVE</span>
+              <span data-frame03-node-index>01</span>
+            </div>
+
+            <div id="03-closed-loop-node-reason" data-frame03-node>
+              <span data-frame03-node-icon>
+                <svg viewBox="0 0 32 32" aria-hidden="true">
+                  <path d="M8 9h16v11H14l-6 5v-5H8V9Z" />
+                  <path d="M12 14h8M12 17h5" />
+                </svg>
+              </span>
+              <span data-frame03-node-label>REASON</span>
+              <span data-frame03-node-index>02</span>
+            </div>
+
+            <div id="03-closed-loop-node-act" data-frame03-node>
+              <span data-frame03-node-icon>
+                <svg viewBox="0 0 32 32" aria-hidden="true">
+                  <path d="M16 5v22M8 13l8-8 8 8" />
+                </svg>
+              </span>
+              <span data-frame03-node-label>ACT</span>
+              <span data-frame03-node-index>03</span>
+            </div>
+
+            <div id="03-closed-loop-node-prove" data-frame03-node>
+              <span data-frame03-node-icon>
+                <svg viewBox="0 0 32 32" aria-hidden="true">
+                  <path d="M7 17l6 6L26 9" />
+                </svg>
+              </span>
+              <span data-frame03-node-label>PROVE</span>
+              <span data-frame03-node-index>04</span>
+            </div>
+
+            <div id="03-closed-loop-hub">
+              <div data-frame03-hub-kicker>CLOSED LOOP</div>
+              <div data-frame03-hub-name>CONTINUITY</div>
+              <div data-frame03-hub-status>
+                <span id="03-closed-loop-hub-pulse"></span>
+                COMMAND ACTIVE
+              </div>
+            </div>
+
+            <div id="03-closed-loop-evidence-metrics" data-frame03-evidence>LIVE METRICS</div>
+            <div id="03-closed-loop-evidence-context" data-frame03-evidence>POLICY + CODE</div>
+            <div id="03-closed-loop-evidence-route" data-frame03-evidence>FAILOVER</div>
+            <div id="03-closed-loop-evidence-audit" data-frame03-evidence>ANNOTATION</div>
+          </div>
+        </div>
+      </div>
+
+      <div data-frame03-progress-track>
+        <span id="03-closed-loop-progress-fill"></span>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @font-face {
+      font-family: "Geist";
+      src: url("capture/assets/fonts/53b9e256198e5412-s.390ncx5urfkfu.woff2") format("woff2");
+      font-style: normal;
+      font-weight: 100 900;
+      font-display: swap;
+    }
+
+    #root {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      container-type: size;
+      color: #111827;
+      font-family: "Geist";
+    }
+
+    #root .clip {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    [data-frame03-layer="background"] {
+      background: #ffffff;
+    }
+
+    [data-frame03-grid] {
+      position: absolute;
+      inset: 0 0 17cqh 0;
+      opacity: 0.42;
+      background-image:
+        linear-gradient(rgba(0, 153, 102, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 153, 102, 0.045) 1px, transparent 1px);
+      background-size: 4cqw 4cqw;
+      -webkit-mask-image: linear-gradient(90deg, #000 0%, rgba(0, 0, 0, 0.72) 61%, transparent 82%);
+      mask-image: linear-gradient(90deg, #000 0%, rgba(0, 0, 0, 0.72) 61%, transparent 82%);
+    }
+
+    [data-frame03-wash] {
+      position: absolute;
+      width: 41cqw;
+      height: 41cqw;
+      left: 46cqw;
+      top: -17cqw;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0, 153, 102, 0.105), rgba(0, 153, 102, 0));
+    }
+
+    [data-frame03-layer="main"] {
+      height: 83cqh;
+    }
+
+    [id="03-closed-loop-zoom-outer"],
+    [id="03-closed-loop-zoom-inner"],
+    [id="03-closed-loop-world"] {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    [id="03-closed-loop-zoom-outer"] {
+      transform-origin: 50% 50%;
+      will-change: transform;
+    }
+
+    [id="03-closed-loop-zoom-inner"] {
+      will-change: transform;
+    }
+
+    [id="03-closed-loop-world"] {
+      overflow: hidden;
+    }
+
+    [data-frame03-header] {
+      position: absolute;
+      left: 4.7cqw;
+      top: 4.8cqh;
+      z-index: 8;
+    }
+
+    [data-frame03-eyebrow] {
+      color: #009966;
+      font-size: 0.8cqw;
+      font-weight: 600;
+      line-height: 1;
+      letter-spacing: 0.08em;
+    }
+
+    [id="03-closed-loop-title"] {
+      margin-top: 1.2cqh;
+      color: #111827;
+      font-size: 3.35cqw;
+      font-weight: 700;
+      line-height: 0.96;
+      letter-spacing: -0.04em;
+      transform-origin: 0% 50%;
+      will-change: transform, opacity;
+    }
+
+    [id="03-closed-loop-title-rule"] {
+      width: 4.2cqw;
+      height: 4px;
+      margin-top: 1.35cqh;
+      border-radius: 2px;
+      background: #009966;
+      transform-origin: 0% 50%;
+      will-change: transform;
+    }
+
+    [id="03-closed-loop-capture"] {
+      --dof: 0px;
+      position: absolute;
+      left: 4.5cqw;
+      top: 15.5cqh;
+      width: 66cqw;
+      height: 63cqh;
+      z-index: 1;
+      overflow: hidden;
+      border: 1.5px solid rgba(0, 153, 102, 0.2);
+      border-radius: 14px;
+      background: rgba(0, 153, 102, 0.04);
+      filter: blur(var(--dof));
+      will-change: transform, opacity, filter;
+    }
+
+    [id="03-closed-loop-capture"] img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.68;
+    }
+
+    [data-frame03-capture-tint] {
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.22);
+    }
+
+    [id="03-closed-loop-broadcast-mask"] {
+      position: absolute;
+      left: 1.7cqw;
+      top: 1.8cqh;
+      display: flex;
+      align-items: center;
+      gap: 0.7cqw;
+      min-width: 24cqw;
+      height: 5.9cqh;
+      padding: 0 1.25cqw;
+      border: 1.5px solid rgba(0, 153, 102, 0.2);
+      border-radius: 100px;
+      background: rgba(255, 255, 255, 0.98);
+      color: #111827;
+      font-size: 0.86cqw;
+      font-weight: 600;
+      line-height: 1;
+      letter-spacing: 0.08em;
+      white-space: nowrap;
+    }
+
+    [data-frame03-live-dot] {
+      width: 0.58cqw;
+      height: 0.58cqw;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      background: #009966;
+    }
+
+    [data-frame03-surface-chip] {
+      position: absolute;
+      right: 1.45cqw;
+      top: 1.8cqh;
+      padding: 1.45cqh 1.05cqw;
+      border-radius: 100px;
+      background: rgba(0, 153, 102, 0.08);
+      color: #009966;
+      font-size: 0.7cqw;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+    }
+
+    [id="03-closed-loop-network"] {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      width: 100cqw;
+      height: 100cqh;
+      overflow: visible;
+      pointer-events: none;
+    }
+
+    [id="03-closed-loop-network"] path {
+      fill: none;
+      stroke: rgba(0, 153, 102, 0.88);
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
+    }
+
+    [id^="03-closed-loop-ring-"] {
+      stroke: rgba(0, 153, 102, 0.42) !important;
+      stroke-width: 2 !important;
+    }
+
+    [data-frame03-node] {
+      position: absolute;
+      z-index: 5;
+      display: grid;
+      grid-template-columns: 3.1cqw 1fr auto;
+      align-items: center;
+      width: 12.8cqw;
+      height: 9.4cqh;
+      padding: 0 0.9cqw;
+      border: 1.5px solid rgba(0, 153, 102, 0.2);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.96);
+      transform-origin: 50% 50%;
+      will-change: transform, opacity;
+    }
+
+    [id="03-closed-loop-node-observe"] {
+      left: 11.5cqw;
+      top: 28cqh;
+    }
+
+    [id="03-closed-loop-node-reason"] {
+      left: 46cqw;
+      top: 28cqh;
+    }
+
+    [id="03-closed-loop-node-act"] {
+      left: 46cqw;
+      top: 60.5cqh;
+    }
+
+    [id="03-closed-loop-node-prove"] {
+      left: 11.5cqw;
+      top: 60.5cqh;
+    }
+
+    [data-frame03-node-icon] {
+      display: grid;
+      place-items: center;
+      width: 2.35cqw;
+      height: 2.35cqw;
+      border-radius: 50%;
+      background: #009966;
+    }
+
+    [data-frame03-node-icon] svg {
+      width: 1.25cqw;
+      height: 1.25cqw;
+      overflow: visible;
+    }
+
+    [data-frame03-node-icon] path,
+    [data-frame03-node-icon] circle {
+      fill: none;
+      stroke: #ffffff;
+      stroke-width: 2.25;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    [data-frame03-node-label] {
+      color: #111827;
+      font-size: 1.4cqw;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: 0.045em;
+    }
+
+    [data-frame03-node-index] {
+      color: #00bc7d;
+      font-size: 0.62cqw;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+
+    [id="03-closed-loop-hub"] {
+      position: absolute;
+      left: 33cqw;
+      top: 43.7cqh;
+      z-index: 7;
+      display: flex;
+      width: 18cqw;
+      height: 12cqh;
+      box-sizing: border-box;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 1.5px solid rgba(0, 153, 102, 0.2);
+      border-radius: 14px;
+      background: #ffffff;
+      transform-origin: 50% 50%;
+      will-change: transform, opacity;
+    }
+
+    [data-frame03-hub-kicker] {
+      color: #009966;
+      font-size: 0.62cqw;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+    }
+
+    [data-frame03-hub-name] {
+      margin-top: 0.75cqh;
+      color: #111827;
+      font-size: 1.6cqw;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -0.035em;
+    }
+
+    [data-frame03-hub-status] {
+      display: flex;
+      align-items: center;
+      gap: 0.45cqw;
+      margin-top: 0.9cqh;
+      color: #00bc7d;
+      font-size: 0.58cqw;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+    }
+
+    [id="03-closed-loop-hub-pulse"] {
+      width: 0.42cqw;
+      height: 0.42cqw;
+      border-radius: 50%;
+      background: #009966;
+      transform-origin: 50% 50%;
+      will-change: transform, opacity;
+    }
+
+    [data-frame03-evidence] {
+      position: absolute;
+      z-index: 6;
+      padding: 0.72cqh 0.75cqw;
+      border: 1px solid rgba(0, 153, 102, 0.2);
+      border-radius: 100px;
+      background: rgba(255, 255, 255, 0.96);
+      color: #009966;
+      font-size: 0.64cqw;
+      font-weight: 600;
+      line-height: 1;
+      letter-spacing: 0.07em;
+      white-space: nowrap;
+      will-change: transform, opacity;
+    }
+
+    [id="03-closed-loop-evidence-metrics"] {
+      left: 31.1cqw;
+      top: 25.3cqh;
+    }
+
+    [id="03-closed-loop-evidence-context"] {
+      left: 55.4cqw;
+      top: 48.3cqh;
+    }
+
+    [id="03-closed-loop-evidence-route"] {
+      left: 32.4cqw;
+      top: 72.5cqh;
+    }
+
+    [id="03-closed-loop-evidence-audit"] {
+      left: 9.2cqw;
+      top: 48.3cqh;
+    }
+
+    [data-frame03-progress-track] {
+      position: absolute;
+      left: 4.7cqw;
+      right: 29.5cqw;
+      bottom: 0.55cqh;
+      z-index: 12;
+      height: 3px;
+      overflow: hidden;
+      background: rgba(0, 153, 102, 0.08);
+    }
+
+    [id="03-closed-loop-progress-fill"] {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: #009966;
+      transform-origin: 0% 50%;
+      will-change: transform;
+    }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (() => {
+      const root = document.querySelector('[data-composition-id="03-closed-loop"]');
+      const byId = (id) => root.querySelector(`[id="${id}"]`);
+      const capture = byId("03-closed-loop-capture");
+      const title = byId("03-closed-loop-title");
+      const titleRule = byId("03-closed-loop-title-rule");
+      const mask = byId("03-closed-loop-broadcast-mask");
+      const hub = byId("03-closed-loop-hub");
+      const hubPulse = byId("03-closed-loop-hub-pulse");
+      const zoomOuter = byId("03-closed-loop-zoom-outer");
+      const zoomInner = byId("03-closed-loop-zoom-inner");
+      const progress = byId("03-closed-loop-progress-fill");
+      const nodes = [
+        byId("03-closed-loop-node-observe"),
+        byId("03-closed-loop-node-reason"),
+        byId("03-closed-loop-node-act"),
+        byId("03-closed-loop-node-prove"),
+      ];
+      const spokes = [
+        byId("03-closed-loop-spoke-observe"),
+        byId("03-closed-loop-spoke-reason"),
+        byId("03-closed-loop-spoke-act"),
+        byId("03-closed-loop-spoke-prove"),
+      ];
+      const ringSegments = [
+        byId("03-closed-loop-ring-observe-reason"),
+        byId("03-closed-loop-ring-reason-act"),
+        byId("03-closed-loop-ring-act-prove"),
+        byId("03-closed-loop-ring-prove-observe"),
+      ];
+      const evidence = [
+        byId("03-closed-loop-evidence-metrics"),
+        byId("03-closed-loop-evidence-context"),
+        byId("03-closed-loop-evidence-route"),
+        byId("03-closed-loop-evidence-audit"),
+      ];
+
+      [...spokes, ...ringSegments].forEach((path) => {
+        const length = path.getTotalLength();
+        path.style.strokeDasharray = `${length}`;
+        path.style.strokeDashoffset = `${length}`;
+      });
+
+      const tl = gsap.timeline({ paused: true });
+
+      tl.fromTo(
+        capture,
+        { opacity: 0, y: 14, scale: 0.985 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.78, ease: "power3.out" },
+        0.04,
+      );
+      tl.fromTo(
+        title,
+        { opacity: 0, y: 16, scale: 0.97 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.62, ease: "power3.out" },
+        0.2,
+      );
+      tl.fromTo(
+        titleRule,
+        { scaleX: 0 },
+        { scaleX: 1, duration: 0.5, ease: "power2.out" },
+        0.72,
+      );
+      tl.fromTo(
+        mask,
+        { opacity: 0, x: -16 },
+        { opacity: 1, x: 0, duration: 0.55, ease: "power3.out" },
+        1.15,
+      );
+      tl.fromTo(
+        hub,
+        { opacity: 0, scale: 0.9 },
+        { opacity: 1, scale: 1, duration: 0.65, ease: "power3.out" },
+        2.12,
+      );
+      tl.fromTo(
+        progress,
+        { scaleX: 0 },
+        { scaleX: 0.3, duration: 2.7, ease: "power1.out" },
+        0.1,
+      );
+
+      nodes.forEach((node, index) => {
+        tl.fromTo(
+          node,
+          { scale: 0, opacity: 0, y: 10 },
+          { scale: 1, opacity: 1, y: 0, duration: 0.66, ease: "power3.out" },
+          2.82 + index * 0.76,
+        );
+      });
+      tl.to(progress, { scaleX: 0.54, duration: 3.2, ease: "power1.inOut" }, 2.8);
+
+      spokes.forEach((path, index) => {
+        tl.to(
+          path,
+          { strokeDashoffset: 0, duration: 0.62, ease: "power2.out" },
+          6 + index * 0.74,
+        );
+        tl.to(
+          ringSegments[index],
+          { strokeDashoffset: 0, duration: 0.72, ease: "power2.out" },
+          6.18 + index * 0.74,
+        );
+        tl.fromTo(
+          evidence[index],
+          { opacity: 0, scale: 0.92, y: 6 },
+          { opacity: 1, scale: 1, y: 0, duration: 0.46, ease: "power3.out" },
+          6.58 + index * 0.74,
+        );
+      });
+      tl.to(progress, { scaleX: 0.8, duration: 3.3, ease: "power1.inOut" }, 6);
+
+      tl.to(
+        zoomOuter,
+        { scale: 1.38, duration: 1.75, ease: "power3.inOut" },
+        9.3,
+      );
+      tl.to(
+        zoomInner,
+        { x: 153, y: -89, duration: 1.75, ease: "power3.inOut" },
+        9.3,
+      );
+      tl.to(
+        capture,
+        { "--dof": "8px", opacity: 0.38, duration: 1.2, ease: "power2.inOut" },
+        9.3,
+      );
+      tl.to(progress, { scaleX: 1, duration: 1.75, ease: "power1.inOut" }, 9.3);
+      tl.fromTo(
+        hubPulse,
+        { scale: 0.65, opacity: 0.4 },
+        { scale: 1, opacity: 1, duration: 0.48, ease: "power3.out" },
+        10.82,
+      );
+      tl.to(hub, { opacity: 1, duration: 0.7, ease: "none" }, 11.3);
+
+      window.__timelines = window.__timelines || {};
+      window.__timelines["03-closed-loop"] = tl;
+    })();
+  </script>
+</template>

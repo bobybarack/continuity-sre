@@ -93,6 +93,7 @@ We learned how powerful the Model Context Protocol (MCP) and Grafana Cloud ecosy
 
 * **Track:** Grafana Labs Track
 * **Hosted Project URL:** https://continuity-sre.pages.dev
+* **Public Grafana Cloud Live Dashboard:** https://joyfuljasmine1550.grafana.net/public-dashboards/4cf5f0a12aee4d48a3ed18abd2c03db7
 * **Google Cloud Run Live API:** https://continuity-api-121300560395.us-central1.run.app
 * **GitHub Repository:** https://github.com/bobybarack/continuity-sre
 * **Built With:** `google-cloud`, `gemini-api`, `google-adk`, `google-genai`, `grafana-cloud`, `cloudflare-pages`, `prometheus`, `loki`, `fastapi`, `python`, `docker`, `cloud-run`, `pytest`

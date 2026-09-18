@@ -37,8 +37,8 @@ export function Sidebar({
       <div>
         {/* Logo & Brand */}
         <div className="flex items-center gap-2.5 px-2 py-3 mb-6 border-b border-gray-100">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-cyan-400 p-1.5 flex items-center justify-center text-white shadow-sm shadow-sky-500/20">
-            <ContinuityLogo className="w-full h-full text-white" />
+          <div className="w-8 h-8 flex items-center justify-center">
+            <ContinuityLogo className="w-8 h-8" />
           </div>
           <div>
             <h1 className="text-sm font-bold text-gray-900 tracking-tight">

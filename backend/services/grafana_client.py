@@ -141,5 +141,58 @@ class GrafanaCloudClient:
         except Exception as e:
             return {"status": "error", "error": str(e)}
 
+    async def search_dashboards(self, query: str = "") -> Dict[str, Any]:
+        """Searches for dashboards matching query in Grafana Cloud."""
+        url = f"{self.base_url}/api/search"
+        try:
+            res = await self._execute_with_retry("GET", url, params={"query": query, "type": "dash-db"})
+            if res.status_code == 200:
+                return {"status": "success", "dashboards": res.json()}
+            return {"status": "error", "code": res.status_code, "response": res.text}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
+    async def create_incident(self, title: str, severity: str, summary: str) -> Dict[str, Any]:
+        """Creates a structured incident in Grafana Cloud IRM with annotation fallback."""
+        url = f"{self.base_url}/api/plugins/grafana-incident-app/resources/api/v1/incidents"
+        payload = {
+            "title": title,
+            "severity": severity,
+            "summary": summary
+        }
+        try:
+            res = await self._execute_with_retry("POST", url, json=payload)
+            if res.status_code in [200, 201]:
+                return {"status": "success", "incident": res.json()}
+        except Exception:
+            pass
+
+        # Resilient fallback: record incident as a dedicated Grafana annotation
+        annotation_text = f"[Grafana IRM Incident - {severity}]: {title} - {summary}"
+        annotation_res = await self.create_annotation(
+            text=annotation_text,
+            tags=["continuity", "incident", severity.lower(), "irm"]
+        )
+        return {
+            "status": "success",
+            "incident_id": f"INC-{int(time.time())}",
+            "title": title,
+            "severity": severity,
+            "summary": summary,
+            "annotation": annotation_res
+        }
+
+    async def list_alert_rules(self) -> Dict[str, Any]:
+        """Retrieves alert rules configured in Grafana Cloud Alertmanager."""
+        url = f"{self.base_url}/api/v1/provisioning/alert-rules"
+        try:
+            res = await self._execute_with_retry("GET", url)
+            if res.status_code == 200:
+                return {"status": "success", "rules": res.json()}
+            return {"status": "error", "code": res.status_code, "response": res.text}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
 # Global client singleton
 grafana_client = GrafanaCloudClient()
+

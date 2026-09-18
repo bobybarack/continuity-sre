@@ -46,7 +46,7 @@ export function LiveLogsCard({ telemetry, history }: LiveLogsCardProps) {
         {/* Live Structured Logs Feed */}
         <div
           ref={scrollContainerRef}
-          className="mt-3.5 p-3 bg-gray-50 rounded-xl border border-gray-200/60 font-mono text-[11px] space-y-2 max-h-48 overflow-y-auto"
+          className="mt-3.5 p-3 bg-gray-50 rounded-xl border border-gray-200/60 font-mono text-[11px] space-y-2 max-h-36 overflow-y-auto"
         >
           <div className="flex items-start gap-2 text-gray-600">
             <span className="text-gray-400 shrink-0">[14:04:15]</span>

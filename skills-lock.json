@@ -37,6 +37,18 @@
       "skillPath": "skills/soft-skill/SKILL.md",
       "computedHash": "7db385e4c5370e5a7fca9704a1361b056e4504ea6a03924bb86f33a4f00b5c73"
     },
+    "hyperframes-core": {
+      "source": "heygen-com/hyperframes",
+      "sourceType": "github",
+      "skillPath": "skills/hyperframes-core/SKILL.md",
+      "computedHash": "596d2412b9ea5399998aeda36922e7736786bafbe1275d24d377539cfc08f9f4"
+    },
+    "hyperframes-registry": {
+      "source": "heygen-com/hyperframes",
+      "sourceType": "github",
+      "skillPath": "skills/hyperframes-registry/SKILL.md",
+      "computedHash": "0b2f695074d7a278b5a01610855c95a8eb92b8f52685e204d39e7b849d0858c4"
+    },
     "image-to-code": {
       "source": "Leonxlnx/taste-skill",
       "sourceType": "github",
