@@ -9,11 +9,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
 from main import app
 from services.agent_commander import agent_commander
 from services.chaos import chaos_manager
+from services.mcp_service import official_mcp_bridge
 
 def test_agent_configuration():
     """Verifies that the Gemini Agent is initialized with the valid Google Cloud API key and model."""
     assert agent_commander.is_configured() is True
     assert agent_commander.model_name in ["models/gemini-3.6-flash", "models/gemini-3.7-flash", "models/gemini-2.5-flash"]
+
+@pytest.mark.asyncio
+async def test_official_grafana_mcp_bridge_discovery():
+    """Verifies that the official mcp-grafana runtime server exposes the full tool catalog over stdio."""
+    tools = await official_mcp_bridge.list_official_tools()
+    assert len(tools) >= 50
+    tool_names = [t["name"] for t in tools]
+    assert "query_prometheus" in tool_names
+    assert "query_loki_logs" in tool_names
+    assert "create_annotation" in tool_names
+    assert "create_incident" in tool_names
 
 @pytest.mark.asyncio
 async def test_agent_healthy_stream_evaluation():
@@ -74,6 +86,13 @@ async def test_agent_api_endpoints():
         data_status = res_status.json()
         assert data_status["configured"] is True
         assert "gemini" in data_status["model"]
+
+        # Check Official MCP Tool Catalog
+        res_mcp = await client.get("/api/agent/mcp-tools")
+        assert res_mcp.status_code == 200
+        data_mcp = res_mcp.json()
+        assert data_mcp["status"] == "CONNECTED"
+        assert data_mcp["total_tools"] >= 50
         
         # Trigger Investigation Endpoint
         res_inv = await client.post("/api/agent/investigate-and-remediate")
