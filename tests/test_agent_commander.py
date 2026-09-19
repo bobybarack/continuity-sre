@@ -108,3 +108,40 @@ async def test_agent_api_endpoints():
         data_hist = res_hist.json()
         assert isinstance(data_hist, list)
         assert len(data_hist) >= 1
+
+@pytest.mark.asyncio
+async def test_closed_loop_verifier_readback_and_pending_guard(monkeypatch):
+    """Verifies that continuity_verify_closed_loop_recovery performs Prometheus read-back, and when PENDING, does not log 'Incident Resolved'."""
+    from services.mcp_service import continuity_verify_closed_loop_recovery
+
+    # 1. During an active un-remediated outage, verifier must return PENDING
+    chaos_manager.inject_cdn_outage()
+    verify_pending = await continuity_verify_closed_loop_recovery()
+    assert verify_pending["status"] == "PENDING"
+    assert verify_pending["verified"] is False
+    assert verify_pending["prometheus_query"] == "rate(ott_video_playback_failures_total[1m])"
+    assert "prometheus_readback_status" in verify_pending
+
+    # 2. When verification returns PENDING, agent must NOT log 'Incident Resolved'
+    async def mock_pending_verify():
+        return {
+            "status": "PENDING",
+            "verified": False,
+            "prometheus_query": "rate(ott_video_playback_failures_total[1m])",
+            "prometheus_readback_status": "success",
+            "prometheus_metric_value": 0.85,
+            "current_vpf_pct": 2.4,
+            "vpf_sla_target": 0.5,
+            "forward_buffer_sec": 8.5,
+            "buffer_target_sec": 20.0,
+            "cdn_latency_ms": 310.0
+        }
+
+    monkeypatch.setattr("services.agent_commander.continuity_verify_closed_loop_recovery", mock_pending_verify)
+    result = await agent_commander.investigate_and_remediate()
+
+    assert result.closed_loop_verified is False
+    assert any("CLOSED-LOOP VERIFICATION PENDING" in line for line in result.reasoning_trace)
+    assert not any("Incident Resolved" in line for line in result.reasoning_trace)
+    assert "PENDING" in result.executive_summary
+
