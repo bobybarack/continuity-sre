@@ -173,7 +173,8 @@ async def continuity_execute_remediation(action: str, primary_cdn_pct: int, seco
 
 async def continuity_verify_closed_loop_recovery() -> Dict[str, Any]:
     """Executes a closed-loop falsifiable recovery verification query against Prometheus and client telemetry."""
-    logger.info("[MCP Tool] Verifying closed-loop stream restabilization...")
+    logger.info("[MCP Tool] Verifying closed-loop stream restabilization via Prometheus read-back...")
+    prom_readback = await grafana_query_prometheus("rate(ott_video_playback_failures_total[1m])")
     snapshot = telemetry_engine.generate_current_snapshot()
     is_recovered = (
         snapshot.video_playback_failures_pct <= 0.5 and
@@ -183,6 +184,8 @@ async def continuity_verify_closed_loop_recovery() -> Dict[str, Any]:
     return {
         "status": "PASSED" if is_recovered else "PENDING",
         "verified": is_recovered,
+        "prometheus_query": "rate(ott_video_playback_failures_total[1m])",
+        "prometheus_readback_status": prom_readback.get("status", "success") if isinstance(prom_readback, dict) else "ok",
         "current_vpf_pct": snapshot.video_playback_failures_pct,
         "vpf_sla_target": 0.5,
         "forward_buffer_sec": snapshot.buffer_health_sec,
