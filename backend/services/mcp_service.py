@@ -176,16 +176,36 @@ async def continuity_verify_closed_loop_recovery() -> Dict[str, Any]:
     logger.info("[MCP Tool] Verifying closed-loop stream restabilization via Prometheus read-back...")
     prom_readback = await grafana_query_prometheus("rate(ott_video_playback_failures_total[1m])")
     snapshot = telemetry_engine.generate_current_snapshot()
-    is_recovered = (
+
+    # Parse Prometheus instant vector readback metric value if available
+    prom_vpf_value = None
+    if isinstance(prom_readback, dict):
+        result_list = prom_readback.get("data", {}).get("result", [])
+        if result_list and isinstance(result_list, list) and len(result_list) > 0:
+            first_val = result_list[0].get("value")
+            if first_val and isinstance(first_val, (list, tuple)) and len(first_val) >= 2:
+                try:
+                    prom_vpf_value = float(first_val[1])
+                except (ValueError, TypeError):
+                    pass
+
+    # Closed-loop recovery verification requires both the live telemetry snapshot and
+    # Prometheus metric read-back (if returned) to satisfy SLA bounds.
+    prom_healthy = (prom_vpf_value <= 0.5) if prom_vpf_value is not None else True
+    telemetry_healthy = (
         snapshot.video_playback_failures_pct <= 0.5 and
         snapshot.cdn_egress_latency_ms <= 150.0 and
         snapshot.buffer_health_sec >= 20.0
     )
+    is_recovered = prom_healthy and telemetry_healthy
+
     return {
         "status": "PASSED" if is_recovered else "PENDING",
         "verified": is_recovered,
         "prometheus_query": "rate(ott_video_playback_failures_total[1m])",
         "prometheus_readback_status": prom_readback.get("status", "success") if isinstance(prom_readback, dict) else "ok",
+        "prometheus_metric_value": prom_vpf_value,
+        "prometheus_raw_readback": prom_readback,
         "current_vpf_pct": snapshot.video_playback_failures_pct,
         "vpf_sla_target": 0.5,
         "forward_buffer_sec": snapshot.buffer_health_sec,
