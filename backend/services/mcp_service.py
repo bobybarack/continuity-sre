@@ -180,14 +180,21 @@ async def continuity_verify_closed_loop_recovery() -> Dict[str, Any]:
     # Parse Prometheus instant vector readback metric value if available
     prom_vpf_value = None
     if isinstance(prom_readback, dict):
-        result_list = prom_readback.get("data", {}).get("result", [])
+        data_field = prom_readback.get("data")
+        result_list = []
+        if isinstance(data_field, dict):
+            result_list = data_field.get("result", [])
+        elif isinstance(data_field, list):
+            result_list = data_field
         if result_list and isinstance(result_list, list) and len(result_list) > 0:
-            first_val = result_list[0].get("value")
-            if first_val and isinstance(first_val, (list, tuple)) and len(first_val) >= 2:
-                try:
-                    prom_vpf_value = float(first_val[1])
-                except (ValueError, TypeError):
-                    pass
+            first_item = result_list[0]
+            if isinstance(first_item, dict):
+                first_val = first_item.get("value")
+                if first_val and isinstance(first_val, (list, tuple)) and len(first_val) >= 2:
+                    try:
+                        prom_vpf_value = float(first_val[1])
+                    except (ValueError, TypeError):
+                        pass
 
     # Closed-loop recovery verification requires both the live telemetry snapshot and
     # Prometheus metric read-back (if returned) to satisfy SLA bounds.

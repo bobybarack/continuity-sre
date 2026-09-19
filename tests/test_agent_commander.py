@@ -138,6 +138,7 @@ async def test_closed_loop_verifier_readback_and_pending_guard(monkeypatch):
         }
 
     monkeypatch.setattr("services.agent_commander.continuity_verify_closed_loop_recovery", mock_pending_verify)
+    monkeypatch.setattr("services.mcp_service.continuity_verify_closed_loop_recovery", mock_pending_verify)
     result = await agent_commander.investigate_and_remediate()
 
     assert result.closed_loop_verified is False
