@@ -80,7 +80,7 @@ class AgentCommander:
         # Step 1: Query Prometheus metrics via official Grafana MCP Tool
         mcp_tools_called.append("grafana_query_prometheus")
         trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [grafana_query_prometheus]: Executing PromQL against Grafana Cloud Mimir...")
-        await grafana_query_prometheus("rate(ott_video_playback_failures_total[1m])")
+        prom_res = await grafana_query_prometheus("rate(ott_video_playback_failures_total[1m])")
         
         snapshot = telemetry_engine.generate_current_snapshot()
         state = chaos_manager.get_state()
@@ -130,7 +130,7 @@ class AgentCommander:
         mcp_tools_called.append("grafana_query_loki")
         trace.append(f"[{time.strftime('%H:%M:%S')}] CRITICAL ANOMALY DETECTED: VPF threshold breached.")
         trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [grafana_query_loki]: Querying edge server error stream via Loki proxy...")
-        await grafana_query_loki('{service="ott-edge-router"} |= "502 Bad Gateway"', limit=20)
+        loki_res = await grafana_query_loki('{service="ott-edge-router"} |= "502 Bad Gateway"', limit=20)
         trace.append(f"[{time.strftime('%H:%M:%S')}] Loki Log Isolated: \"{snapshot.latest_log}\"")
 
         prompt = f"""
@@ -150,6 +150,13 @@ OBSERVABILITY TELEMETRY (Prometheus & Loki via Grafana MCP):
 - Buffer Health: {snapshot.buffer_health_sec}s
 - Delivered Bitrate: {snapshot.avg_bitrate_mbps} Mbps
 - Recent Edge Log: "{snapshot.latest_log}"
+
+RAW GRAFANA CLOUD MCP RESPONSES:
+- Prometheus PromQL Query Response (rate(ott_video_playback_failures_total[1m])):
+{json.dumps(prom_res, indent=2) if isinstance(prom_res, (dict, list)) else prom_res}
+
+- Loki LogQL Query Response ({{service="ott-edge-router"}} |= "502 Bad Gateway"):
+{json.dumps(loki_res, indent=2) if isinstance(loki_res, (dict, list)) else loki_res}
 
 AVAILABLE MCP TOOLS:
 - continuity_execute_remediation: Shift traffic or failover key cluster.
@@ -287,13 +294,25 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             verify_res = await continuity_verify_closed_loop_recovery()
         verified_snapshot = telemetry_engine.generate_current_snapshot()
         
-        trace.append(
-            f"[{time.strftime('%H:%M:%S')}] CLOSED-LOOP VERIFIED: VPF dropped from {snapshot.video_playback_failures_pct}% to {verified_snapshot.video_playback_failures_pct}%. "
-            f"Forward buffer restored to {verified_snapshot.buffer_health_sec}s. Verification Gate: {verify_res['status']}."
-        )
-
+        is_verified = verify_res.get("verified", False) if isinstance(verify_res, dict) else False
+        gate_status = verify_res.get("status", "PENDING") if isinstance(verify_res, dict) else "PENDING"
         elapsed = round(time.time() - start_time, 2)
-        trace.append(f"[{time.strftime('%H:%M:%S')}] Incident Resolved in {elapsed}s. MTTR: {elapsed}s. Stream QoE restabilized to 4K UHD.")
+
+        if is_verified and gate_status == "PASSED":
+            trace.append(
+                f"[{time.strftime('%H:%M:%S')}] CLOSED-LOOP VERIFIED: VPF dropped from {snapshot.video_playback_failures_pct}% to {verified_snapshot.video_playback_failures_pct}%. "
+                f"Forward buffer restored to {verified_snapshot.buffer_health_sec}s. Verification Gate: PASSED."
+            )
+            trace.append(f"[{time.strftime('%H:%M:%S')}] Incident Resolved in {elapsed}s. MTTR: {elapsed}s. Stream QoE restabilized to 4K UHD.")
+            exec_summary = decision.get("executive_summary", "Incident resolved autonomously.")
+        else:
+            trace.append(
+                f"[{time.strftime('%H:%M:%S')}] CLOSED-LOOP VERIFICATION PENDING: Stream QoE metrics have not yet crossed recovery SLA threshold. "
+                f"VPF: {verified_snapshot.video_playback_failures_pct}% (Target <= 0.5%), Buffer: {verified_snapshot.buffer_health_sec}s (Target >= 20s). "
+                f"Verification Gate: PENDING."
+            )
+            trace.append(f"[{time.strftime('%H:%M:%S')}] Closed-loop verification pending at {elapsed}s. Awaiting telemetry convergence; incident not marked resolved.")
+            exec_summary = f"Autonomous remediation applied; closed-loop recovery verification is PENDING (VPF={verified_snapshot.video_playback_failures_pct}%, Buffer={verified_snapshot.buffer_health_sec}s). Incident not yet marked resolved."
 
         result = InvestigationResult(
             timestamp=time.time(),
@@ -317,10 +336,10 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             grafana_incident_id=grafana_incident_id,
             mttr_seconds=elapsed,
             estimated_subscriber_loss_prevented=decision.get("estimated_subscriber_loss_prevented", "$1,450,000 USD"),
-            executive_summary=decision.get("executive_summary", "Incident resolved autonomously."),
+            executive_summary=exec_summary,
             reasoning_trace=trace,
             mcp_tools_executed=mcp_tools_called,
-            closed_loop_verified=verify_res.get("verified", True),
+            closed_loop_verified=is_verified and (gate_status == "PASSED"),
             verified_vpf_rate=verified_snapshot.video_playback_failures_pct,
             verified_buffer_health_sec=verified_snapshot.buffer_health_sec
         )
