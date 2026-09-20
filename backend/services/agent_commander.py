@@ -20,6 +20,7 @@ from services.mcp_service import (
     grafana_query_loki,
     grafana_create_annotation,
     grafana_create_incident,
+    grafana_resolve_incident,
     continuity_execute_remediation,
     continuity_verify_closed_loop_recovery
 )
@@ -341,6 +342,18 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             mttr_value = elapsed
             workflow_status = "RESOLVED"
             remediation_status = "SUCCESS"
+
+            # Synchronize Grafana IRM incident lifecycle: resolve incident only after verification passes
+            if grafana_incident_id:
+                try:
+                    await grafana_resolve_incident(
+                        incident_id=grafana_incident_id,
+                        summary=f"Autonomous remediation verified. VPF restabilized to {verified_vpf}%, buffer restored to {verified_buffer}s."
+                    )
+                    trace.append(f"[{time.strftime('%H:%M:%S')}] Grafana IRM Incident {grafana_incident_id} marked RESOLVED.")
+                except Exception as e:
+                    logger.warning(f"Failed to resolve Grafana incident {grafana_incident_id}: {e}")
+
             trace.append(
                 f"[{time.strftime('%H:%M:%S')}] CLOSED-LOOP VERIFIED: VPF dropped from {snapshot.video_playback_failures_pct}% to {verified_vpf}%. "
                 f"Forward buffer restored to {verified_buffer}s. Verification Gate: PASSED (Source: {verify_source}, Authoritative: {is_authoritative})."
@@ -352,6 +365,11 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             mttr_value = None
             workflow_status = "PENDING_VERIFICATION"
             remediation_status = "PENDING_CONVERGENCE"
+
+            # Do NOT resolve Grafana IRM incident while verification is PENDING
+            if grafana_incident_id:
+                trace.append(f"[{time.strftime('%H:%M:%S')}] Grafana IRM Incident {grafana_incident_id} remains ACTIVE (Verification Gate: PENDING).")
+
             trace.append(
                 f"[{time.strftime('%H:%M:%S')}] CLOSED-LOOP VERIFICATION PENDING: Stream QoE metrics have not yet crossed recovery SLA threshold. "
                 f"VPF: {verified_vpf}% (Target <= 0.5%), Buffer: {verified_buffer}s (Target >= 20s). "

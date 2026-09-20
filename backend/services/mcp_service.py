@@ -131,10 +131,69 @@ async def grafana_create_annotation(text: str, tags: Optional[List[str]] = None)
     })
     if res is not None and isinstance(res, dict):
         if "Payload" in res and isinstance(res["Payload"], dict) and "id" in res["Payload"]:
-            return {"id": res["Payload"]["id"], "message": res["Payload"].get("message", "Annotation added")}
+            return normalize_annotation_result({"id": res["Payload"]["id"], "message": res["Payload"].get("message", "Annotation added")})
         if "id" in res:
-            return res
-    return await grafana_client.create_annotation(text, tags)
+            return normalize_annotation_result(res)
+    direct_res = await grafana_client.create_annotation(text, tags)
+    return normalize_annotation_result(direct_res)
+
+def normalize_incident_result(raw: Any, default_title: str = "", default_severity: str = "") -> Dict[str, Any]:
+    """Normalizes raw response from MCP tool or direct API into a canonical incident dict."""
+    if not isinstance(raw, dict):
+        return {
+            "status": "error",
+            "incident_id": f"INC-{int(time.time())}",
+            "id": f"INC-{int(time.time())}",
+            "title": default_title,
+            "severity": default_severity,
+            "lifecycle_status": "active",
+            "raw": raw
+        }
+    
+    incident_id = (
+        raw.get("incident_id") or
+        raw.get("id") or
+        (raw.get("incident", {}).get("id") if isinstance(raw.get("incident"), dict) else None) or
+        (raw.get("Payload", {}).get("id") if isinstance(raw.get("Payload"), dict) else None) or
+        f"INC-{int(time.time())}"
+    )
+    title = raw.get("title") or (raw.get("incident", {}).get("title") if isinstance(raw.get("incident"), dict) else default_title)
+    severity = raw.get("severity") or (raw.get("incident", {}).get("severity") if isinstance(raw.get("incident"), dict) else default_severity)
+    
+    nested_status = raw.get("incident", {}).get("status") if isinstance(raw.get("incident"), dict) else None
+    if nested_status:
+        lifecycle_status = nested_status
+    elif raw.get("lifecycle_status"):
+        lifecycle_status = raw.get("lifecycle_status")
+    elif raw.get("status") and raw.get("status") not in ("success", "error"):
+        lifecycle_status = raw.get("status")
+    else:
+        lifecycle_status = "active"
+    
+    return {
+        "status": "success",
+        "incident_id": str(incident_id),
+        "id": str(incident_id),
+        "title": str(title),
+        "severity": str(severity),
+        "lifecycle_status": str(lifecycle_status),
+        "raw": raw
+    }
+
+def normalize_annotation_result(raw: Any) -> Dict[str, Any]:
+    """Normalizes raw annotation response from MCP tool or direct API into a canonical dict."""
+    if not isinstance(raw, dict):
+        return {"status": "error", "id": None, "raw": raw}
+    ann_id = (
+        raw.get("id") or
+        (raw.get("annotation", {}).get("id") if isinstance(raw.get("annotation"), dict) else None) or
+        (raw.get("Payload", {}).get("id") if isinstance(raw.get("Payload"), dict) else None)
+    )
+    return {
+        "status": "success" if ann_id else raw.get("status", "success"),
+        "id": int(ann_id) if ann_id and str(ann_id).isdigit() else ann_id,
+        "raw": raw
+    }
 
 async def grafana_create_incident(title: str, severity: str, summary: str) -> Dict[str, Any]:
     """Opens a structured P1/P2 incident record in Grafana Cloud IRM via official MCP Server."""
@@ -144,9 +203,22 @@ async def grafana_create_incident(title: str, severity: str, summary: str) -> Di
         "severity": severity,
         "roomPrefix": "stream-incident"
     })
-    if res is not None and isinstance(res, dict) and ("incident_id" in res or "id" in res):
-        return res
-    return await grafana_client.create_incident(title, severity, summary)
+    if res is not None and isinstance(res, dict) and ("incident_id" in res or "id" in res or "incident" in res):
+        return normalize_incident_result(res, default_title=title, default_severity=severity)
+    direct_res = await grafana_client.create_incident(title, severity, summary)
+    return normalize_incident_result(direct_res, default_title=title, default_severity=severity)
+
+async def grafana_resolve_incident(incident_id: str, summary: str = "Verified closed-loop recovery.") -> Dict[str, Any]:
+    """Resolves an existing incident in Grafana Cloud IRM via official MCP Server or direct API."""
+    logger.info(f"[MCP Tool] Resolving Grafana IRM incident: {incident_id}")
+    res = await official_mcp_bridge.call_official_tool("resolve_incident", {
+        "incident_id": incident_id,
+        "summary": summary
+    })
+    if res is not None and isinstance(res, dict) and res.get("status") == "success":
+        return normalize_incident_result(res)
+    direct_res = await grafana_client.resolve_incident(incident_id, summary)
+    return normalize_incident_result(direct_res)
 
 async def grafana_search_dashboards(query: str = "") -> Dict[str, Any]:
     """Searches active dashboards on the connected Grafana Cloud instance via official MCP Server."""
