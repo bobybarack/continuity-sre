@@ -224,6 +224,10 @@ async def continuity_verify_closed_loop_recovery() -> Dict[str, Any]:
     )
     is_recovered = prom_healthy and telemetry_healthy
 
+    is_remote_authoritative = (prom_source == "grafana_cloud_prometheus")
+    is_value_available = (prom_vpf_value is not None)
+    is_source_trusted = prom_source in ["grafana_cloud_prometheus", "prometheus_collector_registry"] and is_value_available
+
     return {
         "status": "PASSED" if is_recovered else "PENDING",
         "verified": is_recovered,
@@ -231,7 +235,9 @@ async def continuity_verify_closed_loop_recovery() -> Dict[str, Any]:
         "prometheus_readback_status": prom_readback.get("status", "success") if isinstance(prom_readback, dict) else "ok",
         "prometheus_metric_value": prom_vpf_value,
         "prometheus_source": prom_source,
-        "prometheus_authoritative": prom_vpf_value is not None,
+        "prometheus_value_available": is_value_available,
+        "prometheus_authoritative": is_remote_authoritative,
+        "verification_source_trusted": is_source_trusted,
         "prometheus_raw_readback": prom_readback,
         "current_vpf_pct": snapshot.video_playback_failures_pct,
         "vpf_sla_target": 0.5,
