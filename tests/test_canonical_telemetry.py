@@ -94,9 +94,9 @@ async def test_agent_and_api_observe_same_canonical_snapshot():
 async def test_verification_corresponds_to_canonical_snapshot():
     """Test 6: Verification output uses canonical snapshot values rather than a second random sample."""
     chaos_manager.reset_to_normal()
-    canonical_snap = telemetry_engine.get_current_snapshot()
     
-    verify_res = await continuity_verify_closed_loop_recovery()
+    verify_res = await continuity_verify_closed_loop_recovery(timeout_sec=0.2, poll_interval_sec=0.1)
+    canonical_snap = telemetry_engine.get_current_snapshot()
     
     assert verify_res["current_vpf_pct"] == canonical_snap.video_playback_failures_pct
     assert verify_res["forward_buffer_sec"] == canonical_snap.buffer_health_sec
