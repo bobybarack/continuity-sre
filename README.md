@@ -384,7 +384,9 @@ The tool returns either:
 along with verification metadata including:
 - `prometheus_metric_value`
 - `prometheus_source`
+- `prometheus_value_available`
 - `prometheus_authoritative`
+- `verification_source_trusted`
 - `current_vpf_pct`
 - `forward_buffer_sec`
 - `cdn_latency_ms`
