@@ -47,15 +47,19 @@ export function GeminiAgentTerminal({
   ];
 
   const trace = latestInvestigation?.reasoning_trace || defaultTrace;
-  const mttr = latestInvestigation?.mttr_seconds || 4.2;
+  const mttr = latestInvestigation?.mttr_seconds
+    ? `${latestInvestigation.mttr_seconds}s`
+    : latestInvestigation?.workflow_elapsed_seconds
+    ? `${latestInvestigation.workflow_elapsed_seconds}s (Pending)`
+    : "Nominal";
   const churnSaved =
     latestInvestigation?.estimated_subscriber_loss_prevented ||
-    "$1,450,000 USD (32,000 churn cancellations avoided)";
+    "$0 USD (Nominal Operation)";
   const rca = latestInvestigation?.root_cause_analysis;
   const actionTaken = latestInvestigation?.autonomous_action_taken;
   const subsystems = latestInvestigation?.affected_subsystems || [
-    "Fastly Edge POP 'iad-01'",
-    "Transit ASN 3356",
+    "Edge CDN",
+    "Transit Subsystems",
   ];
 
   // Pipeline stages
@@ -236,7 +240,9 @@ export function GeminiAgentTerminal({
       <div className="mt-4 pt-3 border-t border-white/[0.06] flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2 text-xs font-mono text-white/50">
           <span className="w-2 h-2 rounded-full bg-[#00f5a0]" />
-          <span>Grafana Cloud IRM: Auto-Annotation Enabled (ID: 88402)</span>
+          <span>
+            Grafana Cloud IRM: Auto-Annotation {latestInvestigation?.annotation_id ? `(ID: ${latestInvestigation.annotation_id})` : "Enabled"}
+          </span>
         </div>
 
         {/* Button-In-Button Interactive CTA */}

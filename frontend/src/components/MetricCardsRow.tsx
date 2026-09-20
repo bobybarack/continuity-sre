@@ -34,7 +34,7 @@ export function MetricCardsRow({ current }: MetricCardsRowProps) {
                 : "bg-emerald-50 text-emerald-700 border-emerald-200"
             }`}
           >
-            {isVpfSpike ? "+4.67%" : "+0.02%"}
+            {isVpfSpike ? "Critical Breach" : "Optimal (<0.5%)"}
           </span>
         </div>
         <div>
@@ -48,7 +48,7 @@ export function MetricCardsRow({ current }: MetricCardsRowProps) {
             </span>
           </div>
           <p className="text-xs text-gray-400 mt-1">
-            {isVpfSpike ? "SLA Threshold Breached" : "Target: Under 1.00% SLA"}
+            {isVpfSpike ? "SLA Threshold Breached" : "Target: Under 0.50% SLA"}
           </p>
         </div>
       </div>
@@ -81,7 +81,7 @@ export function MetricCardsRow({ current }: MetricCardsRowProps) {
             <span className="text-xs text-gray-500 font-semibold">ms</span>
           </div>
           <p className="text-xs text-gray-400 mt-1">
-            {isLatencySpike ? "High Transit Congestion" : "Down 4ms this hour"}
+            {isLatencySpike ? "High Transit Congestion" : "Nominal Edge Egress"}
           </p>
         </div>
       </div>
@@ -126,7 +126,7 @@ export function MetricCardsRow({ current }: MetricCardsRowProps) {
             Concurrent Viewers
           </span>
           <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-            +3.4% Live
+            Live Audience
           </span>
         </div>
         <div>
@@ -135,7 +135,9 @@ export function MetricCardsRow({ current }: MetricCardsRowProps) {
               {viewers.toLocaleString()}
             </span>
           </div>
-          <p className="text-xs text-gray-400 mt-1">4.28M Global Viewers</p>
+          <p className="text-xs text-gray-400 mt-1">
+            {(viewers / 1_000_000).toFixed(2)}M Active Viewers
+          </p>
         </div>
       </div>
 

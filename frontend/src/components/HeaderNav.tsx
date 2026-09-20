@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { ContinuityLogo } from "./ContinuityLogo";
 import {
-  Radio01Icon,
   CpuIcon,
   CloudIcon,
   Activity01Icon,
@@ -15,14 +14,13 @@ import { TelemetrySnapshot, GrafanaHealth } from "../types/telemetry";
 
 interface HeaderNavProps {
   telemetry: TelemetrySnapshot | null;
-  grafanaHealth: GrafanaHealth | null;
+  grafanaHealth?: GrafanaHealth | null;
   onOpenPostMortem: () => void;
   investigationCount: number;
 }
 
 export function HeaderNav({
   telemetry,
-  grafanaHealth,
   onOpenPostMortem,
   investigationCount,
 }: HeaderNavProps) {
@@ -51,7 +49,7 @@ export function HeaderNav({
     ? "CRITICAL SLA BREACH"
     : isRecovered
     ? "STREAM SELF-HEALED"
-    : "SLA NOMINAL (99.98%)";
+    : "STREAM NOMINAL (OPERATIONAL)";
 
   const statusColorClass = isOutage
     ? "bg-[#ff3366]/15 border-[#ff3366]/40 text-[#ff3366] alert-pulse-red"
@@ -79,7 +77,7 @@ export function HeaderNav({
                   </span>
                 </h1>
                 <span className="hidden sm:inline-block text-white/30 text-xs font-mono">
-                  //
+                  {"//"}
                 </span>
                 <span className="text-xs font-mono tracking-wide text-[#00d2ff] uppercase">
                   Autonomous OTT Streaming Incident Commander

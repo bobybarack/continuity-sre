@@ -25,8 +25,13 @@ export function SreCommanderCard({
   const rca = latestInvestigation?.root_cause_analysis;
   const churnSaved =
     latestInvestigation?.estimated_subscriber_loss_prevented ||
-    "$1,450,000 USD";
-  const mttr = latestInvestigation?.mttr_seconds || 4.2;
+    "$0 (Nominal)";
+  const hasMttr = typeof latestInvestigation?.mttr_seconds === "number" && latestInvestigation.mttr_seconds !== null;
+  const mttrDisplay = hasMttr
+    ? `${latestInvestigation!.mttr_seconds}s MTTR`
+    : latestInvestigation?.workflow_elapsed_seconds
+    ? `${latestInvestigation.workflow_elapsed_seconds}s (Pending)`
+    : "Nominal";
 
   return (
     <div className="bg-white border border-gray-200/80 rounded-2xl p-5 subtle-card-shadow flex flex-col justify-between h-full">
@@ -72,16 +77,16 @@ export function SreCommanderCard({
         <div className="grid grid-cols-2 gap-3 mt-3">
           <div className="p-3 bg-gray-50 rounded-xl border border-gray-200/60">
             <span className="text-[11px] text-gray-400 font-semibold uppercase block">
-              Mean Resolution Time
+              Last Verified Recovery
             </span>
             <span className="text-base font-bold text-emerald-600 mt-0.5 block">
-              {mttr}s MTTR
+              {mttrDisplay}
             </span>
           </div>
 
           <div className="p-3 bg-gray-50 rounded-xl border border-gray-200/60">
             <span className="text-[11px] text-gray-400 font-semibold uppercase block">
-              Subscriber Churn Saved
+              Projected Churn Model
             </span>
             <span className="text-base font-bold text-emerald-600 mt-0.5 block">
               {churnSaved.split(" ")[0]}

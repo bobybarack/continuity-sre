@@ -39,7 +39,7 @@ export interface InvestigationResult {
     primary_cdn_pct?: number;
     secondary_cdn?: string;
     secondary_cdn_pct?: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   annotation_id?: number | null;
   grafana_incident_id?: string | null;

@@ -4,11 +4,6 @@ import React, { useRef, useEffect, useState } from "react";
 import {
   ChartLineData01Icon,
   DatabaseIcon,
-  CloudIcon,
-  Activity01Icon,
-  Alert01Icon,
-  CheckmarkCircle01Icon,
-  RefreshIcon,
 } from "hugeicons-react";
 import { DoubleBezelCard } from "./DoubleBezelCard";
 import { TelemetrySnapshot, GrafanaHealth } from "../types/telemetry";
@@ -16,13 +11,12 @@ import { TelemetrySnapshot, GrafanaHealth } from "../types/telemetry";
 interface GrafanaTelemetryPanelProps {
   telemetry: TelemetrySnapshot | null;
   history: TelemetrySnapshot[];
-  grafanaHealth: GrafanaHealth | null;
+  grafanaHealth?: GrafanaHealth | null;
 }
 
 export function GrafanaTelemetryPanel({
   telemetry,
   history,
-  grafanaHealth,
 }: GrafanaTelemetryPanelProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<"vpf" | "latency" | "drm">("vpf");
@@ -61,26 +55,22 @@ export function GrafanaTelemetryPanel({
     let threshold = 1.0;
     let strokeColor = "#00f5a0";
     let unit = "%";
-    let title = "VPF Error Rate";
 
     if (selectedMetric === "vpf") {
       values = history.map((s) => s.video_playback_failures_pct);
       threshold = 1.0;
       strokeColor = "#ff3366";
       unit = "%";
-      title = "rate(ott_video_playback_failures_total[1m])";
     } else if (selectedMetric === "latency") {
       values = history.map((s) => s.cdn_egress_latency_ms);
       threshold = 150.0;
       strokeColor = "#00d2ff";
       unit = "ms";
-      title = "ott_cdn_egress_latency_ms";
     } else {
       values = history.map((s) => s.drm_handshake_ms);
       threshold = 400.0;
       strokeColor = "#6366f1";
       unit = "ms";
-      title = "ott_drm_handshake_ms";
     }
 
     const maxVal = Math.max(...values, threshold * 1.25, 1);
@@ -227,7 +217,7 @@ export function GrafanaTelemetryPanel({
               Loki Edge Logs Stream
             </span>
             <span className="text-[10px] text-white/40 font-mono">
-              Query: &#123;app="edge-cdn"&#125;
+              Query: &#123;app=&quot;edge-cdn&quot;&#125;
             </span>
           </div>
 

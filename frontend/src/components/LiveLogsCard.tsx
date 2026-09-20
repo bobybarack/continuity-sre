@@ -6,10 +6,10 @@ import { TelemetrySnapshot } from "../types/telemetry";
 
 interface LiveLogsCardProps {
   telemetry: TelemetrySnapshot | null;
-  history: TelemetrySnapshot[];
+  history?: TelemetrySnapshot[];
 }
 
-export function LiveLogsCard({ telemetry, history }: LiveLogsCardProps) {
+export function LiveLogsCard({ telemetry }: LiveLogsCardProps) {
   const isOutage = telemetry?.is_outage ?? false;
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -23,17 +23,18 @@ export function LiveLogsCard({ telemetry, history }: LiveLogsCardProps) {
   return (
     <div className="bg-white border border-gray-200/80 rounded-2xl p-5 subtle-card-shadow flex flex-col justify-between h-full">
       <div>
+        {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-gray-100">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
-              <DatabaseIcon className="w-4 h-4 text-emerald-600" />
+            <div className="p-2 rounded-xl bg-purple-50 text-purple-600 border border-purple-100">
+              <DatabaseIcon className="w-5 h-5" />
             </div>
             <div>
               <h3 className="text-sm font-bold text-gray-900 tracking-tight">
                 Live Edge Error & Ingest Stream
               </h3>
               <p className="text-xs text-gray-500 font-medium">
-                Query: &#123;app="ott-edge-router"&#125;
+                Query: &#123;service=&quot;ott-edge-router&quot;&#125;
               </p>
             </div>
           </div>
@@ -67,8 +68,8 @@ export function LiveLogsCard({ telemetry, history }: LiveLogsCardProps) {
           )}
 
           <div className="flex items-start gap-2 text-gray-700">
-            <span className="text-gray-400 shrink-0">[14:04:18]</span>
-            <span className="text-blue-600 font-bold shrink-0">LOKI INGEST</span>
+            <span className="text-gray-400 shrink-0">[Live]</span>
+            <span className="text-blue-600 font-bold shrink-0">SIMULATED EDGE EVENT</span>
             <span className="truncate">
               {telemetry?.latest_log || "All edge delivery streams nominal"}
             </span>
@@ -77,8 +78,8 @@ export function LiveLogsCard({ telemetry, history }: LiveLogsCardProps) {
       </div>
 
       <div className="mt-4 pt-3 border-t border-gray-100 text-xs text-gray-500 font-medium flex items-center justify-between">
-        <span>Prometheus & Loki Data Ingest</span>
-        <span className="font-semibold text-emerald-600">100% Ingest Rate</span>
+        <span>Prometheus & Loki Data Pipeline</span>
+        <span className="font-semibold text-emerald-600">Active Pipeline</span>
       </div>
     </div>
   );

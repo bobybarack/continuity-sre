@@ -39,8 +39,8 @@ export class ApiService {
   }
 
   // Agent APIs
-  static async getAgentStatus(): Promise<any> {
-    return this.request<any>("/api/agent/status");
+  static async getAgentStatus(): Promise<Record<string, unknown>> {
+    return this.request<Record<string, unknown>>("/api/agent/status");
   }
 
   static async investigateAndRemediate(): Promise<InvestigationResult> {
@@ -79,7 +79,7 @@ export class ApiService {
   }
 
   // SSE Stream Generator with auto-reconnect
-  static createTelemetryEventSource(onMessage: (data: TelemetrySnapshot) => void, onError?: (err: any) => void): () => void {
+  static createTelemetryEventSource(onMessage: (data: TelemetrySnapshot) => void, onError?: (err: Event | unknown) => void): () => void {
     let eventSource: EventSource | null = null;
     let isCancelled = false;
 
@@ -107,7 +107,7 @@ export class ApiService {
             setTimeout(connect, 2000);
           }
         };
-      } catch (e) {
+      } catch {
         if (!isCancelled) {
           setTimeout(connect, 3000);
         }

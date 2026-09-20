@@ -95,8 +95,10 @@ async def test_agent_api_endpoints():
         assert data_mcp["status"] == "CONNECTED"
         assert data_mcp["total_tools"] >= 50
         
-        # Trigger Investigation Endpoint
-        res_inv = await client.post("/api/agent/investigate-and-remediate")
+        # Trigger Investigation Endpoint (protected by demo key)
+        from config import CONTINUITY_DEMO_KEY
+        auth_headers = {"X-Continuity-Demo-Key": CONTINUITY_DEMO_KEY}
+        res_inv = await client.post("/api/agent/investigate-and-remediate", headers=auth_headers)
         assert res_inv.status_code == 200
         data_inv = res_inv.json()
         assert "severity" in data_inv

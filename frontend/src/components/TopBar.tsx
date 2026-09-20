@@ -71,7 +71,7 @@ export function TopBar({
               ? "Critical Edge Outage Active"
               : isRecovered
               ? "Failover Restored"
-              : "SLA Operational (99.98%)"}
+              : "Stream Operational (Nominal)"}
           </span>
         </div>
 

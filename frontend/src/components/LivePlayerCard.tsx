@@ -156,10 +156,18 @@ export function LivePlayerCard({ telemetry }: LivePlayerCardProps) {
             <div className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center p-4 text-center">
               <Alert01Icon className="w-8 h-8 text-red-500 animate-bounce mb-1" />
               <p className="text-xs font-bold text-white uppercase">
-                Edge Buffer Stall Detected
+                {telemetry?.chaos_mode === "DRM_TIMEOUT"
+                  ? "DRM License Acquisition Stall"
+                  : telemetry?.chaos_mode === "ISP_PEERING_DROP"
+                  ? "Transit Peering Degradation"
+                  : "Edge Buffer Stall Detected"}
               </p>
               <p className="text-[11px] text-gray-300 mt-0.5">
-                Fastly POP 'iad-01' packet loss
+                {telemetry?.chaos_mode === "DRM_TIMEOUT"
+                  ? "Widevine key authentication proxy timeout"
+                  : telemetry?.chaos_mode === "ISP_PEERING_DROP"
+                  ? "Tier-1 BGP transit peering packet loss (ASN 3356)"
+                  : "Primary edge CDN upstream connection failure (HTTP 502)"}
               </p>
             </div>
           )}

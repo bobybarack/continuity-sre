@@ -25,9 +25,11 @@ export default function ContinuityDashboard() {
   const [isInvestigating, setIsInvestigating] = useState<boolean>(false);
   const [isActionLoading, setIsActionLoading] = useState<boolean>(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
+  const [demoFixtureStage, setDemoFixtureStage] = useState<string | null>(null);
 
   // Initial Data Fetch & Demo Stage Handling
   const applyDemoStage = useCallback((stage: string) => {
+    setDemoFixtureStage(stage);
     const baseSnap = (vpf: number, lat: number, mode: string, isOutage: boolean, buf: number, br: number, pPct: number, sPct: number, label: string, color: string, log: string): TelemetrySnapshot => ({
       timestamp: Date.now() / 1000,
       stream_title: "Spider-Man: Brand New Day (World Premiere 4K UHD)",
@@ -58,27 +60,42 @@ export default function ContinuityDashboard() {
       drm_handshake_ms: 118.0,
       severity: "CRITICAL",
       root_cause_analysis:
-        "Google Cloud Gemini 3.7 Flash correlated Loki 502 Bad Gateway logs with Prometheus VPF surge (5.08% > 1.00% SLA). Diagnosed fiber severance on Level 3 transit ASN 3356 in Ashburn, VA impacting Fastly POP iad-01. Automated Zero-Downtime Traffic Rebalance initiated: 80% shifted to Akamai Cloud CDN.",
-      affected_subsystems: ["Fastly Edge POP iad-01", "Level 3 Transit ASN 3356"],
-      autonomous_action_taken: "SHIFT_EGRESS_TO_SECONDARY_CDN (Fastly 20% / Akamai 80%)",
+        "Correlated Loki edge logs with Prometheus VPF surge (5.08% > 1.00% threshold). Automated traffic rebalance initiated: 80% shifted to secondary CDN.",
+      affected_subsystems: ["Edge CDN POP", "Primary Transit Provider"],
+      autonomous_action_taken: "SHIFT_TRAFFIC_TO_AKAMAI",
+      remediation_action: "SHIFT_TRAFFIC_TO_AKAMAI",
+      remediation_status: "APPLIED",
+      workflow_status: "RESOLVED",
       traffic_shift_details: {
         primary_cdn: "Fastly Edge POP",
         primary_cdn_pct: 20,
         secondary_cdn: "Akamai Cloud CDN",
         secondary_cdn_pct: 80,
       },
+      workflow_elapsed_seconds: 1.28,
       mttr_seconds: 1.28,
-      estimated_subscriber_loss_prevented: "$1,450,000 USD",
-      executive_summary:
-        "Automated mitigation prevented estimated 290,000 subscriber drop-offs during premiere window.",
+      estimated_subscriber_loss_prevented: "Simulated Model: Zero Impact",
+      executive_summary: "Automated mitigation completed with verified recovery in 1.28s.",
+      closed_loop_verified: true,
+      verified_vpf_rate: 0.21,
+      verified_buffer_health_sec: 27.9,
+      verified_latency_ms: 46.0,
+      verification_status: "PASSED",
+      verification_source: "grafana_cloud_prometheus",
+      verification_authoritative: true,
+      mcp_tools_executed: [
+        "continuity_query_prometheus",
+        "continuity_query_loki",
+        "continuity_execute_remediation",
+        "continuity_verify_stream_recovery",
+      ],
       reasoning_trace: [
-        "Ingesting Prometheus streaming_playback_failure_rate metric (5.08%)",
-        "Querying Grafana Loki {app=\"ott-edge-router\"} |= \"502\" (940 err/sec)",
-        "Gemini 3.7 Flash: Diagnosed fiber cut on Level 3 transit ASN 3356",
-        "Dispatching dynamic traffic re-route to Akamai Cloud CDN us-east-2",
-        "Applied route weight: Fastly 20%, Akamai 80% (Zero downtime)",
-        "Verifying downstream forward buffer recovery: 28.1s achieved",
-        "Incident resolved. MTTR: 1.28s. SLA fully restored.",
+        "Ingesting Prometheus ott_video_playback_failures_ratio metric (5.08%)",
+        "Querying Grafana Loki {service=\"ott-edge-router\"} |= \"502 Bad Gateway\"",
+        "Diagnosed edge POP degradation; selecting secondary CDN failover target",
+        "Dispatching SHIFT_TRAFFIC_TO_AKAMAI",
+        "Verifying downstream forward buffer and VPF recovery via Prometheus",
+        "Closed-loop verification passed: VPF 0.21% (threshold < 1.00%)",
       ],
     };
 
@@ -152,23 +169,7 @@ export default function ContinuityDashboard() {
     }
   }, []);
 
-  // Expose demo switcher to global window
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      (window as any).__setDemoState = applyDemoStage;
-      const params = new URLSearchParams(window.location.search);
-      const stage = params.get("stage");
-      if (stage) {
-        applyDemoStage(stage);
-      }
-    }
-  }, [applyDemoStage]);
-
-  const fetchInitialData = useCallback(async () => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("stage")) return;
-    }
+  const reloadLiveState = useCallback(async () => {
     try {
       const [cur, hist, state, invHist] = await Promise.allSettled([
         ApiService.getCurrentTelemetry(),
@@ -182,13 +183,52 @@ export default function ContinuityDashboard() {
       if (state.status === "fulfilled") setChaosState(state.value);
       if (invHist.status === "fulfilled") setInvestigations(invHist.value);
     } catch (err) {
-      console.warn("Initial data load partial failure:", err);
+      console.warn("Live data load partial failure:", err);
     }
   }, []);
 
+  // Expose demo switcher to global window
   useEffect(() => {
-    fetchInitialData();
-  }, [fetchInitialData]);
+    if (typeof window !== "undefined") {
+      (window as unknown as { __setDemoState: (s: string) => void }).__setDemoState = applyDemoStage;
+      const params = new URLSearchParams(window.location.search);
+      const stage = params.get("stage");
+      if (stage) {
+        queueMicrotask(() => {
+          applyDemoStage(stage);
+        });
+      }
+    }
+  }, [applyDemoStage]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const load = async () => {
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("stage")) return;
+      }
+      try {
+        const [cur, hist, state, invHist] = await Promise.allSettled([
+          ApiService.getCurrentTelemetry(),
+          ApiService.getTelemetryHistory(),
+          ApiService.getChaosState(),
+          ApiService.getInvestigationHistory(),
+        ]);
+        if (!isMounted) return;
+        if (cur.status === "fulfilled") setTelemetry(cur.value);
+        if (hist.status === "fulfilled") setHistory(hist.value);
+        if (state.status === "fulfilled") setChaosState(state.value);
+        if (invHist.status === "fulfilled") setInvestigations(invHist.value);
+      } catch (err) {
+        console.warn("Initial data load partial failure:", err);
+      }
+    };
+    void load();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Ensure window stays at top on initial link visit
   useEffect(() => {
@@ -299,6 +339,16 @@ export default function ContinuityDashboard() {
     }
   };
 
+  const handleExitFixture = () => {
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("stage");
+      window.history.replaceState({}, "", url.toString());
+      setDemoFixtureStage(null);
+      reloadLiveState();
+    }
+  };
+
   const latestInvestigation = investigations.length > 0 ? investigations[0] : null;
   const isOutage = telemetry?.is_outage ?? false;
 
@@ -306,6 +356,26 @@ export default function ContinuityDashboard() {
     <div className="min-h-[100dvh] bg-[#f8f9fb]">
       {/* Main Full-Width Container */}
       <main className="max-w-[1680px] mx-auto px-4 py-3 sm:px-6 sm:py-3.5 space-y-3.5">
+        {/* Demo Fixture Mode Indicator Banner */}
+        {demoFixtureStage && (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-2 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-mono uppercase font-bold text-amber-600 bg-amber-500/20 px-1.5 py-0.5 rounded text-[10px]">
+                DEMO FIXTURE
+              </span>
+              <span className="text-amber-800 font-medium">
+                Offline Preset Stage: <span className="font-mono font-bold">{demoFixtureStage}</span> &mdash; Telemetry is simulated client-side.
+              </span>
+            </div>
+            <button
+              onClick={handleExitFixture}
+              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded text-[11px] transition-colors"
+            >
+              Switch to Live Telemetry
+            </button>
+          </div>
+        )}
+
         {/* Top Header with Brand & Incident Notification Bell */}
         <TopBar
           telemetry={telemetry}

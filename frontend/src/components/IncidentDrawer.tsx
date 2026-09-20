@@ -80,10 +80,10 @@ export function IncidentDrawer({
                 <div className="grid grid-cols-2 gap-2">
                   <div className="p-2 bg-white rounded-lg border border-gray-200/60">
                     <span className="text-[10px] text-gray-400 font-semibold uppercase block">
-                      Resolution Time
+                      Recovery Time
                     </span>
                     <span className="text-xs font-bold text-emerald-600 mt-0.5 block">
-                      {inv.mttr_seconds}s MTTR
+                      {inv.mttr_seconds ? `${inv.mttr_seconds}s MTTR` : (inv.workflow_elapsed_seconds ? `${inv.workflow_elapsed_seconds}s Elapsed` : "Pending")}
                     </span>
                   </div>
 
@@ -102,10 +102,10 @@ export function IncidentDrawer({
                   {inv.root_cause_analysis}
                 </div>
 
-                {/* Reasoning Trace */}
-                <div>
-                  <span className="text-[11px] font-semibold text-gray-500 uppercase block mb-1">
-                    Gemini Reasoning Trace:
+                {/* Reasoning Trace Terminal */}
+                <div className="mt-3">
+                  <span className="text-[10px] text-gray-400 font-semibold uppercase block mb-1.5">
+                    Gemini Reasoning Log
                   </span>
                   <div className="p-2 bg-gray-900 rounded-lg text-gray-300 font-mono text-[10px] space-y-1 max-h-28 overflow-y-auto">
                     {inv.reasoning_trace.map((step, sIdx) => (
@@ -121,7 +121,15 @@ export function IncidentDrawer({
         {/* Footer */}
         <div className="p-4 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500 font-medium">
           <span>Total Incidents: {investigations.length}</span>
-          <span className="text-emerald-600 font-semibold">100% Resolved</span>
+          <span className="text-emerald-600 font-semibold">
+            {investigations.length === 0
+              ? "No Incidents Recorded"
+              : `${investigations.filter((i) => i.closed_loop_verified || i.workflow_status === "RESOLVED").length} Resolved${
+                  investigations.filter((i) => !i.closed_loop_verified && i.workflow_status !== "RESOLVED").length > 0
+                    ? ` (${investigations.filter((i) => !i.closed_loop_verified && i.workflow_status !== "RESOLVED").length} Pending)`
+                    : ""
+                }`}
+          </span>
         </div>
       </div>
     </div>

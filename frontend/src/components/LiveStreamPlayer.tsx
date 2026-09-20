@@ -312,7 +312,11 @@ export function LiveStreamPlayer({ telemetry }: LiveStreamPlayerProps) {
                 CRITICAL EDGE BOTTLENECK / BUFFER UNDERFLOW
               </h3>
               <p className="text-xs font-mono text-white/70 max-w-md mt-1 leading-relaxed">
-                Fastly POP 'iad-01' transit collapse. Video playback failure rate exceeded 4.8%. Forward buffer collapsing to {bufferSec.toFixed(1)}s.
+                {telemetry?.chaos_mode === "DRM_TIMEOUT"
+                  ? `Widevine key proxy acquisition timeout. Forward buffer draining to ${bufferSec.toFixed(1)}s.`
+                  : telemetry?.chaos_mode === "ISP_PEERING_DROP"
+                  ? `Tier-1 BGP peering drop (ASN 3356). Bitrate degradation; buffer collapsing to ${bufferSec.toFixed(1)}s.`
+                  : `Primary Edge CDN transit collapse. Playback failure rate exceeded 4.8%. Forward buffer collapsing to ${bufferSec.toFixed(1)}s.`}
               </p>
               <div className="mt-3.5 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#ff3366]/30 border border-[#ff3366]/60 text-xs font-mono text-white">
                 <span className="w-2 h-2 rounded-full bg-[#ff3366] animate-ping" />

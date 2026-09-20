@@ -7,6 +7,7 @@ from httpx import AsyncClient, ASGITransport
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
 
 from main import app
+from config import CONTINUITY_DEMO_KEY
 from services.chaos import chaos_manager
 
 @pytest.mark.asyncio
@@ -54,31 +55,39 @@ async def test_prometheus_metrics_endpoint():
 @pytest.mark.asyncio
 async def test_chaos_lifecycle_flow():
     transport = ASGITransport(app=app)
+    auth_headers = {"X-Continuity-Demo-Key": CONTINUITY_DEMO_KEY}
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         # Reset
-        res_reset = await client.post("/api/chaos/reset")
+        res_reset = await client.post("/api/chaos/reset", headers=auth_headers)
         assert res_reset.status_code == 200
         assert res_reset.json()["current_mode"] == "NORMAL"
         
         # Inject Outage
-        res_inject = await client.post("/api/chaos/inject-cdn-outage")
+        res_inject = await client.post("/api/chaos/inject-cdn-outage", headers=auth_headers)
         assert res_inject.status_code == 200
         assert res_inject.json()["current_mode"] == "CDN_OUTAGE"
         assert res_inject.json()["is_outage_active"] is True
+        
+        from services.telemetry import telemetry_engine
+        telemetry_engine._tick()
         
         # Verify Telemetry shows outage
         res_tel = await client.get("/api/telemetry/current")
         assert res_tel.json()["status_label"] == "CRITICAL_OUTAGE"
         
         # Remediate
-        res_rem = await client.post("/api/chaos/remediate", json={"action": "SHIFT_TRAFFIC_TO_AKAMAI"})
+        res_rem = await client.post(
+            "/api/chaos/remediate",
+            json={"action": "SHIFT_TRAFFIC_TO_AKAMAI"},
+            headers=auth_headers,
+        )
         assert res_rem.status_code == 200
         assert res_rem.json()["lifecycle"] == "RECOVERING"
         assert res_rem.json()["is_outage_active"] is True
         assert res_rem.json()["secondary_cdn_traffic_pct"] == 80
         
         # Reset back
-        res_reset2 = await client.post("/api/chaos/reset")
+        res_reset2 = await client.post("/api/chaos/reset", headers=auth_headers)
         assert res_reset2.status_code == 200
         assert res_reset2.json()["current_mode"] == "NORMAL"
         assert res_reset2.json()["lifecycle"] == "NORMAL"
