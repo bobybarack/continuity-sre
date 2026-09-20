@@ -146,3 +146,26 @@ async def test_closed_loop_verifier_readback_and_pending_guard(monkeypatch):
     assert not any("Incident Resolved" in line for line in result.reasoning_trace)
     assert "PENDING" in result.executive_summary
 
+@pytest.mark.asyncio
+async def test_verifier_fail_closed_on_unparseable_prometheus(monkeypatch):
+    """Verifies that verification fails closed if authoritative Prometheus metrics cannot be parsed, even with nominal simulator telemetry."""
+    from services.mcp_service import continuity_verify_closed_loop_recovery
+    from services.telemetry import PREMIERE_REGISTRY
+
+    # Ensure simulator is in healthy/normal mode
+    chaos_manager.reset_to_normal()
+
+    # Simulate unparseable Prometheus payload and empty registry collection
+    async def mock_corrupt_prometheus(promql):
+        return {"status": "error", "code": 500, "response": "unparseable_corrupt_metric_stream"}
+
+    monkeypatch.setattr("services.mcp_service.grafana_query_prometheus", mock_corrupt_prometheus)
+    monkeypatch.setattr(PREMIERE_REGISTRY, "collect", lambda: [])
+
+    verify_res = await continuity_verify_closed_loop_recovery()
+    assert verify_res["status"] == "PENDING"
+    assert verify_res["verified"] is False
+    assert verify_res["prometheus_authoritative"] is False
+    assert verify_res["prometheus_metric_value"] is None
+
+
