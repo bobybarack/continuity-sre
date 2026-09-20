@@ -119,7 +119,7 @@ async def test_closed_loop_verifier_readback_and_pending_guard(monkeypatch):
     verify_pending = await continuity_verify_closed_loop_recovery()
     assert verify_pending["status"] == "PENDING"
     assert verify_pending["verified"] is False
-    assert verify_pending["prometheus_query"] == "rate(ott_video_playback_failures_total[1m])"
+    assert verify_pending["prometheus_query"] == "ott_video_playback_failures_ratio"
     assert "prometheus_readback_status" in verify_pending
 
     # 2. When verification returns PENDING, agent must NOT log 'Incident Resolved'
@@ -127,7 +127,7 @@ async def test_closed_loop_verifier_readback_and_pending_guard(monkeypatch):
         return {
             "status": "PENDING",
             "verified": False,
-            "prometheus_query": "rate(ott_video_playback_failures_total[1m])",
+            "prometheus_query": "ott_video_playback_failures_ratio",
             "prometheus_readback_status": "success",
             "prometheus_metric_value": 0.85,
             "current_vpf_pct": 2.4,
