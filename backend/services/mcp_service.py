@@ -156,10 +156,14 @@ async def grafana_search_dashboards(query: str = "") -> Dict[str, Any]:
     return await grafana_client.search_dashboards(query)
 
 
-async def continuity_execute_remediation(action: str, primary_cdn_pct: int, secondary_cdn_pct: int, reason: str) -> Dict[str, Any]:
-    """Executes autonomous multi-CDN egress traffic failover and BGP route reallocation."""
+async def continuity_execute_remediation(action: str, primary_cdn_pct: int = 20, secondary_cdn_pct: int = 80, reason: str = "") -> Dict[str, Any]:
+    """Executes autonomous multi-CDN egress traffic failover, DRM cluster switch, or BGP transit rerouting."""
     logger.info(f"[MCP Tool] Executing autonomous remediation: {action} (Primary={primary_cdn_pct}%, Secondary={secondary_cdn_pct}%)")
-    updated_state = chaos_manager.apply_autonomous_remediation(action)
+    updated_state = chaos_manager.apply_autonomous_remediation(
+        action=action,
+        primary_cdn_pct=primary_cdn_pct,
+        secondary_cdn_pct=secondary_cdn_pct
+    )
     return {
         "status": "APPLIED",
         "action": action,
@@ -167,6 +171,8 @@ async def continuity_execute_remediation(action: str, primary_cdn_pct: int, seco
         "primary_cdn_traffic_pct": updated_state.primary_cdn_traffic_pct,
         "secondary_cdn": updated_state.secondary_cdn,
         "secondary_cdn_traffic_pct": updated_state.secondary_cdn_traffic_pct,
+        "active_drm_cluster": updated_state.active_drm_cluster,
+        "active_transit_route": updated_state.active_transit_route,
         "reason": reason,
         "timestamp": time.time()
     }

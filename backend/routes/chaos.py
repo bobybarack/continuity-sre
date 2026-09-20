@@ -6,7 +6,7 @@ from services.chaos import chaos_manager, ChaosState
 router = APIRouter(prefix="/api/chaos", tags=["Chaos Simulator"])
 
 class RemediationRequest(BaseModel):
-    action: Optional[str] = "SHIFT_TRAFFIC_TO_AKAMAI"
+    action: Optional[str] = None
 
 @router.get("/state", response_model=ChaosState)
 async def get_chaos_state():
@@ -31,7 +31,15 @@ async def inject_isp_drop():
 @router.post("/remediate", response_model=ChaosState)
 async def remediate_outage(payload: RemediationRequest):
     """Applies autonomous traffic shift or failover to heal the active incident."""
-    return chaos_manager.apply_autonomous_remediation(payload.action or "SHIFT_TRAFFIC_TO_AKAMAI")
+    action = payload.action
+    if not action:
+        state = chaos_manager.get_state()
+        from services.scenarios import SCENARIOS
+        if state.failure_mode.value in SCENARIOS:
+            action = SCENARIOS[state.failure_mode.value]["default_action"]
+        else:
+            action = "SHIFT_TRAFFIC_TO_AKAMAI"
+    return chaos_manager.apply_autonomous_remediation(action)
 
 @router.post("/reset", response_model=ChaosState)
 async def reset_chaos():

@@ -168,7 +168,12 @@ class TelemetryEngine:
             bitrate = round(max(13.5, 14.7 + random.uniform(-0.3, 0.3)), 1)
             status_label = "RECOVERED"
             status_color = "blue"
-            latest_log = f"[Akamai Cloud CDN {region}] 200 OK - Failover healthy - Active egress: {state.secondary_cdn_traffic_pct}%"
+            if state.failure_mode == "DRM_TIMEOUT":
+                latest_log = f"[DRM Key Proxy] 200 OK - FairPlay/Widevine key license acquisition verified via {state.active_drm_cluster}"
+            elif state.failure_mode == "ISP_PEERING_DROP":
+                latest_log = f"[Transit Reroute] 200 OK - Egress rerouted via {state.active_transit_route} - packet loss: {state.packet_loss_pct}%"
+            else:
+                latest_log = f"[Akamai Cloud CDN {region}] 200 OK - Failover healthy - Active egress: {state.secondary_cdn_traffic_pct}%"
             
         else:
             vpf, latency, drm, buffer_sec, bitrate = 0.2, 50.0, 120.0, 28.0, 14.8

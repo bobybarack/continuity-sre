@@ -36,6 +36,18 @@ class ChaosState(BaseModel):
     secondary_cdn: str = "Akamai Cloud CDN"
     primary_cdn_traffic_pct: int = 100
     secondary_cdn_traffic_pct: int = 0
+    edge_route_status: str = "OPTIMAL" # "OPTIMAL", "FAILING", "REROUTED"
+    primary_drm_cluster: str = "drm-key-cluster-primary"
+    secondary_drm_cluster: str = "drm-key-cluster-failover"
+    active_drm_cluster: str = "drm-key-cluster-primary"
+    primary_drm_cluster_status: str = "HEALTHY" # "HEALTHY", "FAILED"
+    secondary_drm_cluster_status: str = "STANDBY" # "STANDBY", "ACTIVE"
+    primary_transit_route: str = "ASN-3356-Direct"
+    secondary_transit_route: str = "ASN-2914-Backup"
+    active_transit_route: str = "ASN-3356-Direct"
+    primary_transit_status: str = "HEALTHY" # "HEALTHY", "CONGESTED", "BYPASSED"
+    secondary_transit_status: str = "STANDBY" # "STANDBY", "ACTIVE"
+    packet_loss_pct: float = 0.0
     injected_at: Optional[float] = None
     remediation_action: Optional[str] = None
     remediation_action_applied: Optional[str] = None
@@ -82,6 +94,7 @@ class ChaosStateManager:
             self.state.active_incident_id = f"INC-CDN-{int(time.time())}"
             self.state.primary_cdn_traffic_pct = 100
             self.state.secondary_cdn_traffic_pct = 0
+            self.state.edge_route_status = "FAILING"
             
             self._record_event(
                 "CHAOS_INJECT_CDN_OUTAGE",
@@ -105,6 +118,9 @@ class ChaosStateManager:
             self.state.remediation_action_applied = None
             self.state.verified_recovered_at = None
             self.state.active_incident_id = f"INC-DRM-{int(time.time())}"
+            self.state.primary_drm_cluster_status = "FAILED"
+            self.state.secondary_drm_cluster_status = "STANDBY"
+            self.state.active_drm_cluster = self.state.primary_drm_cluster
             
             self._record_event(
                 "CHAOS_INJECT_DRM_TIMEOUT",
@@ -128,6 +144,10 @@ class ChaosStateManager:
             self.state.remediation_action_applied = None
             self.state.verified_recovered_at = None
             self.state.active_incident_id = f"INC-ISP-{int(time.time())}"
+            self.state.primary_transit_status = "CONGESTED"
+            self.state.secondary_transit_status = "STANDBY"
+            self.state.active_transit_route = self.state.primary_transit_route
+            self.state.packet_loss_pct = 18.4
             
             self._record_event(
                 "CHAOS_INJECT_ISP_DROP",
@@ -137,9 +157,25 @@ class ChaosStateManager:
             )
             return self.state.model_copy(deep=True)
 
-    def apply_autonomous_remediation(self, action: str = "SHIFT_TRAFFIC_TO_AKAMAI") -> ChaosState:
-        """Applies edge traffic rerouting or DRM proxy failover to initiate recovery (Thread-Safe)."""
+    def apply_autonomous_remediation(
+        self,
+        action: str = "SHIFT_TRAFFIC_TO_AKAMAI",
+        primary_cdn_pct: Optional[int] = None,
+        secondary_cdn_pct: Optional[int] = None
+    ) -> ChaosState:
+        """Applies scenario-specific traffic rerouting or cluster failover to initiate recovery (Thread-Safe)."""
+        from services.scenarios import SCENARIO_ACTIONS
+        
         with self._lock:
+            if action not in SCENARIO_ACTIONS:
+                raise ValueError(f"Unknown remediation action: {action}")
+                
+            expected_failure_mode = SCENARIO_ACTIONS[action]
+            if self.state.failure_mode != FailureMode.NONE and self.state.failure_mode != expected_failure_mode:
+                raise ValueError(
+                    f"Action '{action}' is invalid for active failure mode '{self.state.failure_mode.value}'"
+                )
+
             self.state.lifecycle = IncidentLifecycle.RECOVERING
             self.state.is_outage_active = True
             now = time.time()
@@ -148,14 +184,32 @@ class ChaosStateManager:
             self.state.remediation_action = action
             self.state.remediation_action_applied = action
             self.state.current_mode = "RECOVERING"
-            self.state.primary_cdn_traffic_pct = 20
-            self.state.secondary_cdn_traffic_pct = 80
             
+            event_details = {"action": action}
+            if action == "SHIFT_TRAFFIC_TO_AKAMAI":
+                p_pct = 20 if primary_cdn_pct is None else primary_cdn_pct
+                s_pct = 80 if secondary_cdn_pct is None else secondary_cdn_pct
+                self.state.primary_cdn_traffic_pct = p_pct
+                self.state.secondary_cdn_traffic_pct = s_pct
+                self.state.edge_route_status = "REROUTED"
+                event_details.update({"primary_traffic": f"{p_pct}%", "secondary_traffic": f"{s_pct}%"})
+            elif action == "FAILOVER_DRM_KEY_CLUSTER":
+                self.state.active_drm_cluster = self.state.secondary_drm_cluster
+                self.state.secondary_drm_cluster_status = "ACTIVE"
+                self.state.primary_drm_cluster_status = "FAILED"
+                event_details.update({"active_drm_cluster": self.state.active_drm_cluster})
+            elif action == "REROUTE_BGP_TRANSIT":
+                self.state.active_transit_route = self.state.secondary_transit_route
+                self.state.secondary_transit_status = "ACTIVE"
+                self.state.primary_transit_status = "BYPASSED"
+                self.state.packet_loss_pct = 0.2
+                event_details.update({"active_transit_route": self.state.active_transit_route})
+
             self._record_event(
                 "AGENT_REMEDIATION_APPLIED",
-                f"Autonomous SRE Agent executed failover: {action}. Egress traffic shifted; entering RECOVERING lifecycle.",
+                f"Autonomous SRE Agent executed failover: {action}. Subsystem state modified; entering RECOVERING lifecycle.",
                 "INFO",
-                {"action": action, "primary_traffic": "20%", "secondary_traffic": "80%"}
+                event_details
             )
             return self.state.model_copy(deep=True)
 
@@ -205,6 +259,14 @@ class ChaosStateManager:
             self.state.verified_recovered_at = None
             self.state.primary_cdn_traffic_pct = 100
             self.state.secondary_cdn_traffic_pct = 0
+            self.state.edge_route_status = "OPTIMAL"
+            self.state.active_drm_cluster = self.state.primary_drm_cluster
+            self.state.primary_drm_cluster_status = "HEALTHY"
+            self.state.secondary_drm_cluster_status = "STANDBY"
+            self.state.active_transit_route = self.state.primary_transit_route
+            self.state.primary_transit_status = "HEALTHY"
+            self.state.secondary_transit_status = "STANDBY"
+            self.state.packet_loss_pct = 0.0
             
             self._record_event(
                 "CHAOS_RESET",
