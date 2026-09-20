@@ -160,7 +160,7 @@ class TelemetryEngine:
             status_color = "yellow"
             latest_log = f"[ASN 3356 Transit] Packet loss rate 18.4% on link NYC-CHI - player downshifting resolution to 720p"
             
-        elif mode == "REMEDIATED":
+        elif mode in ["REMEDIATED", "RECOVERING"]:
             vpf = round(max(0.08, 0.19 + random.uniform(-0.03, 0.03)), 2)
             latency = round(max(32.0, 46.5 + random.uniform(-4.0, 4.0)), 1)
             drm = round(max(85.0, 115.0 + random.uniform(-10.0, 10.0)), 1)

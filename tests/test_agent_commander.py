@@ -72,6 +72,7 @@ async def test_agent_autonomous_outage_remediation_live():
     
     # 4. Verify system state recovered
     state = chaos_manager.get_state()
+    assert state.lifecycle == "VERIFIED_RECOVERED"
     assert state.current_mode == "REMEDIATED"
     assert state.is_outage_active is False
 

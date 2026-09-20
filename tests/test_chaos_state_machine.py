@@ -46,12 +46,20 @@ def test_apply_remediation():
     mgr = ChaosStateManager()
     mgr.inject_cdn_outage()
     state = mgr.apply_autonomous_remediation("SHIFT_TRAFFIC_TO_AKAMAI")
-    assert state.current_mode == "REMEDIATED"
-    assert state.is_outage_active is False
+    assert state.lifecycle == "RECOVERING"
+    assert state.current_mode == "RECOVERING"
+    assert state.is_outage_active is True
     assert state.primary_cdn_traffic_pct == 20
     assert state.secondary_cdn_traffic_pct == 80
     assert state.remediation_action_applied == "SHIFT_TRAFFIC_TO_AKAMAI"
-    assert state.recent_events[0].severity == "RESOLVED"
+    assert state.recent_events[0].severity != "RESOLVED"
+
+    # Verification gate passes -> verified recovered
+    recovered = mgr.mark_verified_recovered({"vpf": 0.19})
+    assert recovered.lifecycle == "VERIFIED_RECOVERED"
+    assert recovered.current_mode == "REMEDIATED"
+    assert recovered.is_outage_active is False
+    assert recovered.recent_events[0].severity == "RESOLVED"
 
 def test_reset_to_normal():
     mgr = ChaosStateManager()
@@ -89,5 +97,5 @@ def test_thread_safety_concurrent_mutations():
             f.result()
             
     state = mgr.get_state()
-    assert state.current_mode in ["NORMAL", "CDN_OUTAGE", "REMEDIATED"]
+    assert state.current_mode in ["NORMAL", "CDN_OUTAGE", "RECOVERING", "REMEDIATED"]
     assert len(state.recent_events) <= 50

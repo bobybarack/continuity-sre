@@ -305,6 +305,7 @@ Call the necessary MCP tools to remediate this critical stream degradation.
         elapsed = round(time.time() - start_time, 2)
 
         if is_verified and gate_status == "PASSED":
+            chaos_manager.mark_verified_recovered(verify_res if isinstance(verify_res, dict) else {})
             trace.append(
                 f"[{time.strftime('%H:%M:%S')}] CLOSED-LOOP VERIFIED: VPF dropped from {snapshot.video_playback_failures_pct}% to {verified_snapshot.video_playback_failures_pct}%. "
                 f"Forward buffer restored to {verified_snapshot.buffer_health_sec}s. Verification Gate: PASSED."
@@ -312,6 +313,7 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             trace.append(f"[{time.strftime('%H:%M:%S')}] Incident Resolved in {elapsed}s. MTTR: {elapsed}s. Stream QoE restabilized to 4K UHD.")
             exec_summary = decision.get("executive_summary", "Incident resolved autonomously.")
         else:
+            chaos_manager.mark_recovery_failed("Closed-loop verification pending or incomplete", details=verify_res if isinstance(verify_res, dict) else {})
             trace.append(
                 f"[{time.strftime('%H:%M:%S')}] CLOSED-LOOP VERIFICATION PENDING: Stream QoE metrics have not yet crossed recovery SLA threshold. "
                 f"VPF: {verified_snapshot.video_playback_failures_pct}% (Target <= 0.5%), Buffer: {verified_snapshot.buffer_health_sec}s (Target >= 20s). "

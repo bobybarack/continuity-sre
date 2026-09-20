@@ -73,10 +73,13 @@ async def test_chaos_lifecycle_flow():
         # Remediate
         res_rem = await client.post("/api/chaos/remediate", json={"action": "SHIFT_TRAFFIC_TO_AKAMAI"})
         assert res_rem.status_code == 200
-        assert res_rem.json()["current_mode"] == "REMEDIATED"
+        assert res_rem.json()["lifecycle"] == "RECOVERING"
+        assert res_rem.json()["is_outage_active"] is True
         assert res_rem.json()["secondary_cdn_traffic_pct"] == 80
         
         # Reset back
         res_reset2 = await client.post("/api/chaos/reset")
         assert res_reset2.status_code == 200
         assert res_reset2.json()["current_mode"] == "NORMAL"
+        assert res_reset2.json()["lifecycle"] == "NORMAL"
+        assert res_reset2.json()["is_outage_active"] is False

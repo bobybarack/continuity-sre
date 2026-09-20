@@ -1,7 +1,22 @@
+from enum import Enum
 import time
 import threading
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field
+
+class IncidentLifecycle(str, Enum):
+    NORMAL = "NORMAL"
+    INCIDENT_ACTIVE = "INCIDENT_ACTIVE"
+    REMEDIATION_APPLIED = "REMEDIATION_APPLIED"
+    RECOVERING = "RECOVERING"
+    VERIFIED_RECOVERED = "VERIFIED_RECOVERED"
+    ESCALATED = "ESCALATED"
+
+class FailureMode(str, Enum):
+    NONE = "NONE"
+    CDN_OUTAGE = "CDN_OUTAGE"
+    DRM_TIMEOUT = "DRM_TIMEOUT"
+    ISP_PEERING_DROP = "ISP_PEERING_DROP"
 
 class ChaosEvent(BaseModel):
     timestamp: float = Field(default_factory=time.time)
@@ -11,7 +26,9 @@ class ChaosEvent(BaseModel):
     details: Dict[str, Any] = Field(default_factory=dict)
 
 class ChaosState(BaseModel):
-    current_mode: str = "NORMAL" # "NORMAL", "CDN_OUTAGE", "DRM_TIMEOUT", "ISP_PEERING_DROP", "REMEDIATED"
+    failure_mode: FailureMode = FailureMode.NONE
+    lifecycle: IncidentLifecycle = IncidentLifecycle.NORMAL
+    current_mode: str = "NORMAL" # Kept for API and telemetry backwards compatibility
     is_outage_active: bool = False
     active_incident_id: Optional[str] = None
     affected_region: str = "us-east-2"
@@ -20,8 +37,11 @@ class ChaosState(BaseModel):
     primary_cdn_traffic_pct: int = 100
     secondary_cdn_traffic_pct: int = 0
     injected_at: Optional[float] = None
-    remediated_at: Optional[float] = None
+    remediation_action: Optional[str] = None
     remediation_action_applied: Optional[str] = None
+    remediation_applied_at: Optional[float] = None
+    remediated_at: Optional[float] = None
+    verified_recovered_at: Optional[float] = None
     recent_events: List[ChaosEvent] = Field(default_factory=list)
 
 class ChaosStateManager:
@@ -49,11 +69,16 @@ class ChaosStateManager:
     def inject_cdn_outage(self) -> ChaosState:
         """Simulates primary edge CDN transit link collapse at US-East (Thread-Safe)."""
         with self._lock:
+            self.state.failure_mode = FailureMode.CDN_OUTAGE
+            self.state.lifecycle = IncidentLifecycle.INCIDENT_ACTIVE
             self.state.current_mode = "CDN_OUTAGE"
             self.state.is_outage_active = True
             self.state.injected_at = time.time()
             self.state.remediated_at = None
+            self.state.remediation_applied_at = None
+            self.state.remediation_action = None
             self.state.remediation_action_applied = None
+            self.state.verified_recovered_at = None
             self.state.active_incident_id = f"INC-CDN-{int(time.time())}"
             self.state.primary_cdn_traffic_pct = 100
             self.state.secondary_cdn_traffic_pct = 0
@@ -69,11 +94,16 @@ class ChaosStateManager:
     def inject_drm_timeout(self) -> ChaosState:
         """Simulates DRM licensing token key server timeout (Thread-Safe)."""
         with self._lock:
+            self.state.failure_mode = FailureMode.DRM_TIMEOUT
+            self.state.lifecycle = IncidentLifecycle.INCIDENT_ACTIVE
             self.state.current_mode = "DRM_TIMEOUT"
             self.state.is_outage_active = True
             self.state.injected_at = time.time()
             self.state.remediated_at = None
+            self.state.remediation_applied_at = None
+            self.state.remediation_action = None
             self.state.remediation_action_applied = None
+            self.state.verified_recovered_at = None
             self.state.active_incident_id = f"INC-DRM-{int(time.time())}"
             
             self._record_event(
@@ -87,11 +117,16 @@ class ChaosStateManager:
     def inject_isp_peering_drop(self) -> ChaosState:
         """Simulates major Tier-1 ISP peering congestion (Thread-Safe)."""
         with self._lock:
+            self.state.failure_mode = FailureMode.ISP_PEERING_DROP
+            self.state.lifecycle = IncidentLifecycle.INCIDENT_ACTIVE
             self.state.current_mode = "ISP_PEERING_DROP"
             self.state.is_outage_active = True
             self.state.injected_at = time.time()
             self.state.remediated_at = None
+            self.state.remediation_applied_at = None
+            self.state.remediation_action = None
             self.state.remediation_action_applied = None
+            self.state.verified_recovered_at = None
             self.state.active_incident_id = f"INC-ISP-{int(time.time())}"
             
             self._record_event(
@@ -103,32 +138,71 @@ class ChaosStateManager:
             return self.state.model_copy(deep=True)
 
     def apply_autonomous_remediation(self, action: str = "SHIFT_TRAFFIC_TO_AKAMAI") -> ChaosState:
-        """Applies edge traffic rerouting or DRM proxy failover to resolve outage (Thread-Safe)."""
+        """Applies edge traffic rerouting or DRM proxy failover to initiate recovery (Thread-Safe)."""
         with self._lock:
-            self.state.current_mode = "REMEDIATED"
-            self.state.is_outage_active = False
-            self.state.remediated_at = time.time()
+            self.state.lifecycle = IncidentLifecycle.RECOVERING
+            self.state.is_outage_active = True
+            now = time.time()
+            self.state.remediation_applied_at = now
+            self.state.remediated_at = now
+            self.state.remediation_action = action
             self.state.remediation_action_applied = action
+            self.state.current_mode = "RECOVERING"
             self.state.primary_cdn_traffic_pct = 20
             self.state.secondary_cdn_traffic_pct = 80
             
             self._record_event(
                 "AGENT_REMEDIATION_APPLIED",
-                f"Autonomous SRE Agent executed failover: {action}. Shifted 80% egress traffic to secondary CDN.",
-                "RESOLVED",
+                f"Autonomous SRE Agent executed failover: {action}. Egress traffic shifted; entering RECOVERING lifecycle.",
+                "INFO",
                 {"action": action, "primary_traffic": "20%", "secondary_traffic": "80%"}
+            )
+            return self.state.model_copy(deep=True)
+
+    def mark_verified_recovered(self, verification_evidence: Optional[Dict[str, Any]] = None) -> ChaosState:
+        """Transitions state to VERIFIED_RECOVERED only after closed-loop verification passes (Thread-Safe)."""
+        with self._lock:
+            self.state.lifecycle = IncidentLifecycle.VERIFIED_RECOVERED
+            self.state.is_outage_active = False
+            self.state.verified_recovered_at = time.time()
+            self.state.current_mode = "REMEDIATED"
+            
+            self._record_event(
+                "CLOSED_LOOP_RECOVERY_VERIFIED",
+                "Closed-loop telemetry verification passed. Incident confirmed resolved.",
+                "RESOLVED",
+                verification_evidence or {}
+            )
+            return self.state.model_copy(deep=True)
+
+    def mark_recovery_failed(self, reason: str, details: Optional[Dict[str, Any]] = None) -> ChaosState:
+        """Transitions state to ESCALATED when verification gate fails or times out (Thread-Safe)."""
+        with self._lock:
+            self.state.lifecycle = IncidentLifecycle.ESCALATED
+            self.state.is_outage_active = True
+            
+            self._record_event(
+                "RECOVERY_VERIFICATION_FAILED",
+                f"Recovery verification failed: {reason}. Incident remains active and escalated.",
+                "CRITICAL",
+                details or {}
             )
             return self.state.model_copy(deep=True)
 
     def reset_to_normal(self) -> ChaosState:
         """Restores healthy baseline operation (Thread-Safe)."""
         with self._lock:
+            self.state.failure_mode = FailureMode.NONE
+            self.state.lifecycle = IncidentLifecycle.NORMAL
             self.state.current_mode = "NORMAL"
             self.state.is_outage_active = False
             self.state.active_incident_id = None
             self.state.injected_at = None
             self.state.remediated_at = None
+            self.state.remediation_applied_at = None
+            self.state.remediation_action = None
             self.state.remediation_action_applied = None
+            self.state.verified_recovered_at = None
             self.state.primary_cdn_traffic_pct = 100
             self.state.secondary_cdn_traffic_pct = 0
             

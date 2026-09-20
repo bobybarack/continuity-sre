@@ -51,16 +51,21 @@ def test_telemetry_remediation_recovery():
     chaos_manager.inject_cdn_outage()
     chaos_manager.apply_autonomous_remediation("SHIFT_TRAFFIC_TO_AKAMAI")
     engine = TelemetryEngine()
-    snap = engine.generate_current_snapshot()
+    snap_recovering = engine.generate_current_snapshot()
     
-    assert snap.chaos_mode == "REMEDIATED"
-    assert snap.is_outage is False
-    assert snap.video_playback_failures_pct < 0.30
-    assert snap.cdn_egress_latency_ms < 60.0
-    assert snap.primary_traffic_pct == 20
-    assert snap.secondary_traffic_pct == 80
-    assert snap.status_label == "RECOVERED"
-    assert snap.status_color == "blue"
+    assert snap_recovering.chaos_mode == "RECOVERING"
+    assert snap_recovering.is_outage is True
+    assert snap_recovering.primary_traffic_pct == 20
+    assert snap_recovering.secondary_traffic_pct == 80
+
+    chaos_manager.mark_verified_recovered({"vpf": 0.19})
+    snap_recovered = engine.generate_current_snapshot()
+    assert snap_recovered.chaos_mode == "REMEDIATED"
+    assert snap_recovered.is_outage is False
+    assert snap_recovered.video_playback_failures_pct < 0.30
+    assert snap_recovered.cdn_egress_latency_ms < 60.0
+    assert snap_recovered.status_label == "RECOVERED"
+    assert snap_recovered.status_color == "blue"
 
 def test_telemetry_history_buffer():
     chaos_manager.reset_to_normal()
