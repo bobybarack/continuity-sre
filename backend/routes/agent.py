@@ -1,7 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from typing import List, Dict, Any
 from services.agent_commander import agent_commander, InvestigationResult
 from services.mcp_service import official_mcp_bridge
+from services.auth import verify_demo_key
 from config import GEMINI_MODEL, GOOGLE_CLOUD_PROJECT
 
 router = APIRouter(prefix="/api/agent", tags=["AI SRE Incident Commander"])
@@ -27,7 +28,7 @@ async def get_mcp_tools() -> Dict[str, Any]:
         "tools": tools
     }
 
-@router.post("/investigate-and-remediate", response_model=InvestigationResult)
+@router.post("/investigate-and-remediate", response_model=InvestigationResult, dependencies=[Depends(verify_demo_key)])
 async def trigger_investigation():
     """Triggers autonomous SRE investigation, root cause diagnosis, Grafana annotation, and edge remediation."""
     return await agent_commander.investigate_and_remediate()

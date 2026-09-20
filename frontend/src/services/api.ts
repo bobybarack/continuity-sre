@@ -1,6 +1,7 @@
 import { TelemetrySnapshot, InvestigationResult, GrafanaHealth, ChaosState } from "../types/telemetry";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://continuity-api-121300560395.us-central1.run.app";
+const DEMO_KEY = process.env.NEXT_PUBLIC_DEMO_KEY || "continuity-demo-secret-2026";
 
 export class ApiService {
   private static async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
@@ -10,6 +11,7 @@ export class ApiService {
         ...options,
         headers: {
           "Content-Type": "application/json",
+          "X-Continuity-Demo-Key": DEMO_KEY,
           ...(options?.headers || {}),
         },
       });

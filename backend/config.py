@@ -28,3 +28,14 @@ TARGET_BUFFER_HEALTH_SEC = 28.5
 
 # Verification Policy ('remote_required', 'remote_preferred', 'local_allowed')
 VERIFICATION_POLICY = os.getenv("VERIFICATION_POLICY", "remote_preferred")
+
+# API Mutation Protection & CORS Settings
+CONTINUITY_DEMO_KEY = os.getenv("CONTINUITY_DEMO_KEY", "continuity-demo-secret-2026")
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000,http://127.0.0.1:8000,https://continuity-sre.pages.dev"
+    ).split(",")
+    if origin.strip()
+]

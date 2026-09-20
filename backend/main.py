@@ -10,7 +10,8 @@ from config import (
     STREAM_TITLE,
     GOOGLE_CLOUD_PROJECT,
     GRAFANA_INSTANCE_URL,
-    GEMINI_MODEL
+    GEMINI_MODEL,
+    CORS_ORIGINS
 )
 
 @asynccontextmanager
@@ -26,12 +27,12 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Enable CORS for local dev and web clients
+# Enable restricted CORS for verified frontends and local dev
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
