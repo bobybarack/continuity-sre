@@ -6,6 +6,7 @@ from routes.chaos import router as chaos_router
 from routes.telemetry import router as telemetry_router
 from routes.agent import router as agent_router
 from services.telemetry import telemetry_engine
+from services.mcp_service import official_mcp_bridge
 from config import (
     STREAM_TITLE,
     GOOGLE_CLOUD_PROJECT,
@@ -19,6 +20,7 @@ async def lifespan(app: FastAPI):
     await telemetry_engine.start()
     yield
     await telemetry_engine.stop()
+    await official_mcp_bridge.close()
 
 app = FastAPI(
     title="Continuity API",
