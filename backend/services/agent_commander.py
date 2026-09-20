@@ -9,7 +9,8 @@ from google import genai
 from google.genai import types
 
 from config import GEMINI_API_KEY, GEMINI_MODEL, STREAM_TITLE
-from services.chaos import chaos_manager
+from services.chaos import chaos_manager, FailureMode
+from services.scenarios import SCENARIOS
 from services.telemetry import telemetry_engine
 from services.grafana_client import grafana_client
 from services.mcp_service import (
@@ -86,13 +87,20 @@ class AgentCommander:
         trace: List[str] = []
         mcp_tools_called: List[str] = []
         
-        # Step 1: Query Prometheus metrics via official Grafana MCP Tool
-        mcp_tools_called.append("grafana_query_prometheus")
-        trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [grafana_query_prometheus]: Executing PromQL against Grafana Cloud Mimir...")
-        prom_res = await grafana_query_prometheus("ott_video_playback_failures_ratio")
-        
         snapshot = telemetry_engine.get_current_snapshot()
         state = chaos_manager.get_state()
+        
+        # Route initial PromQL and LogQL based on active scenario failure mode
+        failure_key = state.failure_mode.value if (state.failure_mode and state.failure_mode.value in SCENARIOS) else FailureMode.CDN_OUTAGE.value
+        scenario = SCENARIOS.get(failure_key, SCENARIOS[FailureMode.CDN_OUTAGE.value])
+        promql_query = scenario["promql"]
+        logql_query = scenario["logql"]
+        scenario_subsystems = scenario.get("affected_subsystems", ["Edge CDN"])
+
+        # Step 1: Query Prometheus metrics via official Grafana MCP Tool
+        mcp_tools_called.append("grafana_query_prometheus")
+        trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [grafana_query_prometheus]: Executing PromQL ({promql_query}) against Grafana Cloud Mimir...")
+        prom_res = await grafana_query_prometheus(promql_query)
         
         trace.append(
             f"[{time.strftime('%H:%M:%S')}] Telemetry Ingested: VPF={snapshot.video_playback_failures_pct}%, "
@@ -148,9 +156,9 @@ class AgentCommander:
 
         # Step 2: Anomaly Confirmed - Query Loki Logs via official Grafana MCP Tool
         mcp_tools_called.append("grafana_query_loki")
-        trace.append(f"[{time.strftime('%H:%M:%S')}] CRITICAL ANOMALY DETECTED: VPF threshold breached.")
-        trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [grafana_query_loki]: Querying edge server error stream via Loki proxy...")
-        loki_res = await grafana_query_loki('{service="ott-edge-router"} |= "502 Bad Gateway"', limit=20)
+        trace.append(f"[{time.strftime('%H:%M:%S')}] CRITICAL ANOMALY DETECTED: {state.failure_mode.value if state.failure_mode else 'QoS'} threshold breached.")
+        trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [grafana_query_loki]: Querying error logs via Loki proxy ({logql_query})...")
+        loki_res = await grafana_query_loki(logql_query, limit=20)
         trace.append(f"[{time.strftime('%H:%M:%S')}] Loki Log Isolated: \"{snapshot.latest_log}\"")
 
         prompt = f"""
@@ -172,10 +180,10 @@ OBSERVABILITY TELEMETRY (Prometheus & Loki via Grafana MCP):
 - Recent Edge Log: "{snapshot.latest_log}"
 
 RAW GRAFANA CLOUD MCP RESPONSES:
-- Prometheus PromQL Query Response (ott_video_playback_failures_ratio):
+- Prometheus PromQL Query Response ({promql_query}):
 {json.dumps(prom_res, indent=2) if isinstance(prom_res, (dict, list)) else prom_res}
 
-- Loki LogQL Query Response ({{service="ott-edge-router"}} |= "502 Bad Gateway"):
+- Loki LogQL Query Response ({logql_query}):
 {json.dumps(loki_res, indent=2) if isinstance(loki_res, (dict, list)) else loki_res}
 
 AVAILABLE MCP TOOLS:
@@ -252,27 +260,20 @@ Call the necessary MCP tools to remediate this critical stream degradation.
 
         if not decision:
             if not remediation_action:
-                if state.current_mode == "DRM_TIMEOUT":
-                    remediation_action = "FAILOVER_DRM_KEY_CLUSTER"
-                    decision_rca = f"Widevine Key Authentication timeout identified via {snapshot.latest_log}"
-                elif state.current_mode == "ISP_PEERING_DROP":
-                    remediation_action = "REROUTE_BGP_TRANSIT"
-                    decision_rca = f"Tier-1 BGP transit peering congestion identified via {snapshot.latest_log}"
-                else:
-                    remediation_action = "SHIFT_TRAFFIC_TO_AKAMAI"
-                    decision_rca = f"Edge POP transit failure detected via {snapshot.latest_log}"
+                remediation_action = scenario["default_action"]
+                decision_rca = f"Degradation in {', '.join(scenario_subsystems)} identified via {snapshot.latest_log}"
 
             decision = {
-                "severity": "CRITICAL" if state.current_mode != "ISP_PEERING_DROP" else "WARNING",
-                "root_cause_analysis": decision_rca or f"Edge degradation detected via {snapshot.latest_log}",
-                "affected_subsystems": ["Edge CDN", "Transit ASN 3356"] if "CDN" in remediation_action else ["DRM Auth Proxy"],
+                "severity": "CRITICAL" if state.failure_mode != FailureMode.ISP_PEERING_DROP else "WARNING",
+                "root_cause_analysis": decision_rca or f"Degradation detected via {snapshot.latest_log}",
+                "affected_subsystems": scenario_subsystems,
                 "remediation_action": remediation_action,
                 "estimated_subscriber_loss_prevented": synthetic_churn_str,
                 "executive_summary": f"Autonomous remediation policy '{remediation_action}' executed via official Grafana MCP tools."
             }
 
         if not remediation_action:
-            remediation_action = decision.get("remediation_action", "SHIFT_TRAFFIC_TO_AKAMAI")
+            remediation_action = decision.get("remediation_action", scenario["default_action"])
 
         trace.append(f"[{time.strftime('%H:%M:%S')}] Gemini Root Cause Analysis: {decision.get('root_cause_analysis')}")
 
@@ -286,10 +287,15 @@ Call the necessary MCP tools to remediate this critical stream degradation.
                 secondary_cdn_pct=80,
                 reason=decision.get("root_cause_analysis", "Autonomous failover")
             )
-        trace.append(
-            f"[{time.strftime('%H:%M:%S')}] Failover Applied: Primary CDN egress throttled to {remediation_res['primary_cdn_traffic_pct']}%, "
-            f"Secondary CDN egress scaled to {remediation_res['secondary_cdn_traffic_pct']}%."
-        )
+        if remediation_action == "FAILOVER_DRM_KEY_CLUSTER":
+            trace.append(f"[{time.strftime('%H:%M:%S')}] Failover Applied: DRM Key Cluster switched to {remediation_res.get('active_drm_cluster', 'secondary')}.")
+        elif remediation_action == "REROUTE_BGP_TRANSIT":
+            trace.append(f"[{time.strftime('%H:%M:%S')}] Reroute Applied: Transit route shifted to {remediation_res.get('active_transit_route', 'secondary')}.")
+        else:
+            trace.append(
+                f"[{time.strftime('%H:%M:%S')}] Failover Applied: Primary CDN egress throttled to {remediation_res.get('primary_cdn_traffic_pct', 20)}%, "
+                f"Secondary CDN egress scaled to {remediation_res.get('secondary_cdn_traffic_pct', 80)}%."
+            )
 
         # Step 4: Open Incident in Grafana Cloud IRM via MCP Tool if not yet opened
         if not incident_res:
