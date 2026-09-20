@@ -22,24 +22,40 @@ class GrafanaCloudClient:
         }
         self.max_retries = 3
         self.retry_delay_sec = 0.5
+        self._client: Optional[httpx.AsyncClient] = None
+        self._lock = asyncio.Lock()
+
+    async def get_client(self) -> httpx.AsyncClient:
+        """Returns or lazily creates a shared persistent httpx.AsyncClient with connection pooling."""
+        if self._client is None or self._client.is_closed:
+            async with self._lock:
+                if self._client is None or self._client.is_closed:
+                    self._client = httpx.AsyncClient(
+                        timeout=10.0,
+                        headers=self.headers,
+                        limits=httpx.Limits(max_keepalive_connections=10, max_connections=20)
+                    )
+        return self._client
+
+    async def close(self):
+        """Cleanly terminates the underlying connection pool on application shutdown."""
+        async with self._lock:
+            if self._client and not self._client.is_closed:
+                await self._client.aclose()
+                self._client = None
 
     async def _execute_with_retry(self, method: str, url: str, **kwargs) -> httpx.Response:
-        """Executes an HTTP request with exponential backoff retries for production resilience."""
+        """Executes an HTTP request with exponential backoff retries using the shared pooled client."""
+        client = await self.get_client()
         last_exception = None
         for attempt in range(1, self.max_retries + 1):
             try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
-                    if method.upper() == "GET":
-                        response = await client.get(url, headers=self.headers, **kwargs)
-                    elif method.upper() == "POST":
-                        response = await client.post(url, headers=self.headers, **kwargs)
-                    else:
-                        raise ValueError(f"Unsupported HTTP method: {method}")
+                response = await client.request(method.upper(), url, **kwargs)
 
-                    if response.status_code < 500:
-                        return response
-                    
-                    logger.warning(f"Grafana API returned {response.status_code} on attempt {attempt}/{self.max_retries}: {response.text}")
+                if response.status_code < 500:
+                    return response
+
+                logger.warning(f"Grafana API returned {response.status_code} on attempt {attempt}/{self.max_retries}: {response.text}")
             except (httpx.TimeoutException, httpx.NetworkError, httpx.ConnectError) as e:
                 last_exception = e
                 logger.warning(f"Grafana network attempt {attempt}/{self.max_retries} failed: {e}")
