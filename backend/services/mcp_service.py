@@ -180,12 +180,13 @@ async def continuity_execute_remediation(action: str, primary_cdn_pct: int = 20,
 
 async def _evaluate_single_recovery_sample() -> Dict[str, Any]:
     """Evaluates a single recovery sample against Grafana Prometheus and local telemetry."""
+    from config import VERIFICATION_POLICY
     prom_readback = await grafana_query_prometheus("ott_video_playback_failures_ratio")
     snapshot = telemetry_engine.get_current_snapshot()
 
     # Parse Prometheus instant vector readback metric value if available
     prom_vpf_value = None
-    prom_source = "unresolved"
+    prom_source = "none"
     if isinstance(prom_readback, dict):
         data_field = prom_readback.get("data")
         result_list = []
@@ -206,8 +207,9 @@ async def _evaluate_single_recovery_sample() -> Dict[str, Any]:
                     except (ValueError, TypeError):
                         pass
 
-    # If Grafana Cloud Prometheus proxy is unreachable or unparseable, query authoritative Prometheus CollectorRegistry sample
-    if prom_vpf_value is None:
+    # Policy enforcement:
+    # If remote value was not obtained, allow local fallback ONLY under 'remote_preferred' or 'local_allowed'
+    if prom_vpf_value is None and VERIFICATION_POLICY in ("remote_preferred", "local_allowed"):
         try:
             from services.telemetry import PREMIERE_REGISTRY
             for metric in PREMIERE_REGISTRY.collect():
@@ -220,19 +222,30 @@ async def _evaluate_single_recovery_sample() -> Dict[str, Any]:
         except Exception as e:
             logger.warning(f"Authoritative Prometheus CollectorRegistry sample read failed: {e}")
 
-    # Fail closed: if an authoritative Prometheus value cannot be parsed, verification fails.
-    # A failed/unparseable external read-back must never pass based solely on simulator telemetry.
-    prom_healthy = (prom_vpf_value <= 0.5) if prom_vpf_value is not None else False
+    # Semantics per Issue 6:
+    if prom_source == "grafana_cloud_prometheus":
+        is_remote_authoritative = True
+        is_value_available = (prom_vpf_value is not None)
+        is_source_trusted = True
+    elif prom_source == "prometheus_collector_registry":
+        is_remote_authoritative = False
+        is_value_available = (prom_vpf_value is not None)
+        is_source_trusted = True
+    else:
+        prom_source = "none"
+        prom_vpf_value = None
+        is_remote_authoritative = False
+        is_value_available = False
+        is_source_trusted = False
+
+    # Fail closed: if an authoritative/trusted Prometheus value is not available, verification fails
+    prom_healthy = (prom_vpf_value <= 0.5) if (prom_vpf_value is not None and is_source_trusted) else False
     telemetry_healthy = (
         snapshot.video_playback_failures_pct <= 0.5 and
         snapshot.cdn_egress_latency_ms <= 150.0 and
         snapshot.buffer_health_sec >= 20.0
     )
     is_recovered = prom_healthy and telemetry_healthy
-
-    is_remote_authoritative = (prom_source == "grafana_cloud_prometheus")
-    is_value_available = (prom_vpf_value is not None)
-    is_source_trusted = prom_source in ["grafana_cloud_prometheus", "prometheus_collector_registry"] and is_value_available
 
     return {
         "status": "PASSED" if is_recovered else "PENDING",
@@ -244,6 +257,7 @@ async def _evaluate_single_recovery_sample() -> Dict[str, Any]:
         "prometheus_value_available": is_value_available,
         "prometheus_authoritative": is_remote_authoritative,
         "verification_source_trusted": is_source_trusted,
+        "verification_policy": VERIFICATION_POLICY,
         "prometheus_raw_readback": prom_readback,
         "current_vpf_pct": snapshot.video_playback_failures_pct,
         "vpf_sla_target": 0.5,

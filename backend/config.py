@@ -25,3 +25,6 @@ STREAM_TITLE = "Spider-Man: Brand New Day (World Premiere 4K UHD)"
 TOTAL_ACTIVE_VIEWERS_BASE = 4_281_900
 TARGET_BITRATE_MBPS = 14.8
 TARGET_BUFFER_HEALTH_SEC = 28.5
+
+# Verification Policy ('remote_required', 'remote_preferred', 'local_allowed')
+VERIFICATION_POLICY = os.getenv("VERIFICATION_POLICY", "remote_preferred")

@@ -59,6 +59,10 @@ class InvestigationResult(BaseModel):
     closed_loop_verified: bool = False
     verified_vpf_rate: float = 0.0
     verified_buffer_health_sec: float = 0.0
+    verified_latency_ms: Optional[float] = None
+    verification_status: Optional[str] = "PENDING"
+    verification_source: Optional[str] = None
+    verification_authoritative: bool = False
 
 class AgentCommander:
     def __init__(self):
@@ -298,17 +302,23 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             mcp_tools_called.append("continuity_verify_closed_loop_recovery")
             trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [continuity_verify_closed_loop_recovery]: Executing closed-loop verification check...")
             verify_res = await continuity_verify_closed_loop_recovery()
-        verified_snapshot = telemetry_engine.get_current_snapshot()
-        
+
         is_verified = verify_res.get("verified", False) if isinstance(verify_res, dict) else False
         gate_status = verify_res.get("status", "PENDING") if isinstance(verify_res, dict) else "PENDING"
         elapsed = round(time.time() - start_time, 2)
 
+        # Single source of truth: extract verified QoE metrics and source semantics directly from verify_res
+        verified_vpf = verify_res.get("current_vpf_pct", snapshot.video_playback_failures_pct) if isinstance(verify_res, dict) else snapshot.video_playback_failures_pct
+        verified_buffer = verify_res.get("forward_buffer_sec", snapshot.buffer_health_sec) if isinstance(verify_res, dict) else snapshot.buffer_health_sec
+        verified_latency = verify_res.get("cdn_latency_ms", snapshot.cdn_egress_latency_ms) if isinstance(verify_res, dict) else snapshot.cdn_egress_latency_ms
+        verify_source = verify_res.get("prometheus_source", "none") if isinstance(verify_res, dict) else "none"
+        is_authoritative = verify_res.get("prometheus_authoritative", False) if isinstance(verify_res, dict) else False
+
         if is_verified and gate_status == "PASSED":
             chaos_manager.mark_verified_recovered(verify_res if isinstance(verify_res, dict) else {})
             trace.append(
-                f"[{time.strftime('%H:%M:%S')}] CLOSED-LOOP VERIFIED: VPF dropped from {snapshot.video_playback_failures_pct}% to {verified_snapshot.video_playback_failures_pct}%. "
-                f"Forward buffer restored to {verified_snapshot.buffer_health_sec}s. Verification Gate: PASSED."
+                f"[{time.strftime('%H:%M:%S')}] CLOSED-LOOP VERIFIED: VPF dropped from {snapshot.video_playback_failures_pct}% to {verified_vpf}%. "
+                f"Forward buffer restored to {verified_buffer}s. Verification Gate: PASSED (Source: {verify_source}, Authoritative: {is_authoritative})."
             )
             trace.append(f"[{time.strftime('%H:%M:%S')}] Incident Resolved in {elapsed}s. MTTR: {elapsed}s. Stream QoE restabilized to 4K UHD.")
             exec_summary = decision.get("executive_summary", "Incident resolved autonomously.")
@@ -316,11 +326,11 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             chaos_manager.mark_recovery_failed("Closed-loop verification pending or incomplete", details=verify_res if isinstance(verify_res, dict) else {})
             trace.append(
                 f"[{time.strftime('%H:%M:%S')}] CLOSED-LOOP VERIFICATION PENDING: Stream QoE metrics have not yet crossed recovery SLA threshold. "
-                f"VPF: {verified_snapshot.video_playback_failures_pct}% (Target <= 0.5%), Buffer: {verified_snapshot.buffer_health_sec}s (Target >= 20s). "
-                f"Verification Gate: PENDING."
+                f"VPF: {verified_vpf}% (Target <= 0.5%), Buffer: {verified_buffer}s (Target >= 20s). "
+                f"Verification Gate: PENDING (Source: {verify_source})."
             )
             trace.append(f"[{time.strftime('%H:%M:%S')}] Closed-loop verification pending at {elapsed}s. Awaiting telemetry convergence; incident not marked resolved.")
-            exec_summary = f"Autonomous remediation applied; closed-loop recovery verification is PENDING (VPF={verified_snapshot.video_playback_failures_pct}%, Buffer={verified_snapshot.buffer_health_sec}s). Incident not yet marked resolved."
+            exec_summary = f"Autonomous remediation applied; closed-loop recovery verification is PENDING (VPF={verified_vpf}%, Buffer={verified_buffer}s). Incident not yet marked resolved."
 
         result = InvestigationResult(
             timestamp=time.time(),
@@ -348,8 +358,12 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             reasoning_trace=trace,
             mcp_tools_executed=mcp_tools_called,
             closed_loop_verified=is_verified and (gate_status == "PASSED"),
-            verified_vpf_rate=verified_snapshot.video_playback_failures_pct,
-            verified_buffer_health_sec=verified_snapshot.buffer_health_sec
+            verified_vpf_rate=verified_vpf,
+            verified_buffer_health_sec=verified_buffer,
+            verified_latency_ms=verified_latency,
+            verification_status=gate_status,
+            verification_source=verify_source,
+            verification_authoritative=is_authoritative
         )
 
         self._record_result(result)
