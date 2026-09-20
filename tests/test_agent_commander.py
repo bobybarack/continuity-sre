@@ -165,7 +165,28 @@ async def test_verifier_fail_closed_on_unparseable_prometheus(monkeypatch):
     verify_res = await continuity_verify_closed_loop_recovery()
     assert verify_res["status"] == "PENDING"
     assert verify_res["verified"] is False
+    assert verify_res["prometheus_value_available"] is False
     assert verify_res["prometheus_authoritative"] is False
+    assert verify_res["verification_source_trusted"] is False
     assert verify_res["prometheus_metric_value"] is None
+
+@pytest.mark.asyncio
+async def test_verifier_metadata_source_differentiation():
+    """Verifies that local registry read-back sets prometheus_value_available=True, verification_source_trusted=True, and prometheus_authoritative=False."""
+    from services.mcp_service import continuity_verify_closed_loop_recovery
+
+    chaos_manager.reset_to_normal()
+    verify_res = await continuity_verify_closed_loop_recovery()
+
+    assert verify_res["status"] == "PASSED"
+    assert verify_res["verified"] is True
+    assert verify_res["prometheus_value_available"] is True
+    assert verify_res["verification_source_trusted"] is True
+    # In local testing without remote Grafana Prometheus push, authoritative remote is False
+    if verify_res["prometheus_source"] == "prometheus_collector_registry":
+        assert verify_res["prometheus_authoritative"] is False
+    elif verify_res["prometheus_source"] == "grafana_cloud_prometheus":
+        assert verify_res["prometheus_authoritative"] is True
+
 
 
