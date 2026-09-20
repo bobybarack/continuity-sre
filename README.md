@@ -1,80 +1,77 @@
 # CONTINUITY
 
-### Closed-loop incident response for live streaming infrastructure
+### Autonomous closed-loop incident response for live streaming infrastructure
 
-CONTINUITY is an autonomous SRE prototype that connects Google Gemini, Grafana Cloud, Prometheus/Mimir, Loki, the official Grafana MCP server, and a constrained remediation control plane.
+CONTINUITY is an agentic SRE prototype for high-concurrency streaming systems.
 
-It is built around one idea:
-
-> Detecting an incident is not enough. A reliability system should investigate it, act on it, and verify that the system actually recovered.
+It connects Google Gemini, Grafana Cloud, the official Grafana MCP server, Prometheus/Mimir, Loki, and a constrained remediation control plane to automate the incident lifecycle:
 
 ```
 Detect → Investigate → Diagnose → Remediate → Record → Verify
 ```
 
-In the submitted demo scenario, CONTINUITY completed that closed loop in **1.28 seconds**.
+The project is built around one reliability principle:
 
-> **Important:** The streaming environment and CDN failover are simulated. Grafana Cloud integration, Gemini calls, MCP bridging, Prometheus/OpenMetrics exposition, Loki/Grafana operations, annotations, API services, and deployment infrastructure are real.
+> A remediation command succeeding does not prove that the service recovered.
+
+CONTINUITY measures the system again after an autonomous action and only marks recovery when explicit health conditions pass.
 
 ---
 
-## Live
+## Live Demo
 
-- **Repository:** [https://github.com/bobybarack/continuity-sre](https://github.com/bobybarack/continuity-sre)
-- **Cloud Run API:** [https://continuity-api-121300560395.us-central1.run.app/](https://continuity-api-121300560395.us-central1.run.app/)
-- **Public Grafana Dashboard:** [https://joyfuljasmine1550.grafana.net/public-dashboards/4cf5f0a12aee4d48a3ed18abd2c03db7](https://joyfuljasmine1550.grafana.net/public-dashboards/4cf5f0a12aee4d48a3ed18abd2c03db7)
+- **Command Center**: [https://continuity-sre.pages.dev](https://continuity-sre.pages.dev/)
+- **Backend API**: [https://continuity-api-121300560395.us-central1.run.app](https://continuity-api-121300560395.us-central1.run.app/)
+- **Grafana Cloud Dashboard**: [https://joyfuljasmine1550.grafana.net/public-dashboards/4cf5f0a12aee4d48a3ed18abd2c03db7](https://joyfuljasmine1550.grafana.net/public-dashboards/4cf5f0a12aee4d48a3ed18abd2c03db7)
+- **Repository**: [https://github.com/bobybarack/continuity-sre](https://github.com/bobybarack/continuity-sre)
 
 ---
 
 ## Why CONTINUITY?
 
-CONTINUITY started with a simple frustration.
+A streaming incident is often visible to the infrastructure long before anyone has fully diagnosed it.
 
-A live stream can fail even when the viewer's connection is perfectly healthy. The viewer sees a buffering spinner, degraded video, or an error screen.
+During a major premiere, live event, game reveal, or sports broadcast, the observability stack may already contain signals such as:
 
-Behind the scenes, the infrastructure may already contain most of the evidence needed to understand what happened:
-- playback failure metrics
-- CDN latency
-- buffer health
-- bitrate degradation
-- DRM latency
-- edge errors
-- transit failures
-- routing state
+- rising playback failures
+- CDN latency spikes
+- collapsing forward-buffer depth
+- degraded delivered bitrate
+- DRM authentication delays
+- HTTP 502 / 504 responses
+- routing or transit failures
+- unhealthy traffic distribution
 
-The problem is often the gap between observability and action.
+The difficult part is what happens after those signals appear.
 
-A conventional incident workflow can look like:
+A conventional workflow can look like this:
+
 ```
-Alert → Page engineer → Open dashboards → Inspect metrics → Search logs → Correlate evidence → Choose remediation → Execute change → Watch the system → Confirm recovery
+Alert ↓ Page engineer ↓ Open dashboards ↓ Inspect metrics ↓ Search logs ↓ Correlate evidence ↓ Identify failure mode ↓ Choose remediation ↓ Execute change ↓ Watch telemetry ↓ Confirm recovery
 ```
 
-Every step makes sense.
-
-But during a high-concurrency live event, every minute spent manually moving context between systems is another minute the viewer experiences the failure.
+Every step is reasonable. The delay comes from requiring a person to manually carry context between each one.
 
 CONTINUITY explores a narrower question:
-> If the infrastructure already exposes enough information to respond, how much of that incident loop can be safely automated?
+
+> If the infrastructure already exposes the evidence required to understand an incident, how much of the response loop can be automated safely?
 
 ---
 
 ## What CONTINUITY Does
 
-CONTINUITY implements a six-stage incident lifecycle:
-1. Detect abnormal streaming QoS
-2. Investigate metrics and logs
-3. Diagnose the active failure mode
-4. Remediate through a constrained action surface
-5. Record the incident in Grafana
-6. Verify post-remediation health
+CONTINUITY implements six stages:
 
-The important part is the last step.
+1. **Detect** abnormal streaming QoS
+2. **Investigate** Prometheus metrics and Loki logs
+3. **Diagnose** the failure with Gemini
+4. **Remediate** through a constrained action surface
+5. **Record** the incident in Grafana
+6. **Verify** the post-remediation state
 
-$$\text{Command executed} \neq \text{System recovered}$$
+The last stage is what makes the system closed-loop.
 
-CONTINUITY does not use successful function execution alone as its recovery signal.
-
-It checks the resulting telemetry against explicit health conditions and records whether the closed-loop verification passed.
+> Command executed ≠ Service recovered
 
 ---
 
@@ -82,114 +79,184 @@ It checks the resulting telemetry against explicit health conditions and records
 
 ```mermaid
 flowchart TD
-    UI["Next.js Command Center"] -->|"REST + SSE"| API["FastAPI Control Plane"]
-    API --> CHAOS["Chaos State Manager"]
-    CHAOS --> TELEMETRY["Telemetry Engine"]
-    TELEMETRY --> METRICS["Prometheus / OpenMetrics"]
+    UI["Next.js Command Center"]
+    API["FastAPI Control Plane"]
+    CHAOS["Failure Simulator"]
+    TELEMETRY["Telemetry Engine"]
+    GEMINI["Google Gemini"]
+    TOOLS["Constrained Function Tools"]
+    BRIDGE["Grafana MCP Bridge"]
+    MCP["Official grafana/mcp-grafana"]
+    GRAFANA["Grafana Cloud"]
+    PROM["Prometheus / Mimir"]
+    LOKI["Loki"]
+    ACTION["Controlled Remediation"]
+    VERIFY["Recovery Gate"]
+
+    UI -->|"REST + SSE"| API
+    API --> CHAOS
+    CHAOS --> TELEMETRY
     TELEMETRY --> UI
-    API --> AGENT["Agent Commander"]
-    AGENT -->|"Preflight PromQL / LogQL"| BRIDGE["Grafana MCP Bridge"]
-    BRIDGE -->|"stdio JSON-RPC"| MCP["Official grafana/mcp-grafana"]
-    MCP --> GRAFANA["Grafana Cloud<br/>Prometheus / Loki / IRM"]
-    BRIDGE -. "fallback" .-> REST["Direct Grafana REST Client"]
-    REST --> GRAFANA
-    AGENT --> GEMINI["Google Gemini"]
-    GEMINI -->|"Native function calls"| DISPATCH["Constrained Tool Dispatcher"]
-    DISPATCH --> BRIDGE
-    DISPATCH --> REMEDIATE["CONTINUITY Remediation"]
-    DISPATCH --> VERIFY["Recovery Verification"]
-    REMEDIATE --> CHAOS
-    VERIFY --> TELEMETRY
+
+    API --> BRIDGE
+    BRIDGE -->|"stdio JSON-RPC"| MCP
+    MCP --> GRAFANA
+    GRAFANA --> PROM
+    GRAFANA --> LOKI
+
+    API --> GEMINI
+    GEMINI --> TOOLS
+    TOOLS --> BRIDGE
+    TOOLS --> ACTION
+    TOOLS --> VERIFY
+
+    ACTION --> CHAOS
+    VERIFY --> BRIDGE
+    VERIFY -->|"PASSED"| RESOLVED["Incident Resolved"]
+    VERIFY -->|"PENDING"| OPEN["Incident Remains Open"]
 ```
 
-The architecture deliberately separates:
-- observation
-- reasoning
-- action
-- verification
+At a high level:
 
-Gemini does not receive arbitrary shell access or unrestricted infrastructure control.
+```
+Streaming failure ↓ Prometheus + Loki evidence ↓ Grafana MCP ↓ Gemini reasoning ↓ Constrained remediation ↓ Grafana incident + annotation ↓ Prometheus-backed verification ↓ PASSED or PENDING
+```
 
 ---
 
-## Incident Lifecycle
+## 1. Detect
 
-### 1. Detect
+CONTINUITY exposes a Prometheus/OpenMetrics telemetry surface representing the viewer and edge-delivery experience.
 
-CONTINUITY generates and exposes streaming Quality of Service telemetry including:
+Current metrics include:
 
-| Metric | Meaning |
-| :--- | :--- |
+| Metric | Description |
+|---|---|
 | `ott_video_playback_failures_ratio` | Current playback failure ratio |
 | `ott_cdn_egress_latency_ms` | CDN response latency |
 | `ott_drm_handshake_ms` | DRM license handshake duration |
 | `ott_active_viewers_count` | Simulated concurrent audience |
-| `ott_buffer_health_seconds` | Client forward-buffer depth |
-| `ott_stream_bitrate_mbps` | Delivered stream bitrate |
-| `ott_cdn_traffic_split_percentage` | Traffic distribution by CDN |
+| `ott_buffer_health_seconds` | Forward playback buffer |
+| `ott_stream_bitrate_mbps` | Delivered video bitrate |
+| `ott_cdn_traffic_split_percentage` | Traffic split by CDN |
 | `ott_incident_active_status` | Active outage indicator |
 
-Prometheus/OpenMetrics exposition is available at:
-```
-/api/telemetry/metrics
-```
-
-The frontend also receives live telemetry through a 1 Hz Server-Sent Events stream:
-```
-/api/telemetry/stream
+Prometheus exposition is available at:
+```http
+GET /api/telemetry/metrics
 ```
 
-The incident controller currently considers conditions such as elevated VPF, CDN latency, DRM latency, or an active chaos state when deciding whether investigation is necessary.
+Live frontend telemetry is streamed using Server-Sent Events:
+```http
+GET /api/telemetry/stream
+```
 
-### 2. Investigate
+The current anomaly gate checks conditions including:
+- VPF > 1.0%
+- CDN latency > 200 ms
+- DRM handshake > 500 ms
+- or an active injected outage
 
-When an anomaly is detected, the agent commander starts with observability preflight operations.
+The detection threshold is intentionally separate from the stricter recovery threshold.
 
-It calls the Grafana integration for:
+---
+
+## 2. Investigate
+
+When an anomaly is confirmed, CONTINUITY queries the observability layer.
+
+The initial investigation calls:
 - `grafana_query_prometheus`
 - `grafana_query_loki`
 
-The Grafana integration uses the official `mcp-grafana` runtime when available.
-
-The bridge creates a live stdio JSON-RPC MCP session, initializes it, and calls the official Grafana tools.
+The Grafana integration prefers the official Grafana MCP runtime.
 
 Conceptually:
 ```
-CONTINUITY → MCP ClientSession → mcp-grafana → Grafana Cloud
+CONTINUITY ↓ MCP ClientSession ↓ stdio JSON-RPC ↓ mcp-grafana ↓ Grafana Cloud
 ```
 
-If the MCP binary is unavailable or an MCP operation fails, supported operations fall back to the direct Grafana client.
+- **Prometheus** provides the measurable infrastructure state.
+- **Loki** provides the event context surrounding the failure.
 
-That gives the prototype two paths to the observability layer:
-- **Primary:** CONTINUITY → official `mcp-grafana` → Grafana Cloud
-- **Fallback:** CONTINUITY → Grafana REST APIs → Grafana Cloud
+The returned Grafana responses are included directly in the incident context supplied to Gemini. That means Gemini receives both:
+- the structured application telemetry snapshot
+- the raw Grafana Prometheus and Loki responses
+
+rather than being asked to reason from a generic description of the failure.
 
 ### Official Grafana MCP Integration
 
-The production Docker image pulls the official Grafana MCP binary directly from:
-```
-grafana/mcp-grafana
-```
-and installs it into the CONTINUITY runtime.
+CONTINUITY uses the official `grafana/mcp-grafana` runtime.
 
-At runtime, CONTINUITY can discover the official tool catalog through:
+The bridge can:
+- locate the installed `mcp-grafana` binary
+- launch it over stdio
+- initialize an MCP `ClientSession`
+- dynamically enumerate available tools
+- invoke official Grafana MCP operations
+- return results to the CONTINUITY orchestration layer
+
+Supported operations currently include:
+- `query_prometheus`
+- `query_loki_logs`
+- `create_annotation`
+- `create_incident`
+- `search_dashboards`
+
+The discovered tool catalog is exposed through:
 ```http
 GET /api/agent/mcp-tools
 ```
 
-The endpoint returns:
-- MCP connection status
-- discovered binary path
-- number of discovered tools
-- runtime tool catalog
+This endpoint reports:
+- connection status
+- MCP binary path
+- discovered tool count
+- tool names and descriptions
 
-CONTINUITY does not expose that entire catalog to Gemini. That is intentional.
+CONTINUITY does not expose the entire discovered Grafana catalog directly to Gemini. The model receives a deliberately constrained function surface instead.
 
-### Constrained Gemini Tool Surface
+### Grafana API Fallback
 
-The application gives Gemini a deliberately small function-call surface.
+If the official MCP runtime is unavailable or a supported MCP call fails, CONTINUITY can fall back to a direct Grafana Cloud client.
 
-The current native Gemini tool declarations are:
+```
+Primary path:   CONTINUITY ↓ official mcp-grafana ↓ Grafana Cloud
+Fallback path:  CONTINUITY ↓ Grafana HTTP APIs ↓ Grafana Cloud
+```
+
+The direct client includes retry handling with exponential backoff for transient network and server errors.
+
+---
+
+## 3. Diagnose
+
+Gemini provides the reasoning layer.
+
+CONTINUITY uses Google's official `google-genai` Python SDK.
+
+The model receives incident context including:
+- active failure mode
+- affected region
+- playback failure rate
+- CDN latency
+- DRM handshake time
+- buffer health
+- delivered bitrate
+- current infrastructure event
+- raw Prometheus response
+- raw Loki response
+
+Gemini then reasons about:
+- incident severity
+- likely root cause
+- affected subsystem
+- appropriate remediation
+
+### Constrained Gemini Function Calling
+
+Gemini is not given arbitrary system access. The current function surface contains:
 - `grafana_query_prometheus`
 - `grafana_query_loki`
 - `grafana_create_annotation`
@@ -197,179 +264,230 @@ The current native Gemini tool declarations are:
 - `continuity_execute_remediation`
 - `continuity_verify_closed_loop_recovery`
 
-This keeps the agent's action space narrow and auditable.
+These are passed through Google's native function-calling interface. When Gemini emits a function call, CONTINUITY dispatches it to the appropriate implementation.
+
+This creates a deliberate separation between:
+```
+Reasoning ↓ Allowed tool selection ↓ Controlled execution
+```
 
 The design principle is:
 > Reason broadly. Act narrowly. Verify everything.
 
-Gemini receives structured incident context and may emit native function calls through the Google GenAI SDK.
+### Hybrid Orchestration
 
-CONTINUITY then dispatches those calls to the corresponding integration or remediation function.
+CONTINUITY does not rely on the model to remember every lifecycle step.
 
-If the model does not execute a lifecycle-critical stage itself, the orchestrator can still guarantee required stages such as remediation, incident recording, annotation, and verification.
+Gemini can independently request tools, but the orchestration layer still guarantees critical stages such as:
+- remediation
+- incident creation
+- dashboard annotation
+- recovery verification
 
-This creates a hybrid architecture:
-> Deterministic workflow + Gemini reasoning/tool selection + Constrained side effects
+if the model does not invoke them itself.
 
-rather than giving an LLM unrestricted control of the system.
-
-### Gemini Reasoning Layer
-
-CONTINUITY uses the official `google-genai` Python SDK.
-
-The configured Gemini model is controlled with:
-```bash
-GEMINI_MODEL=models/gemini-3.6-flash
+The architecture is therefore hybrid:
 ```
-and the agent includes fallback model candidates for resilience if a model call fails.
+Gemini reasoning + Native function calling + Deterministic orchestration + Explicit verification gate
+```
 
-The model receives incident context including:
-- current failure mode
-- affected region
-- playback failure rate
-- CDN latency
-- DRM handshake duration
-- buffer depth
-- delivered bitrate
-- current edge-event context
+This is intentional. Autonomous infrastructure should not depend entirely on probabilistic control flow.
 
-Gemini then participates in selecting an appropriate constrained remediation.
+---
 
-Current remediation policies are:
+## 4. Remediate
+
+CONTINUITY exposes the constrained action:
+```
+continuity_execute_remediation
+```
+
+Current remediation policy names include:
 - `SHIFT_TRAFFIC_TO_AKAMAI`
 - `FAILOVER_DRM_KEY_CLUSTER`
 - `REROUTE_BGP_TRANSIT`
 
-### Controlled Remediation
-
-The simulation begins in a healthy state with:
+The simulation begins with:
 - Primary CDN: 100%
 - Secondary CDN: 0%
 
-For the CDN outage scenario, remediation moves the simulated routing state to:
+After remediation, the current simulator transitions to:
 - Primary CDN: 20%
 - Secondary CDN: 80%
 
-The important boundary is that this is a control-plane simulation. CONTINUITY does not currently modify real Fastly or Akamai production traffic.
-
-The current remediation action updates the internal thread-safe chaos state, which then changes the telemetry emitted by the application.
-
-That allows the complete autonomous control loop to be demonstrated safely and reproducibly.
-
-### Closed-Loop Verification
-
-The core reliability invariant in CONTINUITY is:
-
-$$\text{action success} \neq \text{recovery}$$
-
-After remediation, the verification function evaluates the new telemetry state against three conditions:
-
-$$VPF \leq 0.5\%$$
-
-$$L_{CDN} \leq 150\text{ ms}$$
-
-$$B_{forward} \geq 20\text{ s}$$
-
-where:
-- $VPF$ is video playback failure percentage
-- $L_{CDN}$ is CDN egress latency
-- $B_{forward}$ is client forward-buffer depth
-
-The recovery predicate is therefore:
-
-$$\text{Recovered} = (VPF \leq 0.5) \land (L_{CDN} \leq 150) \land (B_{forward} \geq 20)$$
-
-The verifier returns either:
-```
-PASSED
-```
-or:
-```
-PENDING
-```
-along with the measured values.
-
-The result is stored on the investigation record as:
-- `closed_loop_verified`
-- `verified_vpf_rate`
-- `verified_buffer_health_sec`
-
-#### Current Verification Boundary
-
-In the current prototype, the recovery gate evaluates a fresh snapshot from the CONTINUITY telemetry engine.
-
-It does not yet require an independent post-remediation Grafana/Prometheus read-back before resolution.
-
-Moving verification to an independent observability read-back is one of the next production-hardening steps.
-
-### Grafana Incident Recording
-
-CONTINUITY can write incident context back into Grafana.
-
-The integration supports:
-- `grafana_create_annotation`
-- `grafana_create_incident`
-
-Annotations create timestamped markers that make autonomous actions visible on the dashboard timeline.
-
-For incident creation, the system first attempts the Grafana incident-management path.
-
-If that operation is unavailable, the direct Grafana integration falls back to creating a dedicated incident annotation so that the event still has a visible audit record.
+The model cannot issue arbitrary infrastructure commands. It chooses from explicit remediation policies supported by the backend.
 
 ---
 
-## Failure Simulation
+## 5. Record
 
-CONTINUITY includes a controlled chaos engine for reproducing several classes of streaming incident.
+CONTINUITY writes the operational response back into Grafana.
+
+Supported actions include:
+- `grafana_create_incident`
+- `grafana_create_annotation`
+
+The system records:
+- incident title
+- severity
+- diagnosis
+- selected remediation
+- timestamp
+- dashboard annotation
+
+If structured Grafana Incident Management creation is unavailable through the direct fallback path, the event is still preserved as a dedicated Grafana annotation. This keeps autonomous changes visible and auditable.
+
+---
+
+## 6. Verify
+
+Verification is the defining part of CONTINUITY.
+
+A basic automation flow might be:
+```
+Run remediation ↓ Function returned successfully ↓ Declare success
+```
+
+CONTINUITY instead performs:
+```
+Observe ↓ Reason ↓ Act ↓ Observe Again ↓ Verify
+```
+
+The recovery tool is:
+```
+continuity_verify_closed_loop_recovery
+```
+
+The verifier attempts a Prometheus read-back through the Grafana integration.
+If a usable Grafana Cloud Prometheus value cannot be obtained, the current implementation falls back to the application's Prometheus `CollectorRegistry`.
+If no Prometheus value can be obtained from either source, verification fails closed.
+
+Recovery additionally requires the current client telemetry state to satisfy:
+
+$$\text{VPF} \le 0.5\%$$
+$$L_{\text{CDN}} \le 150\text{ ms}$$
+$$B_{\text{forward}} \ge 20\text{ s}$$
+
+where:
+- $\text{VPF}$ = Video Playback Failure percentage
+- $L_{\text{CDN}}$ = CDN egress latency
+- $B_{\text{forward}}$ = forward playback buffer
+
+The recovery predicate is:
+
+$$\text{Recovered} = \text{PrometheusHealthy} \land \text{VPFHealthy} \land \text{LatencyHealthy} \land \text{BufferHealthy}$$
+
+The tool returns either:
+- `PASSED`
+- or `PENDING`
+
+along with verification metadata including:
+- `prometheus_metric_value`
+- `prometheus_source`
+- `prometheus_authoritative`
+- `current_vpf_pct`
+- `forward_buffer_sec`
+- `cdn_latency_ms`
+
+If the gate is `PENDING`, CONTINUITY explicitly leaves the incident unresolved.
+
+---
+
+## Failure Scenarios
+
+The project includes a controlled chaos simulator with three main failure modes.
 
 ### CDN Outage (`CDN_OUTAGE`)
 Simulates:
 - primary edge failure
-- 502 Bad Gateway errors
-- high playback failure rate
-- CDN latency spike
-- forward-buffer collapse
-- bitrate degradation
+- 502 Bad Gateway
+- elevated playback failures
+- high CDN latency
+- buffer collapse
+- delivered bitrate degradation
+
+Typical simulated failure state:
+- VPF ≈ 4.85%
+- CDN latency ≈ 412 ms
+- Forward buffer ≈ 3.4 s
+- Bitrate ≈ 3.8 Mbps
 
 ### DRM Timeout (`DRM_TIMEOUT`)
 Simulates:
-- DRM licensing delays
-- Widevine/FairPlay authentication failure
-- multi-second key acquisition latency
-- playback failures caused by license acquisition
+- Widevine / FairPlay license delay
+- key-acquisition timeout
+- elevated DRM handshake latency
+- resulting playback failures
+
+Typical simulated handshake duration:
+- ≈ 2450 ms
 
 ### ISP Peering Degradation (`ISP_PEERING_DROP`)
 Simulates:
 - Tier-1 transit congestion
 - packet loss
-- reduced delivered bitrate
-- increased network latency
+- bitrate reduction
+- elevated latency
 - player quality downshift
+
+The current synthetic scenario uses ASN 3356 as transit metadata.
+
+---
+
+## Command Center
+
+The frontend is designed to show both sides of a streaming incident:
+- what the infrastructure sees
+- what the viewer experiences
+
+The command center includes:
+- live playback state
+- VPF
+- CDN latency
+- DRM latency
+- forward-buffer health
+- delivered bitrate
+- CDN traffic distribution
+- recent edge events
+- Gemini incident trace
+- chaos controls
+- recovery status
+
+The demonstration flow is:
+```
+Healthy stream ↓ Inject failure ↓ QoS deteriorates ↓ Prometheus + Loki investigation ↓ Gemini analyzes evidence ↓ Controlled remediation ↓ Traffic state changes ↓ Prometheus-backed read-back ↓ Recovery gate ↓ Playback stabilizes
+```
+
+This makes the infrastructure problem visible without requiring the audience to interpret every metric before understanding its impact.
 
 ---
 
 ## Real vs. Simulated
 
-This distinction is important.
+This boundary is important. CONTINUITY is a working agentic infrastructure prototype. It is not a production streaming CDN.
 
 ### Real
-The repository currently contains real implementations for:
+The repository contains real implementations for:
 - Google Gemini API calls
 - Google GenAI native function calling
-- official Grafana `mcp-grafana` stdio integration
-- MCP tool discovery
-- Grafana Cloud API fallback
-- Prometheus/OpenMetrics metric exposition
-- Loki query integration
+- official `grafana/mcp-grafana`
+- MCP stdio sessions
+- runtime MCP tool discovery
+- Grafana Cloud connectivity
+- Prometheus queries
+- Loki queries
 - Grafana annotations
-- Grafana incident-management integration/fallback
-- FastAPI APIs
+- Grafana Incident Management integration
+- direct Grafana API fallback
+- Prometheus/OpenMetrics exposition
+- FastAPI services
 - Server-Sent Events
-- Docker packaging
-- Google Cloud Run deployment
-- thread-safe shared state
-- constrained agent tool dispatch
-- recovery verification logic
+- Docker deployment
+- Google Cloud Run packaging
+- constrained action dispatch
+- Prometheus-backed verification
+- fail-closed verification when no Prometheus value is available
+- thread-safe state mutation
 
 ### Simulated
 The prototype simulates:
@@ -377,212 +495,72 @@ The prototype simulates:
 - commercial CDN traffic
 - Fastly edge failures
 - Akamai failover traffic
-- Tier-1 peering failures
+- ISP transit degradation
 - DRM infrastructure failures
-- customer-facing streaming QoS
-- production remediation
+- playback QoS degradation
+- CDN routing changes
+- subscriber/business-impact estimates
 
-No production Fastly, Akamai, ISP, DRM provider, film studio, or streaming platform infrastructure is controlled by this repository.
-
----
-
-## Hybrid Safety Model
-
-Autonomous infrastructure systems need more than a capable model.
-
-CONTINUITY therefore uses several deterministic safeguards around Gemini:
-
-1. **Narrow function surface:** Gemini only receives explicit function declarations. It cannot issue arbitrary shell commands.
-2. **Explicit remediation policies:** The agent chooses between known remediation labels instead of generating arbitrary infrastructure mutations.
-3. **Orchestrator-enforced lifecycle:** Critical stages do not depend entirely on the model choosing to call them.
-4. **Post-action measurement:** Remediation is followed by a separate health evaluation.
-5. **Observable audit trail:** Tool calls, remediation state, annotations, incident IDs, and reasoning events are recorded in the investigation history.
+No real Fastly, Akamai, ISP, DRM provider, studio, or streaming-service production infrastructure is controlled by this project.
 
 ---
 
-## Resilience
+## Safety Boundaries
 
-CONTINUITY includes several fallback layers:
+Autonomous infrastructure systems need stronger control boundaries than conversational agents. CONTINUITY uses several.
 
-- **Gemini:** The agent can try alternate configured Gemini models when a model call fails.
-- **Grafana MCP:** The preferred path uses the official `mcp-grafana` server over stdio. If that path fails, supported Grafana operations can fall back to the direct REST client.
-- **Grafana Incident Management:** If structured incident creation is unavailable, CONTINUITY records the incident through a dedicated Grafana annotation instead.
+- **Restricted tool surface**: Gemini receives specific function declarations. It does not receive arbitrary shell execution.
+- **Predefined policies**: Remediation is selected from explicit backend policies.
+- **Deterministic orchestration**: Critical lifecycle stages are enforced outside the model.
+- **Post-action verification**: Execution alone is never treated as recovery.
+- **Failed verification remains open**: A PENDING recovery gate does not become a resolved incident.
+- **Audit trail**: The investigation result records:
+  - reasoning trace
+  - tools executed
+  - remediation policy
+  - traffic distribution
+  - Grafana incident identifier
+  - annotation identifier
+  - elapsed time
+  - recovery result
 
-This keeps the demo functional while making failures in external dependencies visible rather than silently hiding them.
+### Thread Safety
 
----
-
-## Thread Safety
-
-The chaos simulator contains shared mutable state that can be read and modified concurrently by:
-- telemetry requests
+Several parts of the application interact with shared simulation state simultaneously:
+- telemetry generation
+- Prometheus scraping
 - SSE clients
 - chaos injection
 - remediation
 - agent execution
 
-State transitions are protected with:
+State mutations are protected using:
 ```python
 threading.RLock()
 ```
-The state manager returns copied state objects rather than exposing its internal object directly.
+The chaos manager returns deep copies of its state instead of exposing the internal mutable object directly.
 
----
+### Resilience
 
-## API
+CONTINUITY contains fallback behavior at multiple layers:
+- **Gemini**: The agent can attempt fallback Gemini models if the configured model fails.
+- **Grafana**: The preferred path uses official `mcp-grafana`. Supported operations fall back to direct Grafana APIs when MCP execution fails.
+- **HTTP retries**: The direct Grafana client retries transient failures using exponential backoff.
+- **Agent policy fallback**: If Gemini cannot produce a usable incident decision, the supported failure modes have deterministic fallback remediation policies.
 
-The FastAPI service exposes three main API groups.
-
-### Agent
-```http
-GET  /api/agent/status
-GET  /api/agent/mcp-tools
-POST /api/agent/investigate-and-remediate
-GET  /api/agent/history
-```
-
-- `GET /api/agent/status`: Returns Gemini configuration state, configured model, Google Cloud project, and investigation count.
-- `GET /api/agent/mcp-tools`: Starts an official Grafana MCP session and returns the discovered tool catalog.
-- `POST /api/agent/investigate-and-remediate`: Runs the full CONTINUITY incident workflow.
-
-### Telemetry
-```http
-GET /api/telemetry/current
-GET /api/telemetry/history
-GET /api/telemetry/grafana-health
-GET /api/telemetry/metrics
-GET /api/telemetry/stream
-```
-
-- `/metrics` exposes Prometheus-compatible metrics.
-- `/stream` provides a continuous SSE telemetry stream.
-
-### Chaos
-```http
-GET  /api/chaos/state
-POST /api/chaos/inject-cdn-outage
-POST /api/chaos/inject-drm-timeout
-POST /api/chaos/inject-isp-drop
-POST /api/chaos/remediate
-POST /api/chaos/reset
-```
-
-These endpoints allow the failure scenarios to be reproduced deterministically during the demo.
-
----
-
-## Demo Flow
-
-A typical demonstration is:
-
-```
-1. Reset the environment
-   ↓
-2. Observe healthy playback telemetry
-   ↓
-3. Inject CDN outage
-   ↓
-4. Watch VPF rise and buffer health collapse
-   ↓
-5. Trigger CONTINUITY
-   ↓
-6. Grafana Prometheus/Loki preflight runs
-   ↓
-7. Gemini receives incident context
-   ↓
-8. Constrained remediation executes
-   ↓
-9. Traffic state shifts 100/0 → 20/80
-   ↓
-10. Grafana incident + annotation are recorded
-   ↓
-11. Recovery telemetry is evaluated
-   ↓
-12. closed_loop_verified records the result
-```
-
-This makes the full lifecycle visible instead of demonstrating only an LLM response or a dashboard alert.
-
----
-
-## Why the Command Center Includes Video
-
-Infrastructure observability is easy to make technically impressive and difficult to make immediately understandable.
-
-A metric like:
-```
-VPF = 4.85%
-```
-means something specific to an SRE.
-
-For everyone else, a frozen video player communicates the same failure instantly.
-
-CONTINUITY therefore connects the infrastructure state to the viewer-facing experience.
-
-The intended demo sequence is:
-```
-Healthy playback
-   ↓
-Failure injected
-   ↓
-Playback quality degrades
-   ↓
-CONTINUITY investigates
-   ↓
-Remediation executes
-   ↓
-Telemetry recovers
-   ↓
-Playback stabilizes
-```
-
-The application shows both sides of an incident: what the infrastructure sees and what the viewer experiences.
+This keeps the prototype operational while making the AI dependency explicit rather than pretending it cannot fail.
 
 ---
 
 ## Tech Stack
 
-### AI
-- Google Gemini
-- Google GenAI Python SDK
-- native Gemini function calling
-- configurable model fallback
-
-### Observability
-- Grafana Cloud
-- official `grafana/mcp-grafana`
-- Prometheus / Mimir
-- Loki
-- Grafana annotations
-- Grafana Incident Management integration
-
-### Backend
-- Python 3.11
-- FastAPI
-- Uvicorn
-- Pydantic
-- HTTPX
-- Prometheus Client
-- MCP Python SDK
-- Server-Sent Events
-- `threading.RLock()`
-
-### Frontend
-- Next.js 16.3.4
-- React 19.2.8
-- TypeScript
-- Tailwind CSS 4
-- Motion
-- Hugeicons
-
-### Infrastructure
-- Docker
-- Docker Compose
-- Google Cloud Run
-
-### Testing
-- Pytest
-- Pytest AsyncIO
+- **AI**: Google Gemini, Google GenAI Python SDK, native Gemini function calling
+- **Agent / MCP**: Model Context Protocol, official Grafana `mcp-grafana`, MCP Python SDK, stdio JSON-RPC, constrained tool dispatcher
+- **Observability**: Grafana Cloud, Prometheus / Mimir, Loki, Grafana annotations, Grafana Incident Management integration
+- **Backend**: Python 3.11, FastAPI, Uvicorn, Pydantic, HTTPX, Prometheus Client, Server-Sent Events, `threading.RLock()`
+- **Frontend**: Next.js 16.3.4, React 19.2.8, TypeScript, Tailwind CSS 4, Motion, Hugeicons
+- **Infrastructure**: Docker, Docker Compose, Google Cloud Run, Cloudflare Pages
+- **Testing**: Pytest, Pytest AsyncIO
 
 ---
 
@@ -618,26 +596,48 @@ continuity-sre/
 
 ---
 
-## Running Locally
+## API
+
+### Agent
+- `GET /api/agent/status`: Returns current agent configuration, including model configuration and investigation count.
+- `GET /api/agent/mcp-tools`: Discovers the official Grafana MCP tool catalog at runtime.
+- `POST /api/agent/investigate-and-remediate`: Executes the incident investigation and remediation workflow.
+- `GET /api/agent/history`: Returns previous investigation results.
+
+### Telemetry
+- `GET /api/telemetry/current`: Current streaming snapshot.
+- `GET /api/telemetry/history`: Recent rolling history.
+- `GET /api/telemetry/grafana-health`: Grafana Cloud connectivity status.
+- `GET /api/telemetry/metrics`: OpenMetrics / Prometheus scrape endpoint.
+- `GET /api/telemetry/stream`: Real-time Server-Sent Events stream.
+
+### Chaos
+- `GET /api/chaos/state`: Current chaos state.
+- `POST /api/chaos/inject-cdn-outage`: Inject CDN edge failure.
+- `POST /api/chaos/inject-drm-timeout`: Inject DRM auth proxy delay.
+- `POST /api/chaos/inject-isp-drop`: Inject BGP transit degradation.
+- `POST /api/chaos/remediate`: Apply remediation policy.
+- `POST /api/chaos/reset`: Reset state to normal.
+
+---
+
+## Local Development
 
 ### Prerequisites
-You need:
 - Python 3.11+
-- Node.js
-- npm
-- a Gemini API key
-- a Grafana Cloud stack and service-account token for live Grafana operations
+- Node.js & npm
+- Gemini API key
+- Grafana Cloud credentials for live observability operations
+- For local official MCP execution, install the `mcp-grafana` binary or use the included Docker image.
 
-The official `mcp-grafana` binary is recommended for local development. If you use the provided Docker image, the binary is copied automatically from the official Grafana MCP image.
-
-### 1. Clone the repository
+### 1. Clone
 ```bash
 git clone https://github.com/bobybarack/continuity-sre.git
 cd continuity-sre
 ```
 
-### 2. Configure environment variables
-Create `.env` in the project root:
+### 2. Configure Environment
+Create a `.env` file in the repository root:
 ```bash
 # Gemini
 GEMINI_API_KEY=your_gemini_api_key
@@ -654,37 +654,43 @@ GRAFANA_PROM_UID=your_prometheus_datasource_uid
 GRAFANA_LOKI_UID=your_loki_datasource_uid
 GRAFANA_TEMPO_UID=your_tempo_datasource_uid
 ```
-*Never commit `.env`.*
+Do not commit `.env`.
 
-### 3. Install backend dependencies
+### 3. Backend
+Create a virtual environment:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r backend/requirements.txt
 ```
 
-### 4. Start the API
-From the repository root:
+Start the API:
 ```bash
-uvicorn main:app \
-  --app-dir backend \
-  --host 0.0.0.0 \
-  --port 8000 \
-  --reload
+uvicorn main:app --app-dir backend --host 0.0.0.0 --port 8000 --reload
 ```
-The API will be available at: `http://localhost:8000`  
-FastAPI's interactive documentation is available at: `http://localhost:8000/docs`
 
-### 5. Start the frontend
-In another terminal:
+- API: `http://localhost:8000`
+- OpenAPI documentation: `http://localhost:8000/docs`
+
+### 4. Frontend
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-### Docker
-The repository includes a multi-stage Docker build. One stage uses the official `grafana/mcp-grafana` image. The resulting MCP binary is copied into the Python runtime before the FastAPI service starts.
+---
+
+## Docker
+
+The repository uses a multi-stage Docker build. The first stage uses the official Grafana MCP image:
+```dockerfile
+FROM grafana/mcp-grafana:latest AS grafana-mcp
+```
+The MCP binary is copied into the Python runtime:
+```dockerfile
+COPY --from=grafana-mcp /app/mcp-grafana /usr/local/bin/mcp-grafana
+```
 
 Build:
 ```bash
@@ -693,30 +699,34 @@ docker build -t continuity-sre .
 
 Run:
 ```bash
-docker run \
-  --env-file .env \
-  -p 8080:8080 \
-  continuity-sre
+docker run --env-file .env -p 8080:8080 continuity-sre
 ```
-Then open: `http://localhost:8080`
+Then open `http://localhost:8080`.
 
 ### Docker Compose
 ```bash
 docker compose up --build
 ```
-The service is exposed on: `http://localhost:8080`
+The API is exposed at `http://localhost:8080`.
 
 ---
 
 ## Testing
 
-Run the backend test suite with:
+Run:
 ```bash
 pytest -q
 ```
-The repository contains tests around the core backend behavior, telemetry, remediation, recovery workflow, and concurrency-sensitive state.
 
-Test counts are intentionally not hard-coded into this README so that the documentation does not become stale when the suite changes.
+The test suite covers core backend paths around:
+- telemetry
+- failure injection
+- remediation
+- agent execution
+- recovery verification
+- concurrency-sensitive state
+
+Test counts are intentionally not hard-coded here so the README does not become stale as the suite evolves.
 
 ---
 
@@ -726,25 +736,28 @@ A deployment script is included:
 ```bash
 ./deploy.sh
 ```
-The script currently targets the project's configured Google Cloud project and `us-central1`. If you fork the repository, update the project and region values before deploying.
 
-The production container listens on:
-```
-PORT=8080
-```
-as expected by Cloud Run.
+The deployment script:
+1. validates `.env`
+2. checks required Gemini and Grafana credentials
+3. runs the automated test suite
+4. configures the Google Cloud project
+5. submits the container to Cloud Build
+6. deploys the service to Cloud Run
+
+The production container listens on `PORT=8080`.
 
 ---
 
 ## Configuration
 
 | Variable | Purpose |
-| :--- | :--- |
-| `GEMINI_API_KEY` | Google Gemini API authentication |
-| `GEMINI_MODEL` | Gemini model used by the agent |
-| `GOOGLE_CLOUD_PROJECT` | Google Cloud project identifier |
+|---|---|
+| `GEMINI_API_KEY` | Gemini API authentication |
+| `GEMINI_MODEL` | Configured Gemini model |
+| `GOOGLE_CLOUD_PROJECT` | Google Cloud project ID |
 | `GOOGLE_CLOUD_PROJECT_NUMBER` | Google Cloud project number |
-| `GRAFANA_INSTANCE_URL` | Grafana Cloud instance URL |
+| `GRAFANA_INSTANCE_URL` | Grafana Cloud stack URL |
 | `GRAFANA_TOKEN` | Grafana service-account token |
 | `GRAFANA_PROM_UID` | Prometheus/Mimir datasource UID |
 | `GRAFANA_LOKI_UID` | Loki datasource UID |
@@ -754,171 +767,90 @@ as expected by Cloud Run.
 
 ## Current Prototype Boundaries
 
-CONTINUITY demonstrates the architecture of an autonomous reliability loop. It is not presented as a production CDN controller.
+CONTINUITY demonstrates an autonomous reliability architecture. It is not presented as a production CDN controller.
 
-The current branch has several deliberate or known boundaries.
-
-### Simulated Actuation
-Traffic changes affect the local simulation state, not real CDN infrastructure.
-
-### Shared Remediation State
-The prototype exposes several remediation policy names, but the current simulator converges them into the same generic `REMEDIATED` state. A production implementation would execute policy-specific actions against separate infrastructure systems.
-
-### Reasoning Context
-Grafana Prometheus and Loki preflight calls are executed, but the current Gemini incident prompt is primarily populated from the simulator's structured telemetry snapshot and latest generated event context. A deeper implementation would feed returned Prometheus/Loki payloads directly back into Gemini as first-class tool results across multiple reasoning turns.
-
-### Verification Source
-The current closed-loop verifier checks a fresh local telemetry snapshot. A production implementation should require an independent read-back from the authoritative observability plane before an incident may be closed.
-
-### Recovery Enforcement
-The verification result is recorded as `PASSED` or `PENDING` and exposed through `closed_loop_verified`. A production controller should explicitly prevent incident closure and escalate to a human whenever the recovery predicate remains false.
-
-### Access Control
-The current prototype uses permissive API/CORS settings for demonstration. A production deployment would require:
-- authentication
-- authorization
-- restricted CORS
-- service identities
-- action-level permissions
-- secret management
-- approval boundaries for high-impact remediation
+- **Simulated actuation**: Traffic shifts update CONTINUITY's internal routing state. They do not call Fastly or Akamai production APIs.
+- **Fixed remediation outcome**: The current simulator transitions supported remediation policies into a common REMEDIATED state and applies the same 20/80 traffic split. A production implementation would use policy-specific adapters.
+- **Prometheus verification sources**: Recovery verification prefers Grafana Cloud Prometheus. If that result is unavailable or cannot be parsed, the prototype can use its local Prometheus CollectorRegistry. If no Prometheus value can be obtained, verification fails. A production deployment could be configured to require the remote observability plane exclusively.
+- **Business-impact values**: Viewer counts and subscriber-loss estimates shown in the demo are synthetic scenario metadata. They are not measured customer or revenue outcomes.
+- **Demo security posture**: The current application is optimized for hackathon demonstration. A production deployment would additionally require authentication, authorization, restricted CORS, workload identities, secret management, action-level permissions, approval controls for high-impact remediation, and persistent incident storage.
 
 ---
 
 ## Production Evolution
 
-The next version of CONTINUITY would deepen four areas.
-
-### 1. True Observability-Grounded Multi-Turn Reasoning
-Instead of merely executing Grafana preflight operations, returned Prometheus and Loki data would become model-visible tool responses.
-
-The agent loop would become:
-```
-Gemini requests metric
-   ↓
-MCP query executes
-   ↓
-Result returned to Gemini
-   ↓
-Gemini requests logs
-   ↓
-MCP query executes
-   ↓
-Result returned to Gemini
-   ↓
-Diagnosis
-```
-That makes the diagnosis fully traceable to observability evidence.
-
-### 2. Independent Recovery Verification
-The recovery gate should query the authoritative metrics source after remediation.
-
-Conceptually:
-```
-Act
-   ↓
-Wait for telemetry propagation
-   ↓
-Query Prometheus through Grafana
-   ↓
-Evaluate SLA predicate
-   ↓
-PASS → resolve
-FAIL → escalate
-```
-
-### 3. Real Infrastructure Adapters
-The current simulated remediation boundary can be replaced with provider adapters for:
-- CDN traffic management
-- load balancers
-- DNS
-- service mesh routing
-- DRM infrastructure
-- cloud network controls
-
-The reasoning layer would remain separated from the actual provider-specific action implementation.
-
-### 4. Human Escalation
-Autonomy should have a stopping condition. If recovery cannot be verified after an allowed remediation, CONTINUITY should stop making changes and escalate with:
-- failure classification
-- relevant metrics
-- relevant logs
-- attempted remediation
-- current system state
-- recommended next investigation step
-
-The human engineer starts with context rather than starting from zero.
+- **Provider-specific actions**: Replace simulated routing mutations with authenticated infrastructure adapters for CDN traffic managers, DNS, load balancers, service meshes, DRM infrastructure, and cloud networking.
+- **Authoritative remote verification**: Require recovery evidence from the production observability plane before incident closure.
+  ```
+  No authoritative read-back ↓ Recovery cannot be proven ↓ Incident stays open
+  ```
+- **Multi-turn tool reasoning**: The current implementation seeds Gemini with Grafana evidence and supports native function calls. A deeper agent loop could continuously feed every tool result back into the next Gemini reasoning turn:
+  ```
+  Gemini ↓ query_prometheus ↓ Result ↓ Gemini ↓ query_loki_logs ↓ Result ↓ Gemini ↓ Remediation decision
+  ```
+- **Human escalation**: Autonomy needs a stopping condition. If recovery cannot be verified within a defined window, CONTINUITY should stop making changes and escalate with incident classification, Prometheus evidence, Loki evidence, remediation attempted, current health state, and recommended next investigation step.
+- **Predictive response**: CONTINUITY currently reacts after degradation is detected. A future system could reason over $\frac{d(\text{VPF})}{dt}$ and $\frac{dB_{\text{forward}}}{dt}$ to detect an approaching failure before playback interruption occurs.
 
 ---
 
 ## Design Principles
 
-- **Observe before acting:** The agent should receive measurable state, not a vague alert.
-- **Constrain side effects:** The reasoning model should choose from explicitly implemented actions.
-- **Separate execution from success:** A successful function return is not proof that users recovered.
-- **Verify after every remediation:** Recovery must be an observable state transition.
-- **Preserve an audit trail:** Every automated action should be inspectable afterward.
-- **Escalate when certainty ends:** Autonomy should stop when the system can no longer prove that its actions improved the incident.
+- **Ground the model**: Give the reasoning layer observable evidence rather than a vague alert.
+- **Restrict the action surface**: Models should choose from explicit, auditable operations.
+- **Separate action from success**: A successful command is not proof of recovery.
+- **Observe again**: Every remediation should be followed by another measurement cycle.
+- **Fail closed when recovery cannot be proven**: An unknown state should not become a successful state.
+- **Preserve an audit trail**: Automated actions must remain inspectable afterward.
+- **Escalate when certainty ends**: Autonomy should stop when the system can no longer prove that its actions restored health.
 
 ---
 
-## The Core Idea
+## Reliability Model
 
-A conventional AI agent loop is often described as:
+Let $S_t$ represent the infrastructure state before remediation.
+Let $A_t$ represent the remediation action.
 
-$$\text{Observe} \rightarrow \text{Think} \rightarrow \text{Act}$$
-
-For infrastructure automation, that is incomplete.
-
-CONTINUITY uses:
-
-$$\text{Observe} \rightarrow \text{Think} \rightarrow \text{Act} \rightarrow \text{Observe Again} \rightarrow \text{Verify}$$
-
-Formally, let:
-- $S_t$ be the observed infrastructure state,
-- $A_t$ be the remediation action, and
-- $S_{t+1}$ be the resulting state.
-
-The system executes:
+The action produces:
 
 $$S_{t+1} = f(S_t, A_t)$$
 
-but the action is only useful if:
+Execution of $A_t$ is not the success condition. The system only considers the action successful if:
 
 $$S_{t+1} \in S_{\text{healthy}}$$
 
-That distinction is the central idea behind CONTINUITY.
+That changes the common agent loop from:
+
+$$\text{Observe} \to \text{Think} \to \text{Act}$$
+
+to:
+
+$$\text{Observe} \to \text{Think} \to \text{Act} \to \text{Observe Again} \to \text{Verify}$$
+
+That is the central idea behind CONTINUITY.
 
 ---
 
 ## Hackathon
 
-CONTINUITY was built for Agentic Cinema: The Blockbuster Hackathon, with a focus on the Grafana Labs partner track.
+CONTINUITY was built for **Agentic Cinema: The Blockbuster Hackathon**, with a focus on the **Grafana Labs** partner track.
 
-The project explores how agentic systems can shorten the distance between observability and action while maintaining explicit boundaries around what an AI is allowed to change.
+The project explores how agentic systems can reduce the distance between observability and action without giving an LLM unrestricted control over production infrastructure.
 
 ---
 
 ## Disclaimer
 
-CONTINUITY is an independent technical prototype.
-
-Names such as Fastly, Akamai, Grafana, Google, Widevine, and film/streaming titles appearing in the simulator are used to demonstrate an infrastructure scenario.
-
-The project does not imply affiliation with, endorsement by, or production access to those companies or services unless explicitly stated.
+CONTINUITY is an independent engineering prototype. References to Fastly, Akamai, Widevine, FairPlay, Grafana, Google, film titles, studios, streaming platforms, and network providers are used to model or demonstrate infrastructure scenarios. Unless explicitly stated otherwise, those references do not imply affiliation, endorsement, partnership, or access to the companies' production infrastructure.
 
 ---
 
 ## License
 
-Licensed under the Apache License 2.0.  
-See [LICENSE](LICENSE).
+Licensed under the Apache License 2.0. See [LICENSE](LICENSE).
 
 ---
 
 ### CONTINUITY
-
-Infrastructure failures will happen.  
-The real question is what the system does after it notices.
+*Systems fail. The important part is what happens next.*
 
 CONTINUITY turns observable failure into controlled action—and controlled action back into measurable evidence of recovery.
