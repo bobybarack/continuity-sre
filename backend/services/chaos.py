@@ -48,6 +48,8 @@ class ChaosState(BaseModel):
     primary_transit_status: str = "HEALTHY" # "HEALTHY", "CONGESTED", "BYPASSED"
     secondary_transit_status: str = "STANDBY" # "STANDBY", "ACTIVE"
     packet_loss_pct: float = 0.0
+    force_recovery_failure: bool = False
+    convergence_duration_sec: float = 1.5
     injected_at: Optional[float] = None
     remediation_action: Optional[str] = None
     remediation_action_applied: Optional[str] = None
@@ -61,6 +63,11 @@ class ChaosStateManager:
         self._lock = threading.RLock()
         self.state = ChaosState()
         self._record_event("SYSTEM_START", "Continuity telemetry engine initialized in NORMAL state", "INFO")
+
+    def set_force_recovery_failure(self, force_failure: bool = True) -> None:
+        """Sets flag to simulate failed or incomplete remediation convergence (Thread-Safe)."""
+        with self._lock:
+            self.state.force_recovery_failure = force_failure
 
     def _record_event(self, event_type: str, description: str, severity: str, details: Optional[Dict[str, Any]] = None):
         event = ChaosEvent(
@@ -267,6 +274,8 @@ class ChaosStateManager:
             self.state.primary_transit_status = "HEALTHY"
             self.state.secondary_transit_status = "STANDBY"
             self.state.packet_loss_pct = 0.0
+            self.state.force_recovery_failure = False
+            self.state.convergence_duration_sec = 1.5
             
             self._record_event(
                 "CHAOS_RESET",

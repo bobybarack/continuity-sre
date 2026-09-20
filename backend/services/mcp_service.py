@@ -1,6 +1,7 @@
 import os
 import time
 import json
+import asyncio
 import logging
 import shutil
 from pathlib import Path
@@ -177,9 +178,8 @@ async def continuity_execute_remediation(action: str, primary_cdn_pct: int = 20,
         "timestamp": time.time()
     }
 
-async def continuity_verify_closed_loop_recovery() -> Dict[str, Any]:
-    """Executes a closed-loop falsifiable recovery verification query against Prometheus and client telemetry."""
-    logger.info("[MCP Tool] Verifying closed-loop stream restabilization via Prometheus read-back...")
+async def _evaluate_single_recovery_sample() -> Dict[str, Any]:
+    """Evaluates a single recovery sample against Grafana Prometheus and local telemetry."""
     prom_readback = await grafana_query_prometheus("ott_video_playback_failures_ratio")
     snapshot = telemetry_engine.get_current_snapshot()
 
@@ -252,6 +252,33 @@ async def continuity_verify_closed_loop_recovery() -> Dict[str, Any]:
         "cdn_latency_ms": snapshot.cdn_egress_latency_ms,
         "timestamp": time.time()
     }
+
+async def continuity_verify_closed_loop_recovery(
+    timeout_sec: float = 5.0,
+    poll_interval_sec: float = 0.25
+) -> Dict[str, Any]:
+    """Executes a closed-loop falsifiable recovery verification query against Prometheus and client telemetry with convergence polling."""
+    logger.info(f"[MCP Tool] Verifying closed-loop recovery (timeout={timeout_sec}s, poll={poll_interval_sec}s)...")
+    loop = asyncio.get_event_loop()
+    deadline = loop.time() + timeout_sec
+    last_evidence: Dict[str, Any] = {}
+
+    while True:
+        # Advance telemetry tick to reflect active convergence
+        telemetry_engine._tick()
+        
+        evidence = await _evaluate_single_recovery_sample()
+        last_evidence = evidence
+        
+        if evidence.get("verified", False) and evidence.get("status") == "PASSED":
+            return evidence
+            
+        if loop.time() + poll_interval_sec > deadline:
+            break
+            
+        await asyncio.sleep(poll_interval_sec)
+
+    return last_evidence
 
 # Register tools with MCP Server
 @mcp_server.tool()

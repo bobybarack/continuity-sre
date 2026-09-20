@@ -172,19 +172,46 @@ class TelemetryEngine:
                 latest_log = f"[ASN 3356 Transit] Packet loss rate 18.4% on link NYC-CHI - player downshifting resolution to 720p"
                 
             elif mode in ["REMEDIATED", "RECOVERING"]:
-                vpf = round(max(0.08, 0.19 + self.rng.uniform(-0.03, 0.03)), 2)
-                latency = round(max(32.0, 46.5 + self.rng.uniform(-4.0, 4.0)), 1)
-                drm = round(max(85.0, 115.0 + self.rng.uniform(-10.0, 10.0)), 1)
-                buffer_sec = round(max(22.0, 27.8 + self.rng.uniform(-1.0, 1.0)), 1)
-                bitrate = round(max(13.5, 14.7 + self.rng.uniform(-0.3, 0.3)), 1)
-                status_label = "RECOVERED"
-                status_color = "blue"
+                remediation_time = state.remediation_applied_at or now
+                elapsed = max(0.0, now - remediation_time)
+                conv_sec = getattr(state, "convergence_duration_sec", 1.5)
+                
+                if getattr(state, "force_recovery_failure", False):
+                    # Stalls convergence at 40% progress - metrics never cross healthy SLA thresholds
+                    progress = min(0.4, (elapsed / max(0.1, conv_sec)) * 0.4)
+                elif mode == "REMEDIATED" or state.lifecycle == "VERIFIED_RECOVERED":
+                    progress = 1.0
+                else:
+                    progress = min(1.0, elapsed / max(0.1, conv_sec))
+
                 if state.failure_mode == "DRM_TIMEOUT":
+                    drm = round(2450.0 - progress * (2450.0 - 95.0) + self.rng.uniform(-10.0, 10.0), 1)
+                    vpf = round(3.20 - progress * (3.20 - 0.18) + self.rng.uniform(-0.03, 0.03), 2)
+                    latency = round(65.0 - progress * (65.0 - 45.0) + self.rng.uniform(-3.0, 3.0), 1)
+                    buffer_sec = round(5.2 + progress * (26.0 - 5.2) + self.rng.uniform(-0.5, 0.5), 1)
+                    bitrate = round(14.2 + progress * (14.7 - 14.2) + self.rng.uniform(-0.2, 0.2), 1)
                     latest_log = f"[DRM Key Proxy] 200 OK - FairPlay/Widevine key license acquisition verified via {state.active_drm_cluster}"
                 elif state.failure_mode == "ISP_PEERING_DROP":
+                    bitrate = round(3.2 + progress * (14.5 - 3.2) + self.rng.uniform(-0.2, 0.2), 1)
+                    vpf = round(2.90 - progress * (2.90 - 0.17) + self.rng.uniform(-0.03, 0.03), 2)
+                    latency = round(180.0 - progress * (180.0 - 45.0) + self.rng.uniform(-5.0, 5.0), 1)
+                    drm = round(140.0 - progress * (140.0 - 110.0) + self.rng.uniform(-5.0, 5.0), 1)
+                    buffer_sec = round(8.5 + progress * (27.0 - 8.5) + self.rng.uniform(-0.5, 0.5), 1)
                     latest_log = f"[Transit Reroute] 200 OK - Egress rerouted via {state.active_transit_route} - packet loss: {state.packet_loss_pct}%"
                 else:
+                    vpf = round(4.85 - progress * (4.85 - 0.19) + self.rng.uniform(-0.04, 0.04), 2)
+                    latency = round(412.0 - progress * (412.0 - 46.5) + self.rng.uniform(-5.0, 5.0), 1)
+                    drm = round(135.0 - progress * (135.0 - 105.0) + self.rng.uniform(-5.0, 5.0), 1)
+                    buffer_sec = round(3.4 + progress * (27.8 - 3.4) + self.rng.uniform(-0.5, 0.5), 1)
+                    bitrate = round(3.8 + progress * (14.7 - 3.8) + self.rng.uniform(-0.2, 0.2), 1)
                     latest_log = f"[Akamai Cloud CDN {region}] 200 OK - Failover healthy - Active egress: {state.secondary_cdn_traffic_pct}%"
+
+                if progress >= 1.0:
+                    status_label = "RECOVERED"
+                    status_color = "blue"
+                else:
+                    status_label = "RECOVERING"
+                    status_color = "yellow"
                 
             else:
                 vpf, latency, drm, buffer_sec, bitrate = 0.2, 50.0, 120.0, 28.0, 14.8
