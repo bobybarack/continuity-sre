@@ -224,6 +224,12 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             except Exception as e:
                 logger.warning(f"Model {model} tool calling attempt failed: {e}. Trying fallback...")
 
+        # Dynamically compute synthetic churn mitigation estimate from active viewers and VPF failure rate
+        impacted_audience = int(snapshot.active_viewers * (snapshot.video_playback_failures_pct / 100.0))
+        simulated_cancellations = max(100, int(impacted_audience * 0.15))
+        simulated_loss_val = simulated_cancellations * 45  # $45 annual subscriber ARPU projection
+        synthetic_churn_str = f"${simulated_loss_val:,} USD (simulated ~{simulated_cancellations:,} churn cancellations avoided)"
+
         if not decision:
             if not remediation_action:
                 if state.current_mode == "DRM_TIMEOUT":
@@ -241,7 +247,7 @@ Call the necessary MCP tools to remediate this critical stream degradation.
                 "root_cause_analysis": decision_rca or f"Edge degradation detected via {snapshot.latest_log}",
                 "affected_subsystems": ["Edge CDN", "Transit ASN 3356"] if "CDN" in remediation_action else ["DRM Auth Proxy"],
                 "remediation_action": remediation_action,
-                "estimated_subscriber_loss_prevented": "$1,450,000 USD (32,000 churn cancellations avoided)",
+                "estimated_subscriber_loss_prevented": synthetic_churn_str,
                 "executive_summary": f"Autonomous remediation policy '{remediation_action}' executed via official Grafana MCP tools."
             }
 
@@ -335,7 +341,7 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             annotation_id=annotation_id,
             grafana_incident_id=grafana_incident_id,
             mttr_seconds=elapsed,
-            estimated_subscriber_loss_prevented=decision.get("estimated_subscriber_loss_prevented", "$1,450,000 USD"),
+            estimated_subscriber_loss_prevented=decision.get("estimated_subscriber_loss_prevented", synthetic_churn_str),
             executive_summary=exec_summary,
             reasoning_trace=trace,
             mcp_tools_executed=mcp_tools_called,
