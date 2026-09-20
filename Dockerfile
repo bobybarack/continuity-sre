@@ -24,16 +24,21 @@ COPY backend/requirements.txt /app/backend/requirements.txt
 COPY backend/requirements.lock /app/backend/requirements.lock
 RUN pip install --no-cache-dir -r /app/backend/requirements.lock
 
-# Copy source code and configuration
+# Copy source code and configuration (frontend is deployed separately on Cloudflare Pages)
 COPY backend /app/backend
-COPY frontend /app/frontend
+
+# Create non-root system user for runtime isolation
+RUN groupadd -r continuity && useradd -r -g continuity -d /app -s /sbin/nologin continuity \
+    && chown -R continuity:continuity /app
+
+USER continuity
 
 # Expose standard Cloud Run port
 EXPOSE 8080
 
-# Healthcheck
+# Healthcheck probe using dedicated /healthz
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/ || exit 1
+    CMD curl -f http://localhost:${PORT:-8080}/healthz || exit 1
 
 # Start production ASGI server
 CMD ["sh", "-c", "exec uvicorn main:app --app-dir /app/backend --host 0.0.0.0 --port ${PORT:-8080}"]

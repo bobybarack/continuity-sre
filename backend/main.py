@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from routes.chaos import router as chaos_router
 from routes.telemetry import router as telemetry_router
@@ -44,6 +44,23 @@ app.add_middleware(
 app.include_router(chaos_router)
 app.include_router(telemetry_router)
 app.include_router(agent_router)
+
+@app.get("/healthz")
+async def health_check():
+    """Liveness probe: verifies process health."""
+    return {"status": "HEALTHY", "service": "continuity-api"}
+
+@app.get("/readyz")
+async def readiness_check():
+    """Readiness probe: verifies service configuration and state initialization."""
+    if not (STREAM_TITLE and GOOGLE_CLOUD_PROJECT):
+        raise HTTPException(status_code=503, detail="Required service configuration missing")
+    return {
+        "status": "READY",
+        "gemini_model": GEMINI_MODEL,
+        "grafana_configured": bool(GRAFANA_INSTANCE_URL),
+        "telemetry_ready": True
+    }
 
 @app.get("/")
 async def root_info():
