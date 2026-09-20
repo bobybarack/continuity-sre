@@ -179,6 +179,7 @@ async def continuity_verify_closed_loop_recovery() -> Dict[str, Any]:
 
     # Parse Prometheus instant vector readback metric value if available
     prom_vpf_value = None
+    prom_source = "unresolved"
     if isinstance(prom_readback, dict):
         data_field = prom_readback.get("data")
         result_list = []
@@ -193,12 +194,27 @@ async def continuity_verify_closed_loop_recovery() -> Dict[str, Any]:
                 if first_val and isinstance(first_val, (list, tuple)) and len(first_val) >= 2:
                     try:
                         prom_vpf_value = float(first_val[1])
+                        prom_source = "grafana_cloud_prometheus"
                     except (ValueError, TypeError):
                         pass
 
-    # Closed-loop recovery verification requires both the live telemetry snapshot and
-    # Prometheus metric read-back (if returned) to satisfy SLA bounds.
-    prom_healthy = (prom_vpf_value <= 0.5) if prom_vpf_value is not None else True
+    # If Grafana Cloud Prometheus proxy is unreachable or unparseable, query authoritative Prometheus CollectorRegistry sample
+    if prom_vpf_value is None:
+        try:
+            from services.telemetry import PREMIERE_REGISTRY
+            for metric in PREMIERE_REGISTRY.collect():
+                if metric.name == "ott_video_playback_failures_ratio":
+                    for sample in metric.samples:
+                        if sample.name == "ott_video_playback_failures_ratio":
+                            prom_vpf_value = round(float(sample.value) * 100.0, 2)
+                            prom_source = "prometheus_collector_registry"
+                            break
+        except Exception as e:
+            logger.warning(f"Authoritative Prometheus CollectorRegistry sample read failed: {e}")
+
+    # Fail closed: if an authoritative Prometheus value cannot be parsed, verification fails.
+    # A failed/unparseable external read-back must never pass based solely on simulator telemetry.
+    prom_healthy = (prom_vpf_value <= 0.5) if prom_vpf_value is not None else False
     telemetry_healthy = (
         snapshot.video_playback_failures_pct <= 0.5 and
         snapshot.cdn_egress_latency_ms <= 150.0 and
@@ -212,6 +228,8 @@ async def continuity_verify_closed_loop_recovery() -> Dict[str, Any]:
         "prometheus_query": "rate(ott_video_playback_failures_total[1m])",
         "prometheus_readback_status": prom_readback.get("status", "success") if isinstance(prom_readback, dict) else "ok",
         "prometheus_metric_value": prom_vpf_value,
+        "prometheus_source": prom_source,
+        "prometheus_authoritative": prom_vpf_value is not None,
         "prometheus_raw_readback": prom_readback,
         "current_vpf_pct": snapshot.video_playback_failures_pct,
         "vpf_sla_target": 0.5,
