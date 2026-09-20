@@ -1,5 +1,5 @@
 # Multi-stage production container for Continuity (FastAPI + Gemini + Grafana Cloud MCP)
-FROM grafana/mcp-grafana:latest AS grafana-mcp
+FROM grafana/mcp-grafana:1.5.1 AS grafana-mcp
 FROM python:3.11-slim AS production
 
 ENV PYTHONUNBUFFERED=1 \
@@ -19,9 +19,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=grafana-mcp /app/mcp-grafana /usr/local/bin/mcp-grafana
 RUN chmod +x /usr/local/bin/mcp-grafana || true
 
-# Install Python requirements
+# Install locked Python requirements for deterministic reproducible build
 COPY backend/requirements.txt /app/backend/requirements.txt
-RUN pip install --no-cache-dir -r /app/backend/requirements.txt
+COPY backend/requirements.lock /app/backend/requirements.lock
+RUN pip install --no-cache-dir -r /app/backend/requirements.lock
 
 # Copy source code and configuration
 COPY backend /app/backend
