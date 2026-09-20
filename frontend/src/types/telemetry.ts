@@ -21,6 +21,7 @@ export interface TelemetrySnapshot {
 export interface InvestigationResult {
   timestamp: number;
   incident_id?: string | null;
+  failure_mode?: string | null;
   stream_title: string;
   initial_anomaly_detected: boolean;
   vpf_rate: number;
@@ -30,6 +31,9 @@ export interface InvestigationResult {
   root_cause_analysis: string;
   affected_subsystems: string[];
   autonomous_action_taken?: string | null;
+  remediation_action?: string | null;
+  remediation_status?: string | null;
+  workflow_status?: string;
   traffic_shift_details: {
     primary_cdn?: string;
     primary_cdn_pct?: number;
@@ -38,10 +42,20 @@ export interface InvestigationResult {
     [key: string]: any;
   };
   annotation_id?: number | null;
-  mttr_seconds: number;
+  grafana_incident_id?: string | null;
+  workflow_elapsed_seconds?: number;
+  mttr_seconds?: number | null;
   estimated_subscriber_loss_prevented: string;
   executive_summary: string;
   reasoning_trace: string[];
+  mcp_tools_executed?: string[];
+  closed_loop_verified?: boolean;
+  verified_vpf_rate?: number;
+  verified_buffer_health_sec?: number;
+  verified_latency_ms?: number | null;
+  verification_status?: string;
+  verification_source?: string | null;
+  verification_authoritative?: boolean;
 }
 
 export interface GrafanaHealth {

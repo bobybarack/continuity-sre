@@ -39,6 +39,7 @@ FALLBACK_MODELS = [
 class InvestigationResult(BaseModel):
     timestamp: float = Field(default_factory=time.time)
     incident_id: Optional[str] = None
+    failure_mode: Optional[str] = None
     stream_title: str = STREAM_TITLE
     initial_anomaly_detected: bool = False
     vpf_rate: float
@@ -48,10 +49,14 @@ class InvestigationResult(BaseModel):
     root_cause_analysis: str
     affected_subsystems: List[str]
     autonomous_action_taken: Optional[str] = None
+    remediation_action: Optional[str] = None
+    remediation_status: Optional[str] = None
+    workflow_status: str = "COMPLETED"
     traffic_shift_details: Dict[str, Any] = Field(default_factory=dict)
     annotation_id: Optional[int] = None
     grafana_incident_id: Optional[str] = None
-    mttr_seconds: float = 0.0
+    workflow_elapsed_seconds: float = 0.0
+    mttr_seconds: Optional[float] = None
     estimated_subscriber_loss_prevented: str
     executive_summary: str
     reasoning_trace: List[str] = Field(default_factory=list)
@@ -103,10 +108,13 @@ class AgentCommander:
         )
 
         if not is_anomaly and state.current_mode in ["NORMAL", "REMEDIATED"]:
+            elapsed = round(time.time() - start_time, 2)
             trace.append(f"[{time.strftime('%H:%M:%S')}] Anomaly Check: All metrics within operational SLA. Status: HEALTHY.")
             result = InvestigationResult(
                 timestamp=time.time(),
                 incident_id=None,
+                failure_mode=state.failure_mode.value if state.failure_mode else "NONE",
+                stream_title=STREAM_TITLE,
                 initial_anomaly_detected=False,
                 vpf_rate=snapshot.video_playback_failures_pct,
                 cdn_latency_ms=snapshot.cdn_egress_latency_ms,
@@ -115,17 +123,25 @@ class AgentCommander:
                 root_cause_analysis="No anomalous QoS degradation detected. Stream delivery is operating within normal parameters.",
                 affected_subsystems=[],
                 autonomous_action_taken=None,
+                remediation_action=None,
+                remediation_status=None,
+                workflow_status="HEALTHY",
                 traffic_shift_details={"primary_cdn_pct": snapshot.primary_traffic_pct, "secondary_cdn_pct": snapshot.secondary_traffic_pct},
                 annotation_id=None,
                 grafana_incident_id=None,
-                mttr_seconds=0.0,
+                workflow_elapsed_seconds=elapsed,
+                mttr_seconds=None,
                 estimated_subscriber_loss_prevented="$0 (Nominal Operation)",
                 executive_summary="Playback failure rates remain under 0.2%. Global edge CDN delivery and DRM license servers are healthy.",
                 reasoning_trace=trace,
                 mcp_tools_executed=mcp_tools_called,
-                closed_loop_verified=True,
+                closed_loop_verified=False,
                 verified_vpf_rate=snapshot.video_playback_failures_pct,
-                verified_buffer_health_sec=snapshot.buffer_health_sec
+                verified_buffer_health_sec=snapshot.buffer_health_sec,
+                verified_latency_ms=snapshot.cdn_egress_latency_ms,
+                verification_status="NOT_REQUIRED",
+                verification_source=None,
+                verification_authoritative=False
             )
             self._record_result(result)
             return result
@@ -316,6 +332,9 @@ Call the necessary MCP tools to remediate this critical stream degradation.
 
         if is_verified and gate_status == "PASSED":
             chaos_manager.mark_verified_recovered(verify_res if isinstance(verify_res, dict) else {})
+            mttr_value = elapsed
+            workflow_status = "RESOLVED"
+            remediation_status = "SUCCESS"
             trace.append(
                 f"[{time.strftime('%H:%M:%S')}] CLOSED-LOOP VERIFIED: VPF dropped from {snapshot.video_playback_failures_pct}% to {verified_vpf}%. "
                 f"Forward buffer restored to {verified_buffer}s. Verification Gate: PASSED (Source: {verify_source}, Authoritative: {is_authoritative})."
@@ -324,6 +343,9 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             exec_summary = decision.get("executive_summary", "Incident resolved autonomously.")
         else:
             chaos_manager.mark_recovery_failed("Closed-loop verification pending or incomplete", details=verify_res if isinstance(verify_res, dict) else {})
+            mttr_value = None
+            workflow_status = "PENDING_VERIFICATION"
+            remediation_status = "PENDING_CONVERGENCE"
             trace.append(
                 f"[{time.strftime('%H:%M:%S')}] CLOSED-LOOP VERIFICATION PENDING: Stream QoE metrics have not yet crossed recovery SLA threshold. "
                 f"VPF: {verified_vpf}% (Target <= 0.5%), Buffer: {verified_buffer}s (Target >= 20s). "
@@ -335,6 +357,7 @@ Call the necessary MCP tools to remediate this critical stream degradation.
         result = InvestigationResult(
             timestamp=time.time(),
             incident_id=state.active_incident_id or grafana_incident_id or f"INC-{int(time.time())}",
+            failure_mode=state.failure_mode.value if state.failure_mode else "NONE",
             stream_title=STREAM_TITLE,
             initial_anomaly_detected=True,
             vpf_rate=snapshot.video_playback_failures_pct,
@@ -344,6 +367,9 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             root_cause_analysis=decision.get("root_cause_analysis", "Edge transit congestion"),
             affected_subsystems=decision.get("affected_subsystems", ["Edge CDN"]),
             autonomous_action_taken=remediation_action,
+            remediation_action=remediation_action,
+            remediation_status=remediation_status,
+            workflow_status=workflow_status,
             traffic_shift_details={
                 "primary_cdn": remediation_res.get("primary_cdn", "Fastly Edge"),
                 "primary_cdn_pct": remediation_res.get("primary_cdn_traffic_pct", 20),
@@ -352,7 +378,8 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             },
             annotation_id=annotation_id,
             grafana_incident_id=grafana_incident_id,
-            mttr_seconds=elapsed,
+            workflow_elapsed_seconds=elapsed,
+            mttr_seconds=mttr_value,
             estimated_subscriber_loss_prevented=decision.get("estimated_subscriber_loss_prevented", synthetic_churn_str),
             executive_summary=exec_summary,
             reasoning_trace=trace,
