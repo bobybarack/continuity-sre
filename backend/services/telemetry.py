@@ -74,7 +74,7 @@ PROM_CDN_SPLIT = Gauge(
 PROM_OUTAGE_STATUS = Gauge(
     "ott_incident_active_status",
     "Binary indicator (1=outage active, 0=healthy)",
-    ["chaos_mode", "incident_id"],
+    ["chaos_mode", "region"],
     registry=PREMIERE_REGISTRY
 )
 
@@ -228,7 +228,7 @@ class TelemetryEngine:
             PROM_BITRATE.labels(stream_title=STREAM_TITLE, resolution="4K UHD").set(bitrate)
             PROM_CDN_SPLIT.labels(cdn_provider="Fastly").set(state.primary_cdn_traffic_pct)
             PROM_CDN_SPLIT.labels(cdn_provider="Akamai").set(state.secondary_cdn_traffic_pct)
-            PROM_OUTAGE_STATUS.labels(chaos_mode=mode, incident_id=state.active_incident_id or "none").set(1.0 if state.is_outage_active else 0.0)
+            PROM_OUTAGE_STATUS.labels(chaos_mode=mode, region=state.affected_region).set(1.0 if state.is_outage_active else 0.0)
 
             snapshot = TelemetrySnapshot(
                 timestamp=now,
