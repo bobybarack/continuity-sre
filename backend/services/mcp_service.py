@@ -181,7 +181,7 @@ async def continuity_verify_closed_loop_recovery() -> Dict[str, Any]:
     """Executes a closed-loop falsifiable recovery verification query against Prometheus and client telemetry."""
     logger.info("[MCP Tool] Verifying closed-loop stream restabilization via Prometheus read-back...")
     prom_readback = await grafana_query_prometheus("ott_video_playback_failures_ratio")
-    snapshot = telemetry_engine.generate_current_snapshot()
+    snapshot = telemetry_engine.get_current_snapshot()
 
     # Parse Prometheus instant vector readback metric value if available
     prom_vpf_value = None

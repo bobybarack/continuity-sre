@@ -1,9 +1,11 @@
+from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes.chaos import router as chaos_router
 from routes.telemetry import router as telemetry_router
 from routes.agent import router as agent_router
+from services.telemetry import telemetry_engine
 from config import (
     STREAM_TITLE,
     GOOGLE_CLOUD_PROJECT,
@@ -11,10 +13,17 @@ from config import (
     GEMINI_MODEL
 )
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await telemetry_engine.start()
+    yield
+    await telemetry_engine.stop()
+
 app = FastAPI(
     title="Continuity API",
     description="Autonomous Stream Continuity Incident Commander (Grafana Cloud MCP & Gemini)",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Enable CORS for local dev and web clients

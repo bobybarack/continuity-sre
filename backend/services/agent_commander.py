@@ -82,7 +82,7 @@ class AgentCommander:
         trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [grafana_query_prometheus]: Executing PromQL against Grafana Cloud Mimir...")
         prom_res = await grafana_query_prometheus("ott_video_playback_failures_ratio")
         
-        snapshot = telemetry_engine.generate_current_snapshot()
+        snapshot = telemetry_engine.get_current_snapshot()
         state = chaos_manager.get_state()
         
         trace.append(
@@ -298,7 +298,7 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             mcp_tools_called.append("continuity_verify_closed_loop_recovery")
             trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [continuity_verify_closed_loop_recovery]: Executing closed-loop verification check...")
             verify_res = await continuity_verify_closed_loop_recovery()
-        verified_snapshot = telemetry_engine.generate_current_snapshot()
+        verified_snapshot = telemetry_engine.get_current_snapshot()
         
         is_verified = verify_res.get("verified", False) if isinstance(verify_res, dict) else False
         gate_status = verify_res.get("status", "PENDING") if isinstance(verify_res, dict) else "PENDING"

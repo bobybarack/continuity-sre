@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/telemetry", tags=["Telemetry Stream"])
 @router.get("/current", response_model=TelemetrySnapshot)
 async def get_current_telemetry():
     """Returns the latest real-time snapshot of OTT streaming QoS metrics."""
-    return telemetry_engine.generate_current_snapshot()
+    return telemetry_engine.get_current_snapshot()
 
 @router.get("/history", response_model=List[TelemetrySnapshot])
 async def get_telemetry_history():
@@ -34,11 +34,14 @@ async def prometheus_metrics():
 async def stream_telemetry_sse():
     """Server-Sent Events (SSE) endpoint providing a continuous 1Hz real-time telemetry feed."""
     async def event_generator():
+        last_timestamp = None
         while True:
-            snapshot = telemetry_engine.generate_current_snapshot()
-            data_json = json.dumps(snapshot.model_dump())
-            yield f"data: {data_json}\n\n"
-            await asyncio.sleep(1.0)
+            snapshot = telemetry_engine.get_current_snapshot()
+            if snapshot.timestamp != last_timestamp:
+                last_timestamp = snapshot.timestamp
+                data_json = json.dumps(snapshot.model_dump())
+                yield f"data: {data_json}\n\n"
+            await asyncio.sleep(0.25)
 
     return StreamingResponse(
         event_generator(),
