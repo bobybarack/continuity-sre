@@ -80,7 +80,7 @@ class AgentCommander:
         # Step 1: Query Prometheus metrics via official Grafana MCP Tool
         mcp_tools_called.append("grafana_query_prometheus")
         trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [grafana_query_prometheus]: Executing PromQL against Grafana Cloud Mimir...")
-        prom_res = await grafana_query_prometheus("rate(ott_video_playback_failures_total[1m])")
+        prom_res = await grafana_query_prometheus("ott_video_playback_failures_ratio")
         
         snapshot = telemetry_engine.generate_current_snapshot()
         state = chaos_manager.get_state()
@@ -152,7 +152,7 @@ OBSERVABILITY TELEMETRY (Prometheus & Loki via Grafana MCP):
 - Recent Edge Log: "{snapshot.latest_log}"
 
 RAW GRAFANA CLOUD MCP RESPONSES:
-- Prometheus PromQL Query Response (rate(ott_video_playback_failures_total[1m])):
+- Prometheus PromQL Query Response (ott_video_playback_failures_ratio):
 {json.dumps(prom_res, indent=2) if isinstance(prom_res, (dict, list)) else prom_res}
 
 - Loki LogQL Query Response ({{service="ott-edge-router"}} |= "502 Bad Gateway"):
