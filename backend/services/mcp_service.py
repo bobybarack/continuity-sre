@@ -174,7 +174,7 @@ async def continuity_execute_remediation(action: str, primary_cdn_pct: int, seco
 async def continuity_verify_closed_loop_recovery() -> Dict[str, Any]:
     """Executes a closed-loop falsifiable recovery verification query against Prometheus and client telemetry."""
     logger.info("[MCP Tool] Verifying closed-loop stream restabilization via Prometheus read-back...")
-    prom_readback = await grafana_query_prometheus("rate(ott_video_playback_failures_total[1m])")
+    prom_readback = await grafana_query_prometheus("ott_video_playback_failures_ratio")
     snapshot = telemetry_engine.generate_current_snapshot()
 
     # Parse Prometheus instant vector readback metric value if available
@@ -193,7 +193,9 @@ async def continuity_verify_closed_loop_recovery() -> Dict[str, Any]:
                 first_val = first_item.get("value")
                 if first_val and isinstance(first_val, (list, tuple)) and len(first_val) >= 2:
                     try:
-                        prom_vpf_value = float(first_val[1])
+                        raw_val = float(first_val[1])
+                        # Normalize ratio (e.g. 0.0019 -> 0.19%) to match percentage SLA
+                        prom_vpf_value = round(raw_val * 100.0, 2) if raw_val <= 1.0 else round(raw_val, 2)
                         prom_source = "grafana_cloud_prometheus"
                     except (ValueError, TypeError):
                         pass
@@ -225,7 +227,7 @@ async def continuity_verify_closed_loop_recovery() -> Dict[str, Any]:
     return {
         "status": "PASSED" if is_recovered else "PENDING",
         "verified": is_recovered,
-        "prometheus_query": "rate(ott_video_playback_failures_total[1m])",
+        "prometheus_query": "ott_video_playback_failures_ratio",
         "prometheus_readback_status": prom_readback.get("status", "success") if isinstance(prom_readback, dict) else "ok",
         "prometheus_metric_value": prom_vpf_value,
         "prometheus_source": prom_source,
