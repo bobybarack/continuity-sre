@@ -10,7 +10,7 @@ CONTINUITY is an autonomous stream continuity SRE Incident Commander engineered 
 +---------------------------------------------------------------------------------------------------+
 |                                                                                                   |
 |  [4.28M CONCURRENT OTT STREAM CLIENTS]                                                            |
-|  (HLS / DASH Video Players streaming 'Spider-Man: Brand New Day Premiere')                        |
+|  (HLS / DASH Video Players streaming 'Continuity Premiere: Global Broadcast 4K')                  |
 |                                 |                                                                 |
 |                                 v (Pushes Telemetry & Edge Logs)                                  |
 |  +---------------------------------------------------------------------------------------------+  |
@@ -88,8 +88,8 @@ All metric collection conforms to the OpenMetrics / Prometheus standard via a de
 |  [STAGE 4: DASHBOARD ANNOTATION]                                                                  |
 |  Creates visible vertical timestamp on live Grafana Cloud dashboard with diagnosis metadata.      |
 |                                                                                                   |
-|  [STAGE 5: POST-MORTEM & ROI REPORTING]                                                           |
-|  Calculates MTTR and churn prevention: $1.45M USD (32,000 subscriber cancellations avoided).      |
+|  [STAGE 5: POST-MORTEM & SLA RESTORATION REPORTING]                                               |
+|  Verifies MTTR and recovery: VPF restabilized to 0.21% (< 0.50% SLA), buffer restored to 27.9s.     |
 +---------------------------------------------------------------------------------------------------+
 ```
 
