@@ -118,7 +118,7 @@ export function LivePlayerCard({ telemetry }: LivePlayerCardProps) {
               Live Stream Monitor
             </h3>
             <p className="text-xs text-gray-500 mt-0.5 font-medium">
-              Spider-Man: Brand New Day (4K UHD 60fps)
+              Continuity Premiere: Global Broadcast (4K UHD 60fps)
             </p>
           </div>
 
