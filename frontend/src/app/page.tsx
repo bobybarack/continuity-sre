@@ -32,7 +32,7 @@ export default function ContinuityDashboard() {
     setDemoFixtureStage(stage);
     const baseSnap = (vpf: number, lat: number, mode: string, isOutage: boolean, buf: number, br: number, pPct: number, sPct: number, label: string, color: string, log: string): TelemetrySnapshot => ({
       timestamp: Date.now() / 1000,
-      stream_title: "Spider-Man: Brand New Day (World Premiere 4K UHD)",
+      stream_title: "Continuity Premiere: Global Broadcast (Live 4K UHD)",
       chaos_mode: mode,
       is_outage: isOutage,
       video_playback_failures_pct: vpf,
@@ -53,7 +53,7 @@ export default function ContinuityDashboard() {
     const sampleInvestigation: InvestigationResult = {
       timestamp: Date.now() / 1000 - 120,
       incident_id: "INC-89211",
-      stream_title: "Spider-Man: Brand New Day (World Premiere 4K UHD)",
+      stream_title: "Continuity Premiere: Global Broadcast (Live 4K UHD)",
       initial_anomaly_detected: true,
       vpf_rate: 5.08,
       cdn_latency_ms: 840.0,
@@ -74,7 +74,7 @@ export default function ContinuityDashboard() {
       },
       workflow_elapsed_seconds: 1.28,
       mttr_seconds: 1.28,
-      estimated_subscriber_loss_prevented: "Simulated Model: Zero Impact",
+      estimated_subscriber_loss_prevented: "SLA Mitigated: ~217,520 stream sessions protected",
       executive_summary: "Automated mitigation completed with verified recovery in 1.28s.",
       closed_loop_verified: true,
       verified_vpf_rate: 0.21,
@@ -84,10 +84,12 @@ export default function ContinuityDashboard() {
       verification_source: "grafana_cloud_prometheus",
       verification_authoritative: true,
       mcp_tools_executed: [
-        "continuity_query_prometheus",
-        "continuity_query_loki",
+        "grafana_query_prometheus",
+        "grafana_query_loki",
         "continuity_execute_remediation",
-        "continuity_verify_stream_recovery",
+        "grafana_create_annotation",
+        "grafana_create_incident",
+        "continuity_verify_closed_loop_recovery",
       ],
       reasoning_trace: [
         "Ingesting Prometheus ott_video_playback_failures_ratio metric (5.08%)",
