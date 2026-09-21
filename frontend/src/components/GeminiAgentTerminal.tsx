@@ -107,9 +107,9 @@ export function GeminiAgentTerminal({
             </div>
 
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/10 text-xs font-mono">
-              <DollarCircleIcon className="w-3.5 h-3.5 text-[#00f5a0]" />
-              <span className="text-white/50">Prevented Churn:</span>
-              <span className="text-[#00f5a0] font-bold">$1.45M+</span>
+              <CloudIcon className="w-3.5 h-3.5 text-[#00d2ff]" />
+              <span className="text-white/50">Provenance:</span>
+              <span className="text-[#00f5a0] font-bold">Grafana Cloud Mimir (Authoritative)</span>
             </div>
           </div>
         </div>
@@ -181,7 +181,7 @@ export function GeminiAgentTerminal({
                 </div>
 
                 <div className="text-[#00d2ff]">
-                  <span>Saved Churn: </span>
+                  <span>Grounded SLA Impact: </span>
                   <span className="font-bold text-white">{churnSaved}</span>
                 </div>
               </div>
