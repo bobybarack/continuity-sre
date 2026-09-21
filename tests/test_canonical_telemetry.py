@@ -101,3 +101,21 @@ async def test_verification_corresponds_to_canonical_snapshot():
     assert verify_res["current_vpf_pct"] == canonical_snap.video_playback_failures_pct
     assert verify_res["forward_buffer_sec"] == canonical_snap.buffer_health_sec
     assert verify_res["cdn_latency_ms"] == canonical_snap.cdn_egress_latency_ms
+
+@pytest.mark.asyncio
+async def test_verification_polling_does_not_advance_telemetry_clock():
+    """Test 7: Verification polling does not invoke _tick() or append to telemetry history."""
+    chaos_manager.reset_to_normal()
+    initial_history_len = len(telemetry_engine.get_history())
+    snap_before = telemetry_engine.get_current_snapshot()
+    
+    # Run closed-loop verification across multiple poll cycles without background ticker
+    verify_res = await continuity_verify_closed_loop_recovery(timeout_sec=0.2, poll_interval_sec=0.05)
+    assert verify_res["status"] == "PASSED"
+    
+    snap_after = telemetry_engine.get_current_snapshot()
+    final_history_len = len(telemetry_engine.get_history())
+    
+    # Telemetry history and snapshot timestamp must be completely unmodified by verification polling
+    assert final_history_len == initial_history_len
+    assert snap_after.timestamp == snap_before.timestamp
