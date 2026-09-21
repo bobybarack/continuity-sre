@@ -107,7 +107,7 @@ import asyncio
 import threading
 
 class TelemetryEngine:
-    def __init__(self, rng: Optional[random.Random] = None, chaos_mgr: Optional[ChaosStateManager] = None):
+    def __init__(self, rng: Optional[random.Random] = None, chaos_mgr: Optional[ChaosStateManager] = None, tick_interval_sec: float = 1.0):
         self._lock = threading.RLock()
         self.rng = rng or random.Random()
         self._chaos_manager = chaos_mgr
@@ -116,6 +116,7 @@ class TelemetryEngine:
         self.current_snapshot: Optional[TelemetrySnapshot] = None
         self._ticker_task: Optional[asyncio.Task] = None
         self._is_running = False
+        self.tick_interval_sec = tick_interval_sec
         # Initialize an initial canonical snapshot immediately
         self._tick()
 
@@ -301,12 +302,12 @@ class TelemetryEngine:
     async def _ticker_loop(self):
         while self._is_running:
             try:
-                await asyncio.sleep(1.0)
+                await asyncio.sleep(self.tick_interval_sec)
                 self._tick()
             except asyncio.CancelledError:
                 break
             except Exception:
-                await asyncio.sleep(1.0)
+                await asyncio.sleep(self.tick_interval_sec)
 
 # Global telemetry engine singleton
 telemetry_engine = TelemetryEngine()
