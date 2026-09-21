@@ -533,12 +533,16 @@ CONTINUITY therefore uses several controls.
 - **Visible fallback behavior**: The application records whether verification came from remote Grafana Prometheus or the local registry fallback.
 - **Auditability**: Investigation records preserve tool execution, remediation, Grafana references, timing, and verification state.
 
-### Demo Write Guard
+### Demo Write Guard (Demo Friction vs. Authentication)
 
-Public telemetry endpoints can remain readable for demonstration purposes.
-Mutation operations such as chaos injection and autonomous investigation use a demo write guard.
-This is intended to protect the hackathon demonstration from accidental mutation; it should not be interpreted as a production identity/authentication system.
-A production deployment should use proper identity, authorization, secret management, and action-level policy enforcement.
+Public telemetry endpoints (`/api/telemetry/current`, `/api/telemetry/metrics`, etc.) remain openly readable for live monitoring and demonstration purposes.
+Mutation operations (`/api/chaos/inject-*`, `/api/chaos/remediate`, `/api/agent/investigate-and-remediate`) require a demo key header (`X-Continuity-Demo-Key`).
+
+**Architectural Decision on Security vs. Demo Friction:**
+- The frontend Next.js application is statically exported (`output: "export"`) and communicates directly from the client browser to the backend on Cloud Run.
+- Because `NEXT_PUBLIC_DEMO_KEY` is compiled into the client bundle, any browser visitor can easily recover the key.
+- Therefore, this header is **honestly categorized as a demo write guard / demo friction** designed to prevent search engine crawlers, automated web scrapers, and accidental requests from triggering chaos mutations—it is **not** an authentication or identity boundary.
+- For a true production security boundary, mutation requests must be proxied through a secured server-side API gateway with identity authentication (OAuth2 / OIDC), session verification, operator RBAC, and server-side secret management.
 
 ---
 
