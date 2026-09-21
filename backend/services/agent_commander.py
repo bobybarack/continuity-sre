@@ -12,7 +12,12 @@ from config import GEMINI_API_KEY, GEMINI_MODEL, STREAM_TITLE
 from services.chaos import chaos_manager, FailureMode
 from services.scenarios import SCENARIOS
 from services.telemetry import telemetry_engine
-from services.grafana_client import grafana_client
+from services.integration_models import (
+    PrometheusQueryResult,
+    LokiQueryResult,
+    GrafanaIncidentRef,
+    GrafanaAnnotationRef
+)
 from services.mcp_service import (
     GEMINI_MCP_TOOLS,
     dispatch_mcp_tool,
@@ -182,10 +187,10 @@ OBSERVABILITY TELEMETRY (Prometheus & Loki via Grafana MCP):
 
 RAW GRAFANA CLOUD MCP RESPONSES:
 - Prometheus PromQL Query Response ({promql_query}):
-{json.dumps(prom_res, indent=2) if isinstance(prom_res, (dict, list)) else prom_res}
+{json.dumps(prom_res.model_dump() if hasattr(prom_res, "model_dump") else prom_res, indent=2)}
 
 - Loki LogQL Query Response ({logql_query}):
-{json.dumps(loki_res, indent=2) if isinstance(loki_res, (dict, list)) else loki_res}
+{json.dumps(loki_res.model_dump() if hasattr(loki_res, "model_dump") else loki_res, indent=2)}
 
 AVAILABLE MCP TOOLS:
 - continuity_execute_remediation: Shift traffic or failover key cluster.
@@ -236,10 +241,10 @@ Call the necessary MCP tools to remediate this critical stream degradation.
                             decision_rca = tool_args.get("reason")
                         elif tool_name == "grafana_create_incident":
                             incident_res = tool_result
-                            grafana_incident_id = tool_result.get("incident_id") or tool_result.get("id")
+                            grafana_incident_id = getattr(tool_result, "incident_id", None) or (tool_result.get("incident_id") or tool_result.get("id") if isinstance(tool_result, dict) else None)
                         elif tool_name == "grafana_create_annotation":
                             annotation_resp = tool_result
-                            annotation_id = tool_result.get("id")
+                            annotation_id = getattr(tool_result, "id", None) or (tool_result.get("id") if isinstance(tool_result, dict) else None)
                         elif tool_name == "continuity_verify_closed_loop_recovery":
                             verify_res = tool_result
 
@@ -306,7 +311,7 @@ Call the necessary MCP tools to remediate this critical stream degradation.
                 severity=decision.get("severity", "CRITICAL"),
                 summary=decision.get("executive_summary", "Autonomous remediation executed.")
             )
-            grafana_incident_id = incident_res.get("incident_id")
+            grafana_incident_id = getattr(incident_res, "incident_id", None) or (incident_res.get("incident_id") or incident_res.get("id") if isinstance(incident_res, dict) else None)
             trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [grafana_create_incident]: Opened Grafana IRM incident {grafana_incident_id}.")
 
         # Step 5: Write visual annotation to Grafana live dashboard via MCP Tool if not yet written
@@ -318,7 +323,7 @@ Call the necessary MCP tools to remediate this critical stream degradation.
                 text=annotation_text,
                 tags=["continuity", "mcp-grafana", "gemini-sre", "autonomous-remediation"]
             )
-            annotation_id = annotation_resp.get("id") if isinstance(annotation_resp, dict) else None
+            annotation_id = getattr(annotation_resp, "id", None) or (annotation_resp.get("id") if isinstance(annotation_resp, dict) else None)
 
         # Step 6: Closed-Loop Verification Gate (Falsifiable Proof of Recovery)
         if not verify_res:

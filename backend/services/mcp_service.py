@@ -20,6 +20,16 @@ from config import (
 from services.grafana_client import grafana_client
 from services.chaos import chaos_manager
 from services.telemetry import telemetry_engine
+from services.integration_models import (
+    PrometheusQueryResult,
+    LokiQueryResult,
+    GrafanaIncidentRef,
+    GrafanaAnnotationRef,
+    normalize_prometheus_result,
+    normalize_loki_result,
+    normalize_incident_result,
+    normalize_annotation_result,
+)
 
 logger = logging.getLogger("continuity.mcp")
 
@@ -192,8 +202,8 @@ class OfficialGrafanaMCPBridge:
 official_mcp_bridge = OfficialGrafanaMCPBridge()
 
 # Tool Functions implementing runtime Grafana Cloud MCP capabilities
-async def grafana_query_prometheus(promql: str) -> Dict[str, Any]:
-    """Queries real-time OpenMetrics and Prometheus telemetry via official Grafana Cloud MCP Server."""
+async def grafana_query_prometheus(promql: str) -> PrometheusQueryResult:
+    """Queries real-time OpenMetrics and Prometheus telemetry via official Grafana Cloud MCP Server or direct REST."""
     logger.info(f"[MCP Tool] Executing PromQL: {promql}")
     res = await official_mcp_bridge.call_official_tool("query_prometheus", {
         "datasourceUid": GRAFANA_PROM_UID,
@@ -202,22 +212,24 @@ async def grafana_query_prometheus(promql: str) -> Dict[str, Any]:
         "queryType": "instant"
     })
     if res is not None and isinstance(res, dict) and ("data" in res or "status" in res):
-        return res
-    return await grafana_client.query_prometheus(promql)
+        return normalize_prometheus_result(res, query=promql, source="official_mcp")
+    direct_res = await grafana_client.query_prometheus(promql)
+    return normalize_prometheus_result(direct_res, query=promql, source="direct_rest")
 
-async def grafana_query_loki(logql: str, limit: int = 20) -> Dict[str, Any]:
-    """Queries distributed edge router and transcode logs via official Grafana Cloud MCP Server."""
+async def grafana_query_loki(logql: str, limit: int = 20) -> LokiQueryResult:
+    """Queries distributed edge router and transcode logs via official Grafana Cloud MCP Server or direct REST."""
     logger.info(f"[MCP Tool] Executing LogQL: {logql} (limit={limit})")
     res = await official_mcp_bridge.call_official_tool("query_loki_logs", {
         "datasourceUid": GRAFANA_LOKI_UID,
         "logql": logql,
         "limit": limit
     })
-    if res is not None and isinstance(res, dict) and ("data" in res or "lines" in res):
-        return res
-    return await grafana_client.query_loki_logs(logql, limit=limit)
+    if res is not None and isinstance(res, (dict, list)):
+        return normalize_loki_result(res, query=logql, source="official_mcp")
+    direct_res = await grafana_client.query_loki_logs(logql, limit=limit)
+    return normalize_loki_result(direct_res, query=logql, source="direct_rest")
 
-async def grafana_create_annotation(text: str, tags: Optional[List[str]] = None) -> Dict[str, Any]:
+async def grafana_create_annotation(text: str, tags: Optional[List[str]] = None) -> GrafanaAnnotationRef:
     """Drops a visible timestamped vertical annotation pin on live Grafana dashboard via official MCP Server."""
     logger.info(f"[MCP Tool] Creating dashboard annotation: {text}")
     res = await official_mcp_bridge.call_official_tool("create_annotation", {
@@ -226,71 +238,13 @@ async def grafana_create_annotation(text: str, tags: Optional[List[str]] = None)
     })
     if res is not None and isinstance(res, dict):
         if "Payload" in res and isinstance(res["Payload"], dict) and "id" in res["Payload"]:
-            return normalize_annotation_result({"id": res["Payload"]["id"], "message": res["Payload"].get("message", "Annotation added")})
+            return normalize_annotation_result({"id": res["Payload"]["id"], "text": text, "tags": tags or []}, source="official_mcp")
         if "id" in res:
-            return normalize_annotation_result(res)
+            return normalize_annotation_result(res, source="official_mcp")
     direct_res = await grafana_client.create_annotation(text, tags)
-    return normalize_annotation_result(direct_res)
+    return normalize_annotation_result(direct_res, source="direct_rest")
 
-def normalize_incident_result(raw: Any, default_title: str = "", default_severity: str = "") -> Dict[str, Any]:
-    """Normalizes raw response from MCP tool or direct API into a canonical incident dict."""
-    if not isinstance(raw, dict):
-        return {
-            "status": "error",
-            "incident_id": f"INC-{int(time.time())}",
-            "id": f"INC-{int(time.time())}",
-            "title": default_title,
-            "severity": default_severity,
-            "lifecycle_status": "active",
-            "raw": raw
-        }
-    
-    incident_id = (
-        raw.get("incident_id") or
-        raw.get("id") or
-        (raw.get("incident", {}).get("id") if isinstance(raw.get("incident"), dict) else None) or
-        (raw.get("Payload", {}).get("id") if isinstance(raw.get("Payload"), dict) else None) or
-        f"INC-{int(time.time())}"
-    )
-    title = raw.get("title") or (raw.get("incident", {}).get("title") if isinstance(raw.get("incident"), dict) else default_title)
-    severity = raw.get("severity") or (raw.get("incident", {}).get("severity") if isinstance(raw.get("incident"), dict) else default_severity)
-    
-    nested_status = raw.get("incident", {}).get("status") if isinstance(raw.get("incident"), dict) else None
-    if nested_status:
-        lifecycle_status = nested_status
-    elif raw.get("lifecycle_status"):
-        lifecycle_status = raw.get("lifecycle_status")
-    elif raw.get("status") and raw.get("status") not in ("success", "error"):
-        lifecycle_status = raw.get("status")
-    else:
-        lifecycle_status = "active"
-    
-    return {
-        "status": "success",
-        "incident_id": str(incident_id),
-        "id": str(incident_id),
-        "title": str(title),
-        "severity": str(severity),
-        "lifecycle_status": str(lifecycle_status),
-        "raw": raw
-    }
-
-def normalize_annotation_result(raw: Any) -> Dict[str, Any]:
-    """Normalizes raw annotation response from MCP tool or direct API into a canonical dict."""
-    if not isinstance(raw, dict):
-        return {"status": "error", "id": None, "raw": raw}
-    ann_id = (
-        raw.get("id") or
-        (raw.get("annotation", {}).get("id") if isinstance(raw.get("annotation"), dict) else None) or
-        (raw.get("Payload", {}).get("id") if isinstance(raw.get("Payload"), dict) else None)
-    )
-    return {
-        "status": "success" if ann_id else raw.get("status", "success"),
-        "id": int(ann_id) if ann_id and str(ann_id).isdigit() else ann_id,
-        "raw": raw
-    }
-
-async def grafana_create_incident(title: str, severity: str, summary: str) -> Dict[str, Any]:
+async def grafana_create_incident(title: str, severity: str, summary: str) -> GrafanaIncidentRef:
     """Opens a structured P1/P2 incident record in Grafana Cloud IRM via official MCP Server."""
     logger.info(f"[MCP Tool] Opening Grafana IRM incident: {title} [{severity}]")
     res = await official_mcp_bridge.call_official_tool("create_incident", {
@@ -299,11 +253,11 @@ async def grafana_create_incident(title: str, severity: str, summary: str) -> Di
         "roomPrefix": "stream-incident"
     })
     if res is not None and isinstance(res, dict) and ("incident_id" in res or "id" in res or "incident" in res):
-        return normalize_incident_result(res, default_title=title, default_severity=severity)
+        return normalize_incident_result(res, default_title=title, default_severity=severity, source="official_mcp")
     direct_res = await grafana_client.create_incident(title, severity, summary)
-    return normalize_incident_result(direct_res, default_title=title, default_severity=severity)
+    return normalize_incident_result(direct_res, default_title=title, default_severity=severity, source="direct_rest")
 
-async def grafana_resolve_incident(incident_id: str, summary: str = "Verified closed-loop recovery.") -> Dict[str, Any]:
+async def grafana_resolve_incident(incident_id: str, summary: str = "Verified closed-loop recovery.") -> GrafanaIncidentRef:
     """Resolves an existing incident in Grafana Cloud IRM via official MCP Server or direct API."""
     logger.info(f"[MCP Tool] Resolving Grafana IRM incident: {incident_id}")
     res = await official_mcp_bridge.call_official_tool("resolve_incident", {
@@ -311,9 +265,9 @@ async def grafana_resolve_incident(incident_id: str, summary: str = "Verified cl
         "summary": summary
     })
     if res is not None and isinstance(res, dict) and res.get("status") == "success":
-        return normalize_incident_result(res)
+        return normalize_incident_result(res, source="official_mcp")
     direct_res = await grafana_client.resolve_incident(incident_id, summary)
-    return normalize_incident_result(direct_res)
+    return normalize_incident_result(direct_res, source="direct_rest")
 
 async def grafana_search_dashboards(query: str = "") -> Dict[str, Any]:
     """Searches active dashboards on the connected Grafana Cloud instance via official MCP Server."""
@@ -354,7 +308,11 @@ async def _evaluate_single_recovery_sample() -> Dict[str, Any]:
     # Parse Prometheus instant vector readback metric value if available
     prom_vpf_value = None
     prom_source = "none"
-    if isinstance(prom_readback, dict):
+    if isinstance(prom_readback, PrometheusQueryResult):
+        if prom_readback.status == "success" and prom_readback.metric_value is not None:
+            prom_vpf_value = prom_readback.metric_value
+            prom_source = "grafana_cloud_prometheus"
+    elif isinstance(prom_readback, dict):
         data_field = prom_readback.get("data")
         result_list = []
         if isinstance(data_field, dict):
@@ -418,14 +376,14 @@ async def _evaluate_single_recovery_sample() -> Dict[str, Any]:
         "status": "PASSED" if is_recovered else "PENDING",
         "verified": is_recovered,
         "prometheus_query": "ott_video_playback_failures_ratio",
-        "prometheus_readback_status": prom_readback.get("status", "success") if isinstance(prom_readback, dict) else "ok",
+        "prometheus_readback_status": getattr(prom_readback, "status", None) or (prom_readback.get("status", "success") if isinstance(prom_readback, dict) else "ok"),
         "prometheus_metric_value": prom_vpf_value,
         "prometheus_source": prom_source,
         "prometheus_value_available": is_value_available,
         "prometheus_authoritative": is_remote_authoritative,
         "verification_source_trusted": is_source_trusted,
         "verification_policy": VERIFICATION_POLICY,
-        "prometheus_raw_readback": prom_readback,
+        "prometheus_raw_readback": prom_readback.model_dump() if hasattr(prom_readback, "model_dump") else prom_readback,
         "current_vpf_pct": snapshot.video_playback_failures_pct,
         "vpf_sla_target": 0.5,
         "forward_buffer_sec": snapshot.buffer_health_sec,
