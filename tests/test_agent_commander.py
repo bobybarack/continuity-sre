@@ -56,7 +56,7 @@ async def test_agent_autonomous_outage_remediation_live():
     assert result.autonomous_action_taken in ["SHIFT_TRAFFIC_TO_AKAMAI", "FAILOVER_DRM_KEY_CLUSTER", "REROUTE_BGP_TRANSIT"]
     assert result.traffic_shift_details["secondary_cdn_pct"] == 80
     assert result.mttr_seconds > 0.0
-    assert "churn" in result.estimated_subscriber_loss_prevented.lower() or "$" in result.estimated_subscriber_loss_prevented
+    assert "sla" in result.estimated_subscriber_loss_prevented.lower() or "sessions" in result.estimated_subscriber_loss_prevented.lower()
     assert len(result.reasoning_trace) >= 5
     
     # Assert Official Grafana MCP Tool Execution
