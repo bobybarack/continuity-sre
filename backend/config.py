@@ -21,7 +21,7 @@ GRAFANA_LOKI_UID = os.getenv("GRAFANA_LOKI_UID", "grafanacloud-logs")
 GRAFANA_TEMPO_UID = os.getenv("GRAFANA_TEMPO_UID", "grafanacloud-traces")
 
 # Stream Simulation Metadata
-STREAM_TITLE = "Spider-Man: Brand New Day (World Premiere 4K UHD)"
+STREAM_TITLE = "Continuity Premiere: Global Broadcast (Live 4K UHD)"
 TOTAL_ACTIVE_VIEWERS_BASE = 4_281_900
 TARGET_BITRATE_MBPS = 14.8
 TARGET_BUFFER_HEALTH_SEC = 28.5
