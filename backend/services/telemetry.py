@@ -10,7 +10,7 @@ from prometheus_client import (
     generate_latest,
     CONTENT_TYPE_LATEST
 )
-from services.chaos import chaos_manager
+from services.chaos import chaos_manager, ChaosStateManager
 from config import (
     STREAM_TITLE,
     TOTAL_ACTIVE_VIEWERS_BASE,
@@ -107,9 +107,10 @@ import asyncio
 import threading
 
 class TelemetryEngine:
-    def __init__(self, rng: Optional[random.Random] = None):
+    def __init__(self, rng: Optional[random.Random] = None, chaos_mgr: Optional[ChaosStateManager] = None):
         self._lock = threading.RLock()
         self.rng = rng or random.Random()
+        self._chaos_manager = chaos_mgr
         self.history: List[TelemetrySnapshot] = []
         self.max_history_len = 60
         self.current_snapshot: Optional[TelemetrySnapshot] = None
@@ -121,7 +122,8 @@ class TelemetryEngine:
     def _tick(self) -> TelemetrySnapshot:
         """Executes a single canonical 1 Hz telemetry tick, updates Prometheus gauges, and appends to history."""
         with self._lock:
-            state = chaos_manager.get_state()
+            mgr = self._chaos_manager or chaos_manager
+            state = mgr.get_state()
             now = time.time()
             
             # Base jitter calculations
