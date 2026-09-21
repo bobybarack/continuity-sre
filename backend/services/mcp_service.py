@@ -7,7 +7,6 @@ import shutil
 from pathlib import Path
 from contextlib import AsyncExitStack
 from typing import Dict, Any, List, Optional
-from mcp.server.mcpserver import MCPServer
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from google.genai import types
@@ -23,9 +22,6 @@ from services.chaos import chaos_manager
 from services.telemetry import telemetry_engine
 
 logger = logging.getLogger("continuity.mcp")
-
-# Initialize official MCP Server instance for Continuity - Grafana Integration
-mcp_server = MCPServer(name="continuity-grafana-mcp")
 
 def parse_mcp_tool_result(res: Any) -> Any:
     """Parses full MCP CallToolResult handling isError, multiple content items, structured content, and fallbacks."""
@@ -77,12 +73,10 @@ def parse_mcp_tool_result(res: Any) -> Any:
     return parsed_items
 
 class OfficialGrafanaMCPBridge:
-    """Manages persistent live stdio JSON-RPC sessions to the official grafana/mcp-grafana runtime server."""
+    """Manages stdio JSON-RPC sessions to the official grafana/mcp-grafana runtime server with robust lifecycle."""
     def __init__(self):
         self.cached_tools: List[Dict[str, Any]] = []
         self._session: Optional[ClientSession] = None
-        self._exit_stack: Optional[AsyncExitStack] = None
-        self._lock = asyncio.Lock()
         self.init_timeout = float(os.getenv("MCP_INIT_TIMEOUT", "15.0"))
         self.call_timeout = float(os.getenv("MCP_CALL_TIMEOUT", "15.0"))
 
@@ -98,98 +92,101 @@ class OfficialGrafanaMCPBridge:
                 return str(c)
         return shutil.which("mcp-grafana")
 
-    async def _reset_session(self):
-        """Safely cleans up active stdio process and session context."""
-        async with self._lock:
-            if self._exit_stack:
-                try:
-                    await self._exit_stack.aclose()
-                except Exception as e:
-                    logger.debug(f"[Official MCP] Error during session reset: {e}")
-            self._session = None
-            self._exit_stack = None
-
-    async def _ensure_session(self) -> Optional[ClientSession]:
-        """Ensures an active, initialized persistent ClientSession over stdio."""
-        async with self._lock:
-            if self._session is not None:
-                return self._session
-
-            bin_path = self.get_binary_path()
-            if not bin_path:
-                logger.warning("[Official MCP] mcp-grafana binary not located.")
-                return None
-
-            try:
-                env = {
-                    **os.environ,
-                    "GRAFANA_URL": GRAFANA_INSTANCE_URL,
-                    "GRAFANA_SERVICE_ACCOUNT_TOKEN": GRAFANA_TOKEN,
-                }
-                params = StdioServerParameters(
-                    command=bin_path,
-                    args=[],
-                    env=env,
-                )
-                stack = AsyncExitStack()
-                read, write = await stack.enter_async_context(stdio_client(params))
-                session = await stack.enter_async_context(ClientSession(read, write))
-                await asyncio.wait_for(session.initialize(), timeout=self.init_timeout)
-                self._exit_stack = stack
-                self._session = session
-                logger.info(f"[Official MCP] Established persistent session to {bin_path}")
-                return self._session
-            except Exception as e:
-                logger.warning(f"[Official MCP] Failed to initialize persistent session: {e}")
-                try:
-                    await stack.aclose()
-                except Exception:
-                    pass
-                self._session = None
-                self._exit_stack = None
-                return None
-
     async def close(self):
-        """Explicitly terminates the persistent session on application shutdown."""
-        await self._reset_session()
+        """Explicitly resets session state on shutdown."""
+        self._session = None
 
     async def list_official_tools(self) -> List[Dict[str, Any]]:
-        session = await self._ensure_session()
-        if not session:
+        """Discovers tools exposed by the official mcp-grafana binary."""
+        if self._session is not None:
+            try:
+                tools_resp = await asyncio.wait_for(
+                    self._session.list_tools(),
+                    timeout=self.call_timeout,
+                )
+                self.cached_tools = [
+                    {"name": t.name, "description": t.description or ""}
+                    for t in tools_resp.tools
+                ]
+                return self.cached_tools
+            except Exception as e:
+                logger.warning(f"[Official MCP] Session list_tools failed: {e}")
+                self._session = None
+
+        if self.cached_tools:
             return self.cached_tools
+
+        bin_path = self.get_binary_path()
+        if not bin_path:
+            logger.warning("[Official MCP] mcp-grafana binary not located.")
+            return []
+
+        env = {
+            **os.environ,
+            "GRAFANA_URL": GRAFANA_INSTANCE_URL,
+            "GRAFANA_SERVICE_ACCOUNT_TOKEN": GRAFANA_TOKEN,
+        }
+        params = StdioServerParameters(command=bin_path, args=[], env=env)
         try:
-            tools_resp = await asyncio.wait_for(
-                session.list_tools(),
-                timeout=self.call_timeout,
-            )
-            self.cached_tools = [
-                {"name": t.name, "description": t.description or ""}
-                for t in tools_resp.tools
-            ]
-            logger.info(f"[Official MCP] Discovered {len(self.cached_tools)} tools from persistent session")
-            return self.cached_tools
+            async with stdio_client(params) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await asyncio.wait_for(session.initialize(), timeout=self.init_timeout)
+                    tools_resp = await asyncio.wait_for(
+                        session.list_tools(),
+                        timeout=self.call_timeout,
+                    )
+                    self.cached_tools = [
+                        {"name": t.name, "description": t.description or ""}
+                        for t in tools_resp.tools
+                    ]
+                    logger.info(f"[Official MCP] Successfully discovered {len(self.cached_tools)} tools from {bin_path}")
+                    return self.cached_tools
         except Exception as e:
-            logger.warning(f"[Official MCP] Tool enumeration failed: {e}. Resetting session.")
-            await self._reset_session()
+            logger.warning(f"[Official MCP] Tool enumeration via stdio failed: {e}")
             return self.cached_tools
 
     async def call_official_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[Any]:
-        session = await self._ensure_session()
-        if not session:
+        """Calls a tool on the official mcp-grafana binary over stdio with timeout and error handling."""
+        if self._session is not None:
+            try:
+                res = await asyncio.wait_for(
+                    self._session.call_tool(tool_name, arguments),
+                    timeout=self.call_timeout,
+                )
+                return parse_mcp_tool_result(res)
+            except (asyncio.TimeoutError, TimeoutError) as te:
+                logger.warning(f"[Official MCP] Tool {tool_name} timed out: {te}")
+                self._session = None
+                return None
+            except Exception as e:
+                logger.warning(f"[Official MCP] Tool {tool_name} failed: {e}")
+                self._session = None
+                return None
+
+        bin_path = self.get_binary_path()
+        if not bin_path:
             return None
+
+        env = {
+            **os.environ,
+            "GRAFANA_URL": GRAFANA_INSTANCE_URL,
+            "GRAFANA_SERVICE_ACCOUNT_TOKEN": GRAFANA_TOKEN,
+        }
+        params = StdioServerParameters(command=bin_path, args=[], env=env)
         try:
-            res = await asyncio.wait_for(
-                session.call_tool(tool_name, arguments),
-                timeout=self.call_timeout,
-            )
-            return parse_mcp_tool_result(res)
+            async with stdio_client(params) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await asyncio.wait_for(session.initialize(), timeout=self.init_timeout)
+                    res = await asyncio.wait_for(
+                        session.call_tool(tool_name, arguments),
+                        timeout=self.call_timeout,
+                    )
+                    return parse_mcp_tool_result(res)
         except (asyncio.TimeoutError, TimeoutError) as te:
-            logger.warning(f"[Official MCP] Tool {tool_name} timed out after {self.call_timeout}s: {te}. Resetting session.")
-            await self._reset_session()
+            logger.warning(f"[Official MCP] Tool {tool_name} timed out after {self.call_timeout}s: {te}")
             return None
         except Exception as e:
-            logger.warning(f"[Official MCP] Tool {tool_name} execution failed: {e}. Resetting session.")
-            await self._reset_session()
+            logger.warning(f"[Official MCP] Tool {tool_name} stdio execution failed: {e}. Falling back to direct client.")
             return None
 
 official_mcp_bridge = OfficialGrafanaMCPBridge()
@@ -463,49 +460,6 @@ async def continuity_verify_closed_loop_recovery(
         await asyncio.sleep(poll_interval_sec)
 
     return last_evidence
-
-# Register tools with MCP Server
-@mcp_server.tool()
-async def query_prometheus(promql: str) -> str:
-    """Executes a PromQL metric query against Grafana Cloud Prometheus."""
-    res = await grafana_query_prometheus(promql)
-    return json.dumps(res)
-
-@mcp_server.tool()
-async def query_loki(logql: str, limit: int = 20) -> str:
-    """Executes a LogQL query against Grafana Cloud Loki."""
-    res = await grafana_query_loki(logql, limit)
-    return json.dumps(res)
-
-@mcp_server.tool()
-async def create_annotation(text: str, tags: list[str] = None) -> str:
-    """Creates a timestamped annotation on the live Grafana Cloud dashboard."""
-    res = await grafana_create_annotation(text, tags)
-    return json.dumps(res)
-
-@mcp_server.tool()
-async def create_incident(title: str, severity: str, summary: str) -> str:
-    """Opens a structured incident in Grafana Cloud IRM."""
-    res = await grafana_create_incident(title, severity, summary)
-    return json.dumps(res)
-
-@mcp_server.tool()
-async def search_dashboards(query: str = "") -> str:
-    """Searches dashboards on Grafana Cloud."""
-    res = await grafana_search_dashboards(query)
-    return json.dumps(res)
-
-@mcp_server.tool()
-async def shift_traffic(action: str, primary_cdn_pct: int, secondary_cdn_pct: int, reason: str) -> str:
-    """Executes multi-CDN traffic reallocation across edge POPs."""
-    res = await continuity_execute_remediation(action, primary_cdn_pct, secondary_cdn_pct, reason)
-    return json.dumps(res)
-
-@mcp_server.tool()
-async def verify_recovery() -> str:
-    """Validates falsifiable closed-loop recovery against the 0.5% VPF SLA."""
-    res = await continuity_verify_closed_loop_recovery()
-    return json.dumps(res)
 
 # Gemini function declaration schemas for native Google GenAI Tool Calling
 GEMINI_MCP_TOOLS = [
