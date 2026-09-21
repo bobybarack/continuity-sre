@@ -106,6 +106,7 @@ async def test_verification_corresponds_to_canonical_snapshot():
 async def test_verification_polling_does_not_advance_telemetry_clock():
     """Test 7: Verification polling does not invoke _tick() or append to telemetry history."""
     chaos_manager.reset_to_normal()
+    telemetry_engine._tick()
     initial_history_len = len(telemetry_engine.get_history())
     snap_before = telemetry_engine.get_current_snapshot()
     
