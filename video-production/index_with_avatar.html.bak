@@ -549,7 +549,7 @@
 
       <div class="target-stream-pill">
         <span class="live-dot"></span>
-        <span>Spider-Man: Brand New Day (World Premiere 4K)</span>
+        <span>Continuity Premiere: Global Broadcast (Live 4K)</span>
       </div>
 
       <div class="header-badges">
@@ -724,7 +724,7 @@
           AGENT REASONING STREAM
         </div>
         <div id="term-line-1" class="terminal-line">[14:04:15] OpenMetrics QoS Ingest: 100% OK</div>
-        <div id="term-line-2" class="terminal-line">[14:04:16] Stream Spider-Man 4K @ 14.5 Mbps</div>
+        <div id="term-line-2" class="terminal-line">[14:04:16] Stream Continuity Live 4K @ 14.5 Mbps</div>
         <div id="term-line-3" class="terminal-line success">[14:04:17] Egress routed to Fastly Edge POP</div>
       </div>
     </footer>
@@ -755,7 +755,7 @@
 
     // Subtitle track timing
     const subtitles = [
-      { start: 0, end: 7, text: "After months of nonstop engineering work, Friday night was the one release I had blocked off all summer: the midnight premiere of <span class='highlight'>Spider-Man: Brand New Day</span>." },
+      { start: 0, end: 7, text: "After months of nonstop engineering work, Friday night was the one release I had blocked off all summer: the midnight premiere of our <span class='highlight'>Global 4K Live Broadcast</span>." },
       { start: 7, end: 15, text: "But five minutes in, four million viewers hit a frozen screen: <span class='highlight'>Error 502</span>." },
       { start: 15, end: 22.5, text: "For 40 agonizing minutes, human SREs scrambled across dozens of dashboard tabs trying to isolate the failure." },
       { start: 22.5, end: 27, text: "In Hollywood, continuity is the sacred craft of making sure no flaw breaks the cinematic illusion. In streaming, <span class='highlight'>continuity is zero downtime</span>." },
@@ -763,7 +763,7 @@
       { start: 31, end: 41, text: "When an edge transit link collapses on our primary Fastly POP, Prometheus telemetry immediately catches the breach: video playback failures surge past <span class='highlight'>5%</span>, and player buffers collapse to under three seconds." },
       { start: 41, end: 51, text: "<span class='highlight'>CONTINUITY</span> activates instantly. Ingesting live Prometheus metric streams and Loki edge logs, the Google Cloud Gemini 3.7 Flash reasoning engine diagnoses the root cause in just <span class='highlight'>1.28 seconds</span>: an upstream transit peering drop on ASN 3356." },
       { start: 51, end: 63, text: "Without waiting for a human on-call engineer, the agent autonomously executes a traffic failover, rerouting <span class='highlight'>80% of egress to our secondary Akamai edge</span> and logging the incident signature for Grafana Cloud telemetry." },
-      { start: 63, end: 72.5, text: "<span class='highlight'>Mean Time to Resolution: 1.28 seconds</span>. Millions in subscriber churn prevented." },
+      { start: 63, end: 72.5, text: "<span class='highlight'>Mean Time to Resolution: 1.28 seconds</span>. Full stream SLA verified restored." },
       { start: 72.5, end: 81, text: "Now, here is the secret behind what you are watching right now: this entire demo video was <span class='highlight'>autonomously scripted, voiced, and edited by our AI agent, Antigravity</span>." },
       { start: 81, end: 91, text: "To guarantee broadcast audio fidelity, Antigravity synthesized my cloned voice using ElevenLabs, splitting the teleprompter into <span class='highlight'>precise sixty-second chunks</span> to completely eliminate acoustic drift and model fatigue." },
       { start: 91, end: 103, text: "The voice stems were coupled with my digital twin avatar via HeyGen, and the entire production was assembled using <span class='highlight'>HyperFrames</span>, HeyGen's open-source HTML-to-video framework, rendering seekable GSAP motion graphics, telemetry cards, and multi-track audio at 60 frames per second." },
@@ -806,7 +806,7 @@
         hudStatus.style.color = "#4ade80";
         termLine1.innerText = "[14:04:15] OpenMetrics QoS Ingest: 100% OK";
         termLine1.className = "terminal-line";
-        termLine2.innerText = "[14:04:16] Stream Spider-Man 4K @ 14.5 Mbps";
+        termLine2.innerText = "[14:04:16] Stream Continuity Live 4K @ 14.5 Mbps";
         termLine2.className = "terminal-line";
         termLine3.innerText = "[14:04:17] Egress routed to Fastly Edge POP";
         termLine3.className = "terminal-line success";
