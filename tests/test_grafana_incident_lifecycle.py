@@ -110,3 +110,52 @@ async def test_pending_verification_does_not_resolve_grafana_incident():
         assert res.grafana_incident_id == "INC-STAYS-ACTIVE-200"
         # Must NOT have resolved the incident
         mock_resolve_inc.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_grafana_resolve_incident_calls_official_update_incident():
+    """Verifies that grafana_resolve_incident invokes official MCP tool update_incident with incidentId and resolved status."""
+    from services.mcp_service import official_mcp_bridge
+    mock_mcp_call = AsyncMock(return_value={
+        "status": "resolved",
+        "incident": {
+            "id": "INC-MCP-999",
+            "title": "Edge CDN Latency Spike",
+            "status": "resolved"
+        }
+    })
+    
+    with patch.object(official_mcp_bridge, "call_official_tool", mock_mcp_call):
+        res = await grafana_resolve_incident("INC-MCP-999", "Closed loop verification passed.")
+        
+        mock_mcp_call.assert_called_once_with("update_incident", {
+            "incidentId": "INC-MCP-999",
+            "status": "resolved"
+        })
+        assert res.source == "official_mcp"
+        assert res.incident_id == "INC-MCP-999"
+        assert res.lifecycle_status == "resolved"
+        assert res.status == "success"
+
+@pytest.mark.asyncio
+async def test_grafana_resolve_incident_falls_back_to_direct_client():
+    """Verifies that when official MCP update_incident fails, fallback to direct REST resolve_incident occurs."""
+    from services.mcp_service import official_mcp_bridge, grafana_client
+    mock_mcp_call = AsyncMock(return_value=None)
+    mock_direct_resolve = AsyncMock(return_value={
+        "status": "success",
+        "incident_id": "INC-REST-888",
+        "lifecycle_status": "resolved"
+    })
+    
+    with patch.object(official_mcp_bridge, "call_official_tool", mock_mcp_call), \
+         patch.object(grafana_client, "resolve_incident", mock_direct_resolve):
+        res = await grafana_resolve_incident("INC-REST-888", "Closed loop verification passed.")
+        
+        mock_mcp_call.assert_called_once_with("update_incident", {
+            "incidentId": "INC-REST-888",
+            "status": "resolved"
+        })
+        mock_direct_resolve.assert_called_once_with("INC-REST-888", "Closed loop verification passed.")
+        assert res.source == "direct_rest"
+        assert res.incident_id == "INC-REST-888"
+        assert res.lifecycle_status == "resolved"
