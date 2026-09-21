@@ -374,7 +374,11 @@ async def _evaluate_single_recovery_sample() -> Dict[str, Any]:
         snapshot.cdn_egress_latency_ms <= 150.0 and
         snapshot.buffer_health_sec >= 20.0
     )
-    is_recovered = prom_healthy and telemetry_healthy
+    chaos_state = chaos_manager.get_state()
+    if chaos_state.is_outage_active and chaos_state.current_mode != "REMEDIATED":
+        is_recovered = False
+    else:
+        is_recovered = prom_healthy and telemetry_healthy
 
     return {
         "status": "PASSED" if is_recovered else "PENDING",
