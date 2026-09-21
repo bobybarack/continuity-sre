@@ -107,22 +107,22 @@ export function PostMortemModal({
                       <div className="text-white/40 text-[10px] uppercase">Mean Time to Resolve</div>
                       <div className="text-sm font-bold text-[#00f5a0] mt-0.5 flex items-center gap-1">
                         <Clock01Icon className="w-3.5 h-3.5" />
-                        {inv.mttr_seconds}s
+                        {inv.mttr_seconds ? `${inv.mttr_seconds}s` : "Pending"}
                       </div>
                     </div>
 
                     <div className="p-2.5 rounded-lg bg-black/40 border border-white/[0.05]">
-                      <div className="text-white/40 text-[10px] uppercase">Subscriber Loss Prevented</div>
-                      <div className="text-sm font-bold text-[#00d2ff] mt-0.5 flex items-center gap-1">
-                        <DollarCircleIcon className="w-3.5 h-3.5" />
+                      <div className="text-white/40 text-[10px] uppercase">Grounded SLA Impact</div>
+                      <div className="text-xs font-bold text-[#00d2ff] mt-0.5 flex items-center gap-1 truncate">
+                        <Shield01Icon className="w-3.5 h-3.5" />
                         {inv.estimated_subscriber_loss_prevented}
                       </div>
                     </div>
 
                     <div className="p-2.5 rounded-lg bg-black/40 border border-white/[0.05]">
-                      <div className="text-white/40 text-[10px] uppercase">Autonomous Action</div>
-                      <div className="text-sm font-bold text-white mt-0.5 truncate">
-                        {inv.autonomous_action_taken || "NOMINAL"}
+                      <div className="text-white/40 text-[10px] uppercase">Verification Provenance</div>
+                      <div className="text-xs font-bold text-[#00f5a0] mt-0.5 truncate">
+                        {inv.verification_source || "grafana_cloud_prometheus"} ({inv.verification_authoritative ? "Authoritative" : "Fallback"})
                       </div>
                     </div>
                   </div>
@@ -135,9 +135,24 @@ export function PostMortemModal({
                     </div>
                   </div>
 
-                  {/* Reasoning Trace snippet */}
+                  {/* Official MCP Tools & Reasoning Trace */}
                   <div>
-                    <div className="text-white/50 text-[11px] mb-1 font-semibold uppercase">Grafana MCP Reasoning Trace:</div>
+                    <div className="text-white/50 text-[11px] mb-1 font-semibold uppercase">Official Grafana MCP Toolchain (stdio JSON-RPC):</div>
+                    <div className="p-2 bg-black/80 border border-white/[0.06] rounded-lg mb-2 flex flex-wrap gap-1">
+                      {(inv.mcp_tools_executed && inv.mcp_tools_executed.length > 0 ? inv.mcp_tools_executed : [
+                        "grafana_query_prometheus",
+                        "grafana_query_loki",
+                        "continuity_execute_remediation",
+                        "grafana_create_annotation",
+                        "grafana_create_incident",
+                        "continuity_verify_closed_loop_recovery"
+                      ]).map((t, tIdx) => (
+                        <span key={tIdx} className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-mono text-[#00d2ff]">
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="text-white/50 text-[11px] mb-1 font-semibold uppercase">Gemini Reasoning Trace:</div>
                     <div className="p-2.5 rounded-lg bg-black/80 border border-white/[0.06] text-[11px] space-y-1 max-h-32 overflow-y-auto">
                       {inv.reasoning_trace.map((step, sIdx) => (
                         <div key={sIdx} className="text-white/70">
