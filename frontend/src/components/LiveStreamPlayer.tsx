@@ -233,9 +233,9 @@ export function LiveStreamPlayer({ telemetry }: LiveStreamPlayerProps) {
           <div className="w-2.5 h-2.5 rounded-full bg-[#ff3366] animate-pulse" />
           <div>
             <h2 className="text-sm font-bold text-white tracking-tight flex items-center gap-2 font-mono">
-              Spider-Man: Brand New Day
+              Continuity Premiere: Global Broadcast
               <span className="text-[11px] font-mono font-normal text-white/50">
-                (World Premiere 4K Stream)
+                (Live 4K UHD Stream)
               </span>
             </h2>
           </div>
