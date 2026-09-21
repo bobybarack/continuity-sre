@@ -80,7 +80,7 @@ export function IncidentHistoryModal({
                   {inv.root_cause_analysis}
                 </div>
 
-                <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1">
+                <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1 flex-wrap gap-2">
                   <span>
                     Action:{" "}
                     <span className="font-bold text-gray-800">
@@ -88,10 +88,13 @@ export function IncidentHistoryModal({
                     </span>
                   </span>
                   <span>
-                    Saved Churn:{" "}
+                    SLA Impact:{" "}
                     <span className="font-bold text-emerald-600">
                       {inv.estimated_subscriber_loss_prevented}
                     </span>
+                  </span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-gray-200/80 text-gray-700">
+                    Provenance: {inv.verification_source || "grafana_cloud_prometheus"} ({inv.verification_authoritative ? "Authoritative" : "Fallback"})
                   </span>
                 </div>
               </div>
