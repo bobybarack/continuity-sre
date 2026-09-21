@@ -260,11 +260,15 @@ async def grafana_create_incident(title: str, severity: str, summary: str) -> Gr
 async def grafana_resolve_incident(incident_id: str, summary: str = "Verified closed-loop recovery.") -> GrafanaIncidentRef:
     """Resolves an existing incident in Grafana Cloud IRM via official MCP Server or direct API."""
     logger.info(f"[MCP Tool] Resolving Grafana IRM incident: {incident_id}")
-    res = await official_mcp_bridge.call_official_tool("resolve_incident", {
-        "incident_id": incident_id,
-        "summary": summary
+    res = await official_mcp_bridge.call_official_tool("update_incident", {
+        "incidentId": incident_id,
+        "status": "resolved"
     })
-    if res is not None and isinstance(res, dict) and res.get("status") == "success":
+    if res is not None and isinstance(res, dict) and res.get("status") != "error":
+        if "incident_id" not in res and "id" not in res:
+            res["incident_id"] = incident_id
+        if "lifecycle_status" not in res and res.get("status") != "resolved":
+            res["lifecycle_status"] = "resolved"
         return normalize_incident_result(res, source="official_mcp")
     direct_res = await grafana_client.resolve_incident(incident_id, summary)
     return normalize_incident_result(direct_res, source="direct_rest")
@@ -403,9 +407,6 @@ async def continuity_verify_closed_loop_recovery(
     last_evidence: Dict[str, Any] = {}
 
     while True:
-        # Advance telemetry tick to reflect active convergence
-        telemetry_engine._tick()
-        
         evidence = await _evaluate_single_recovery_sample()
         last_evidence = evidence
         
