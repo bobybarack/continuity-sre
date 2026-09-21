@@ -52,9 +52,9 @@ export function GeminiAgentTerminal({
     : latestInvestigation?.workflow_elapsed_seconds
     ? `${latestInvestigation.workflow_elapsed_seconds}s (Pending)`
     : "Nominal";
-  const churnSaved =
+  const slaImpact =
     latestInvestigation?.estimated_subscriber_loss_prevented ||
-    "$0 USD (Nominal Operation)";
+    "Nominal SLA (0 degraded sessions)";
   const rca = latestInvestigation?.root_cause_analysis;
   const actionTaken = latestInvestigation?.autonomous_action_taken;
   const subsystems = latestInvestigation?.affected_subsystems || [
@@ -98,7 +98,7 @@ export function GeminiAgentTerminal({
             </div>
           </div>
 
-          {/* Quick Metrics (MTTR & Churn Saved) */}
+          {/* Quick Metrics (MTTR & Provenance) */}
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/10 text-xs font-mono">
               <Clock01Icon className="w-3.5 h-3.5 text-[#00d2ff]" />
@@ -182,7 +182,7 @@ export function GeminiAgentTerminal({
 
                 <div className="text-[#00d2ff]">
                   <span>Grounded SLA Impact: </span>
-                  <span className="font-bold text-white">{churnSaved}</span>
+                  <span className="font-bold text-white">{slaImpact}</span>
                 </div>
               </div>
             </motion.div>
