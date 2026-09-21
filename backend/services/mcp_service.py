@@ -375,7 +375,8 @@ async def _evaluate_single_recovery_sample() -> Dict[str, Any]:
         snapshot.buffer_health_sec >= 20.0
     )
     chaos_state = chaos_manager.get_state()
-    if chaos_state.is_outage_active and chaos_state.current_mode != "REMEDIATED":
+    from services.chaos import IncidentLifecycle
+    if chaos_state.is_outage_active and (chaos_state.lifecycle == IncidentLifecycle.INCIDENT_ACTIVE or chaos_state.remediation_applied_at is None):
         is_recovered = False
     else:
         is_recovered = prom_healthy and telemetry_healthy
