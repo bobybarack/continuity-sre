@@ -302,8 +302,8 @@ class TelemetryEngine:
     async def _ticker_loop(self):
         while self._is_running:
             try:
-                await asyncio.sleep(self.tick_interval_sec)
                 self._tick()
+                await asyncio.sleep(self.tick_interval_sec)
             except asyncio.CancelledError:
                 break
             except Exception:

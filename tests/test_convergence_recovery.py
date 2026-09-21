@@ -11,12 +11,26 @@ from services.chaos import chaos_manager, IncidentLifecycle
 from services.telemetry import telemetry_engine
 from services.mcp_service import continuity_verify_closed_loop_recovery
 
+from contextlib import asynccontextmanager
+
 @pytest.fixture(autouse=True)
 def mock_remote_prometheus(monkeypatch):
     """Bypasses slow stdio process spawning during deterministic convergence unit tests, falling back to authoritative local registry."""
     async def _mock_remote(promql):
         return None
     monkeypatch.setattr("services.mcp_service.grafana_query_prometheus", _mock_remote)
+
+@asynccontextmanager
+async def running_ticker(interval_sec: float = 0.05):
+    """Runs the canonical background ticker naturally at high frequency during convergence tests."""
+    telemetry_engine.tick_interval_sec = interval_sec
+    await telemetry_engine.start()
+    await asyncio.sleep(0.01)
+    try:
+        yield
+    finally:
+        await telemetry_engine.stop()
+        telemetry_engine.tick_interval_sec = 1.0
 
 @pytest.mark.asyncio
 async def test_successful_convergence_recovery():
@@ -26,8 +40,9 @@ async def test_successful_convergence_recovery():
     chaos_manager.state.convergence_duration_sec = 0.3  # Fast convergence for test
     chaos_manager.apply_autonomous_remediation("SHIFT_TRAFFIC_TO_AKAMAI")
     
-    # Run closed-loop verification with polling
-    verify_res = await continuity_verify_closed_loop_recovery(timeout_sec=2.0, poll_interval_sec=0.05)
+    # Run closed-loop verification with polling while canonical ticker runs in background
+    async with running_ticker(0.05):
+        verify_res = await continuity_verify_closed_loop_recovery(timeout_sec=2.0, poll_interval_sec=0.05)
     
     assert verify_res["status"] == "PASSED"
     assert verify_res["verified"] is True
@@ -46,7 +61,8 @@ async def test_failed_convergence_falsifiable():
     chaos_manager.set_force_recovery_failure(True)
     chaos_manager.apply_autonomous_remediation("SHIFT_TRAFFIC_TO_AKAMAI")
     
-    verify_res = await continuity_verify_closed_loop_recovery(timeout_sec=0.3, poll_interval_sec=0.05)
+    async with running_ticker(0.05):
+        verify_res = await continuity_verify_closed_loop_recovery(timeout_sec=0.3, poll_interval_sec=0.05)
     
     assert verify_res["status"] == "PENDING"
     assert verify_res["verified"] is False
@@ -71,7 +87,8 @@ async def test_slow_convergence_verifier_waits():
     assert snap_early.video_playback_failures_pct > 1.0
     
     # Polling verifier waits until convergence completes
-    verify_res = await continuity_verify_closed_loop_recovery(timeout_sec=2.0, poll_interval_sec=0.05)
+    async with running_ticker(0.05):
+        verify_res = await continuity_verify_closed_loop_recovery(timeout_sec=2.0, poll_interval_sec=0.05)
     assert verify_res["status"] == "PASSED"
     assert verify_res["verified"] is True
 
@@ -85,7 +102,8 @@ async def test_verifier_stops_at_configured_deadline():
     chaos_manager.apply_autonomous_remediation("SHIFT_TRAFFIC_TO_AKAMAI")
     
     start_time = time.time()
-    verify_res = await continuity_verify_closed_loop_recovery(timeout_sec=0.25, poll_interval_sec=0.05)
+    async with running_ticker(0.05):
+        verify_res = await continuity_verify_closed_loop_recovery(timeout_sec=0.25, poll_interval_sec=0.05)
     elapsed = time.time() - start_time
     
     assert elapsed < 0.8  # Stopped promptly at deadline
