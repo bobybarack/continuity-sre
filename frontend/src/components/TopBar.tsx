@@ -7,6 +7,7 @@ import {
   Alert01Icon,
   Clock01Icon,
   CpuIcon,
+  CloudIcon,
 } from "hugeicons-react";
 import { ContinuityLogo } from "./ContinuityLogo";
 import { TelemetrySnapshot } from "../types/telemetry";
@@ -40,7 +41,7 @@ export function TopBar({
             </h1>
             <span className="text-gray-300">•</span>
             <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-md">
-              Spider-Man: Brand New Day (World Premiere 4K)
+              Continuity Premiere: Global Broadcast (Live 4K)
             </span>
           </div>
           <p className="text-xs text-gray-500 font-medium mt-0.5">
@@ -73,6 +74,12 @@ export function TopBar({
               ? "Failover Restored"
               : "Stream Operational (Nominal)"}
           </span>
+        </div>
+
+        {/* Official Grafana Cloud MCP Badge */}
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+          <CloudIcon className="w-3.5 h-3.5 text-sky-600" />
+          <span>Grafana MCP (stdio: CONNECTED)</span>
         </div>
 
         {/* Gemini Engine Badge */}
