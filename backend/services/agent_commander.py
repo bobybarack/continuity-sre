@@ -145,7 +145,7 @@ class AgentCommander:
                 grafana_incident_id=None,
                 workflow_elapsed_seconds=elapsed,
                 mttr_seconds=None,
-                estimated_subscriber_loss_prevented="$0 (Nominal Operation)",
+                estimated_subscriber_loss_prevented="Nominal SLA (0 degraded sessions)",
                 executive_summary="Playback failure rates remain under 0.2%. Global edge CDN delivery and DRM license servers are healthy.",
                 reasoning_trace=trace,
                 mcp_tools_executed=mcp_tools_called,
@@ -258,11 +258,9 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             except Exception as e:
                 logger.warning(f"Model {model} tool calling attempt failed: {e}. Trying fallback...")
 
-        # Dynamically compute synthetic churn mitigation estimate from active viewers and VPF failure rate
+        # Grounded audience SLA impact calculated from active viewers and measured VPF failure rate
         impacted_audience = int(snapshot.active_viewers * (snapshot.video_playback_failures_pct / 100.0))
-        simulated_cancellations = max(100, int(impacted_audience * 0.15))
-        simulated_loss_val = simulated_cancellations * 45  # $45 annual subscriber ARPU projection
-        synthetic_churn_str = f"${simulated_loss_val:,} USD (simulated ~{simulated_cancellations:,} churn cancellations avoided)"
+        grounded_impact_str = f"SLA Impact Mitigated: ~{impacted_audience:,} stream sessions protected (VPF: {snapshot.video_playback_failures_pct:.2f}%)"
 
         if not decision:
             if not remediation_action:
@@ -274,7 +272,7 @@ Call the necessary MCP tools to remediate this critical stream degradation.
                 "root_cause_analysis": decision_rca or f"Degradation detected via {snapshot.latest_log}",
                 "affected_subsystems": scenario_subsystems,
                 "remediation_action": remediation_action,
-                "estimated_subscriber_loss_prevented": synthetic_churn_str,
+                "estimated_subscriber_loss_prevented": grounded_impact_str,
                 "executive_summary": f"Autonomous remediation policy '{remediation_action}' executed via official Grafana MCP tools."
             }
 
@@ -409,7 +407,7 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             grafana_incident_id=grafana_incident_id,
             workflow_elapsed_seconds=elapsed,
             mttr_seconds=mttr_value,
-            estimated_subscriber_loss_prevented=decision.get("estimated_subscriber_loss_prevented", synthetic_churn_str),
+            estimated_subscriber_loss_prevented=decision.get("estimated_subscriber_loss_prevented", grounded_impact_str),
             executive_summary=exec_summary,
             reasoning_trace=trace,
             mcp_tools_executed=mcp_tools_called,
