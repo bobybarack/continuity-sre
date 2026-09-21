@@ -1389,7 +1389,7 @@
 
       <div class="target-stream-pill">
         <span id="target-stream-dot" class="live-dot"></span>
-        <span>Spider-Man: Brand New Day (World Premiere 4K)</span>
+        <span>Continuity Premiere: Global Broadcast (Live 4K)</span>
       </div>
 
       <div class="header-badges">
@@ -1521,7 +1521,7 @@
           <div class="panel-top" style="margin-bottom: 8px;">
             <div>
               <div class="panel-title">Live Stream Monitor</div>
-              <div class="panel-desc">Spider-Man: Brand New Day (4K UHD 60fps)</div>
+              <div class="panel-desc">Continuity Premiere: Global Broadcast (4K UHD 60fps)</div>
             </div>
             <div id="player-bitrate" class="bitrate-tag">14.8 Mbps</div>
           </div>
@@ -1585,8 +1585,8 @@
               <div id="sre-stat-mttr" class="sre-stat-num">1.28s MTTR</div>
             </div>
             <div class="sre-stat-cell">
-              <div class="sre-stat-title">Subscriber Churn Saved</div>
-              <div id="sre-stat-churn" class="sre-stat-num">$1,450,000</div>
+              <div class="sre-stat-title">Grounded SLA Restored</div>
+              <div id="sre-stat-churn" class="sre-stat-num">VPF &le; 0.21%</div>
             </div>
           </div>
 
@@ -1739,7 +1739,7 @@
         </div>
         <div class="term-row" id="term-row-6">
           <span class="term-prompt">&gt;</span>
-          <span style="color:#4ade80; font-weight:700;">[08:33:30] Mean Time to Resolution: 1.28 seconds. Churn prevented: $1,450,000 USD.</span>
+          <span style="color:#4ade80; font-weight:700;">[08:33:30] Mean Time to Resolution: 1.28 seconds. Telemetry Restored: VPF 0.21%, Forward Buffer 27.9s.</span>
         </div>
         <div class="term-row" id="term-row-7">
           <span class="term-prompt">&gt;</span>
@@ -1784,7 +1784,7 @@
           AGENT REASONING STREAM
         </div>
         <div id="bottom-term-1" style="color:#475569;">[14:04:15] OpenMetrics QoS Ingest: 100% OK</div>
-        <div id="bottom-term-2" style="color:#475569;">[14:04:16] Stream Spider-Man 4K @ 14.8 Mbps</div>
+        <div id="bottom-term-2" style="color:#475569;">[14:04:16] Stream Continuity Live 4K @ 14.8 Mbps</div>
         <div id="bottom-term-3" style="color:#059669;">[14:04:17] Egress routed to Fastly Edge POP (100%)</div>
       </div>
     </footer>
@@ -1854,14 +1854,14 @@
 
     // Subtitle Segments with exact timing matching Derek ElevenLabs master audio
     const subtitleSegments = [
-      { start: 0.0, end: 9.2, text: "After months of nonstop engineering work, Friday night was the one release I had blocked off all summer: the midnight premiere of <span class='highlight'>Spider-Man: Brand New Day</span>." },
+      { start: 0.0, end: 9.2, text: "After months of nonstop engineering work, Friday night was the one release I had blocked off all summer: the midnight premiere of our <span class='highlight'>Global 4K Live Broadcast</span>." },
       { start: 9.3, end: 24.5, text: "But five minutes in, four million viewers hit a frozen screen: <span class='highlight-red'>Error 502</span>. For 40 agonizing minutes, human SREs scrambled across dozens of dashboard tabs trying to isolate the failure." },
       { start: 24.7, end: 33.7, text: "In Hollywood, continuity is the sacred craft of making sure no flaw breaks the cinematic illusion. In streaming, <span class='highlight'>continuity is zero downtime</span>." },
       { start: 33.8, end: 42.1, text: "That is why I built <span class='highlight'>CONTINUITY</span>: an autonomous incident commander powered by <span class='highlight-purple'>Google Cloud Gemini 3.7 Flash</span>." },
       { start: 42.3, end: 55.8, text: "When an edge transit link collapses on our primary Fastly POP, Prometheus telemetry immediately catches the breach: video playback failures surge past <span class='highlight-red'>5%</span>, and player buffers collapse to under <span class='highlight-red'>three seconds</span>." },
       { start: 56.1, end: 77.8, text: "<span class='highlight'>CONTINUITY</span> activates instantly. Ingesting live Prometheus metric streams and Loki edge logs, the <span class='highlight-purple'>Google Cloud Gemini 3.7 Flash</span> reasoning engine diagnoses the root cause in just <span class='highlight'>1.28 seconds</span>: an upstream transit peering drop on ASN 3356." },
       { start: 78.0, end: 92.8, text: "Without waiting for a human on-call engineer, the agent autonomously executes a traffic failover, rerouting <span class='highlight'>80% of egress to our secondary Akamai edge</span> and logging the incident signature for Grafana Cloud telemetry." },
-      { start: 93.0, end: 99.1, text: "Mean Time to Resolution: <span class='highlight'>1.28 seconds</span>. Millions in subscriber churn prevented." },
+      { start: 93.0, end: 99.1, text: "Mean Time to Resolution: <span class='highlight'>1.28 seconds</span>. Full stream SLA verified restored." },
       { start: 99.3, end: 109.1, text: "Now, here is the secret behind what you are watching right now: this entire demo video was autonomously scripted, voiced, and edited by our AI agent, <span class='highlight'>Antigravity</span>." },
       { start: 109.3, end: 121.4, text: "To guarantee broadcast audio fidelity, Antigravity synthesized my voice using ElevenLabs, splitting the teleprompter into precise chunks to completely eliminate acoustic drift and model fatigue." },
       { start: 121.8, end: 135.5, text: "The entire production was assembled using <span class='highlight'>HyperFrames</span>, rendering seekable GSAP motion graphics, real-time Prometheus telemetry cards, and multi-track audio at <span class='highlight'>60 frames per second</span>." },
@@ -1977,7 +1977,7 @@
         `;
 
         bottomTerm1.innerText = "[14:04:15] OpenMetrics QoS Ingest: 100% OK";
-        bottomTerm2.innerText = "[14:04:16] Stream Spider-Man 4K @ 14.8 Mbps";
+        bottomTerm2.innerText = "[14:04:16] Stream Continuity Live 4K @ 14.8 Mbps";
         bottomTerm3.className = "terminal-line success";
         bottomTerm3.innerText = "[14:04:17] Egress routed to Fastly Edge POP (100%)";
 
