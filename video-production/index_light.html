@@ -1,0 +1,2170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>CONTINUITY: Autonomous Stream Incident Commander</title>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700;800&display=swap');
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: #06090e;
+      color: #f8fafc;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+      width: 1920px;
+      height: 1080px;
+      user-select: none;
+    }
+
+    #root {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: radial-gradient(circle at 15% 20%, rgba(14, 165, 233, 0.08) 0%, transparent 40%),
+                  radial-gradient(circle at 85% 80%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+                  #070b14;
+    }
+
+    /* Ambient cyber grid */
+    .cyber-grid {
+      position: absolute;
+      inset: 0;
+      background-image: linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Top Broadcast Header */
+    .broadcast-header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 68px;
+      background: rgba(10, 15, 25, 0.92);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 40px;
+      z-index: 50;
+    }
+
+    .brand-cluster {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-shield {
+      width: 38px;
+      height: 38px;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: none;
+    }
+
+    .brand-shield img {
+      width: 38px;
+      height: 38px;
+      object-fit: contain;
+    }
+
+    .brand-title {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-subtitle {
+      font-size: 11px;
+      font-weight: 700;
+      color: #38bdf8;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.5px;
+    }
+
+    .target-stream-pill {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 999px;
+      padding: 6px 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 10px #22c55e;
+    }
+
+    .header-badges {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .status-badge {
+      padding: 6px 16px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.4s ease;
+    }
+
+    .status-badge.normal {
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid rgba(34, 197, 94, 0.4);
+      color: #4ade80;
+    }
+
+    .status-badge.outage {
+      background: rgba(239, 68, 68, 0.25);
+      border: 1px solid rgba(239, 68, 68, 0.7);
+      color: #fca5a5;
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+      animation: pulseAlert 1.2s infinite;
+    }
+
+    .status-badge.recovered {
+      background: rgba(14, 165, 233, 0.2);
+      border: 1px solid rgba(14, 165, 233, 0.5);
+      color: #38bdf8;
+      box-shadow: 0 0 15px rgba(14, 165, 233, 0.4);
+    }
+
+    @keyframes pulseAlert {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(0.98); }
+    }
+
+    .model-badge {
+      padding: 6px 14px;
+      border-radius: 8px;
+      background: rgba(168, 85, 247, 0.15);
+      border: 1px solid rgba(168, 85, 247, 0.4);
+      color: #c084fc;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.5px;
+    }
+
+    /* Main Dashboard Layout (Full Width, No Right Presenter Dock) */
+    .dashboard-viewport {
+      position: absolute;
+      top: 80px;
+      left: 40px;
+      right: 40px;
+      bottom: 156px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      z-index: 10;
+    }
+
+    /* 1. Top Metrics Row */
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 14px;
+      height: 84px;
+    }
+
+    .metric-card {
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 14px;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+      transition: border-color 0.3s ease;
+    }
+
+    .metric-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .metric-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #94a3b8;
+    }
+
+    .metric-pill {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .pill-green {
+      background: rgba(34, 197, 94, 0.15);
+      color: #4ade80;
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+
+    .pill-red {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+
+    .pill-blue {
+      background: rgba(14, 165, 233, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(14, 165, 233, 0.3);
+    }
+
+    .metric-val-row {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .metric-val {
+      font-size: 24px;
+      font-weight: 800;
+      color: #ffffff;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: -0.5px;
+    }
+
+    .metric-val.green { color: #4ade80; }
+    .metric-val.red { color: #ef4444; }
+    .metric-val.blue { color: #38bdf8; }
+
+    .metric-sub {
+      font-size: 11px;
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    /* 2. Middle Row: Playback Chart (62%) + Live Stream Monitor (38%) */
+    .middle-row {
+      display: grid;
+      grid-template-columns: 63fr 37fr;
+      gap: 14px;
+      height: 390px;
+    }
+
+    .chart-panel {
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 16px;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 25px rgba(0, 0, 0, 0.3);
+      position: relative;
+    }
+
+    .panel-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .panel-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #f1f5f9;
+    }
+
+    .panel-desc {
+      font-size: 11px;
+      color: #64748b;
+    }
+
+    .chart-legend {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #94a3b8;
+    }
+
+    .legend-line-red {
+      width: 14px;
+      height: 2px;
+      border-top: 2px dashed #ef4444;
+    }
+
+    .legend-line-green {
+      width: 14px;
+      height: 2px;
+      background: #22c55e;
+    }
+
+    .chart-svg-container {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    .chart-svg-container svg {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+
+    /* Live Stream Monitor Panel */
+    .player-panel {
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 16px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 25px rgba(0, 0, 0, 0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .player-canvas-wrapper {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    #stream-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .player-meta-overlay {
+      position: absolute;
+      top: 10px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .stream-tag {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #f8fafc;
+    }
+
+    .bitrate-tag {
+      font-size: 11px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(34, 197, 94, 0.2);
+      border: 1px solid rgba(34, 197, 94, 0.5);
+      color: #4ade80;
+    }
+
+    .player-bottom-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 8px 12px;
+      background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.85) 100%);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      color: #cbd5e1;
+      z-index: 5;
+    }
+
+    /* Outage Buffer Stall Glitch Alert */
+    .stall-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(20, 5, 5, 0.85);
+      backdrop-filter: blur(4px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      z-index: 10;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .stall-overlay.active {
+      opacity: 1;
+    }
+
+    .stall-icon-pulse {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgba(239, 68, 68, 0.2);
+      border: 2px solid #ef4444;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: stallPulse 1s infinite alternate;
+    }
+
+    .stall-icon-pulse svg {
+      width: 26px;
+      height: 26px;
+      fill: #ef4444;
+    }
+
+    @keyframes stallPulse {
+      0% { transform: scale(0.95); box-shadow: 0 0 10px rgba(239, 68, 68, 0.4); }
+      100% { transform: scale(1.08); box-shadow: 0 0 25px rgba(239, 68, 68, 0.8); }
+    }
+
+    .stall-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: #fca5a5;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .stall-desc {
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    /* Player Buffer Progress Bar */
+    .buffer-track-container {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .buffer-track-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 600;
+      color: #94a3b8;
+    }
+
+    .buffer-progress-bg {
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+
+    .buffer-progress-bar {
+      height: 100%;
+      width: 95%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #22c55e, #4ade80);
+      transition: width 0.6s ease, background 0.4s ease;
+    }
+
+    /* 3. Lower Row: SRE Commander + CDN Traffic Distribution + Live Error Logs */
+    .lower-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 14px;
+      height: 210px;
+    }
+
+    .info-panel {
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 16px;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    }
+
+    .sre-diag-box {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 11px;
+      line-height: 1.4;
+      color: #cbd5e1;
+    }
+
+    .sre-stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .sre-stat-cell {
+      padding: 6px 10px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .sre-stat-title {
+      font-size: 10px;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+    }
+
+    .sre-stat-num {
+      font-size: 14px;
+      font-weight: 800;
+      color: #4ade80;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .sre-action-btn {
+      width: 100%;
+      margin-top: 8px;
+      padding: 8px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #059669, #10b981);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      box-shadow: 0 2px 10px rgba(16, 185, 129, 0.3);
+      transition: all 0.2s ease;
+    }
+
+    .sre-action-btn.active-healing {
+      background: linear-gradient(135deg, #0284c7, #38bdf8);
+      border-color: #38bdf8;
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.5);
+    }
+
+    /* CDN Split Bars */
+    .cdn-item {
+      margin-top: 10px;
+    }
+
+    .cdn-item-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin-bottom: 4px;
+    }
+
+    .cdn-bar-bg {
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+
+    .cdn-bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1), background 0.4s ease;
+    }
+
+    /* Terminal Log Box */
+    .log-stream-box {
+      flex: 1;
+      margin-top: 8px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 8px 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px;
+      line-height: 1.5;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      overflow: hidden;
+    }
+
+    .log-line {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      opacity: 0.85;
+    }
+
+    .log-line.green { color: #4ade80; }
+    .log-line.red { color: #f87171; }
+    .log-line.purple { color: #c084fc; font-weight: 700; }
+    .log-line.cyan { color: #38bdf8; font-weight: 700; }
+
+    /* 4. Chaos Injection Suite Bar */
+    .chaos-suite-bar {
+      background: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 14px;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 52px;
+    }
+
+    .chaos-title-box {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .chaos-icon-box {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .chaos-icon-box svg {
+      width: 16px;
+      height: 16px;
+      fill: #34d399;
+    }
+
+    .chaos-btns-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .chaos-btn {
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #cbd5e1;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .chaos-btn.inject-outage {
+      background: rgba(239, 68, 68, 0.1);
+      border-color: rgba(239, 68, 68, 0.3);
+      color: #fca5a5;
+    }
+
+    .chaos-btn.inject-outage.clicked {
+      background: rgba(239, 68, 68, 0.4);
+      border-color: #ef4444;
+      color: #ffffff;
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.5);
+    }
+
+    .chaos-btn.auto-heal {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #6ee7b7;
+      font-weight: 700;
+    }
+
+    /* Interactive Virtual Mouse Cursor */
+    #virtual-cursor {
+      position: absolute;
+      top: 540px;
+      left: 960px;
+      width: 28px;
+      height: 28px;
+      pointer-events: none;
+      z-index: 1000;
+      filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6));
+      opacity: 0;
+    }
+
+    #virtual-cursor svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    #cursor-ripple {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 2px solid #38bdf8;
+      pointer-events: none;
+      z-index: 999;
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.2);
+    }
+
+    /* Executive Gemini 3.7 Flash Reasoning Terminal Modal Overlay (52s - 72s) */
+    #gemini-modal {
+      position: absolute;
+      top: 150px;
+      left: 360px;
+      right: 360px;
+      height: 490px;
+      background: rgba(10, 16, 30, 0.94);
+      backdrop-filter: blur(24px);
+      border: 1px solid rgba(168, 85, 247, 0.5);
+      border-radius: 20px;
+      box-shadow: 0 0 60px rgba(168, 85, 247, 0.25), 0 20px 40px rgba(0, 0, 0, 0.6);
+      padding: 24px 30px;
+      display: flex;
+      flex-direction: column;
+      z-index: 800;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(20px);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 14px;
+      margin-bottom: 16px;
+    }
+
+    .modal-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .modal-ai-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #a855f7, #6366f1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(168, 85, 247, 0.5);
+    }
+
+    .modal-ai-icon svg {
+      width: 20px;
+      height: 20px;
+      fill: #ffffff;
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.3px;
+    }
+
+    .modal-sub {
+      font-size: 11px;
+      color: #c084fc;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+    }
+
+    .modal-pills-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .modal-pill {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .modal-pill-lbl {
+      font-size: 10px;
+      color: #64748b;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .modal-pill-val {
+      font-size: 13px;
+      font-weight: 800;
+      font-family: 'JetBrains Mono', monospace;
+      margin-top: 2px;
+    }
+
+    .modal-terminal-window {
+      flex: 1;
+      border-radius: 12px;
+      background: rgba(2, 6, 14, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 14px 18px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.7;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      overflow: hidden;
+    }
+
+    .term-row {
+      display: flex;
+      gap: 10px;
+      opacity: 0;
+      transform: translateX(-6px);
+      transition: all 0.3s ease;
+    }
+
+    .term-row.visible {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .term-prompt {
+      color: #a855f7;
+      font-weight: 700;
+    }
+
+    /* Broadcast Lower Third Dock */
+    .lower-third-dock {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 146px;
+      background: rgba(8, 12, 20, 0.95);
+      backdrop-filter: blur(24px);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      display: grid;
+      grid-template-columns: 280px 1fr 340px;
+      gap: 20px;
+      padding: 14px 40px 18px;
+      z-index: 60;
+    }
+
+    .hud-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 14px;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .hud-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      color: #94a3b8;
+      font-weight: 700;
+    }
+
+    .hud-stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .hud-stat-num {
+      font-size: 22px;
+      font-weight: 800;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .hud-stat-desc {
+      font-size: 10px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    .subtitle-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 14px;
+      padding: 12px 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+    }
+
+    .subtitle-speaker-label {
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      color: #38bdf8;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    .subtitle-text {
+      font-size: 15.5px;
+      font-weight: 500;
+      line-height: 1.45;
+      color: #f1f5f9;
+      min-height: 48px;
+    }
+
+    .subtitle-text .highlight {
+      color: #38bdf8;
+      font-weight: 700;
+      text-shadow: 0 0 12px rgba(56, 189, 248, 0.6);
+    }
+
+    .subtitle-text .highlight-red {
+      color: #f87171;
+      font-weight: 700;
+      text-shadow: 0 0 12px rgba(248, 113, 113, 0.6);
+    }
+
+    .subtitle-text .highlight-purple {
+      color: #c084fc;
+      font-weight: 700;
+      text-shadow: 0 0 12px rgba(192, 132, 252, 0.6);
+    }
+
+    .subtitle-progress-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #0ea5e9, #6366f1);
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+
+    .terminal-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 14px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px;
+      line-height: 1.4;
+      color: #94a3b8;
+    }
+
+    .terminal-title {
+      font-size: 10px;
+      font-weight: 700;
+      color: #38bdf8;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+  
+    /* --- CONTINUITY LIGHT MODE THEME (STRIPE / LINEAR SPEC) --- */
+    body {
+      background: #f8fafc !important;
+      color: #0f172a !important;
+    }
+
+    #root {
+      background: #f8fafc !important;
+    }
+
+    .cyber-grid {
+      background-image: radial-gradient(#cbd5e1 1px, transparent 1px) !important;
+      background-size: 32px 32px !important;
+      opacity: 0.5 !important;
+    }
+
+    /* Top Broadcast Header */
+    .broadcast-header {
+      background: rgba(255, 255, 255, 0.94) !important;
+      border-bottom: 1px solid #e2e8f0 !important;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03) !important;
+    }
+
+    .brand-shield {
+      background: transparent !important;
+      box-shadow: none !important;
+      border-radius: 0 !important;
+    }
+
+    .brand-shield img {
+      width: 38px !important;
+      height: 38px !important;
+      object-fit: contain !important;
+    }
+
+    .brand-title {
+      background: none !important;
+      -webkit-text-fill-color: #0f172a !important;
+      color: #0f172a !important;
+    }
+
+    .brand-subtitle {
+      color: #0284c7 !important;
+    }
+
+    .target-stream-pill {
+      background: #f1f5f9 !important;
+      border: 1px solid #e2e8f0 !important;
+      color: #334155 !important;
+    }
+
+    .model-badge {
+      background: #f5f3ff !important;
+      border: 1px solid #ddd6fe !important;
+      color: #7c3aed !important;
+    }
+
+    .status-badge.normal {
+      background: #ecfdf5 !important;
+      border: 1px solid #a7f3d0 !important;
+      color: #065f46 !important;
+    }
+
+    .status-badge.outage {
+      background: #fef2f2 !important;
+      border: 1px solid #fecaca !important;
+      color: #991b1b !important;
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.25) !important;
+    }
+
+    .status-badge.recovered {
+      background: #ecfdf5 !important;
+      border: 1px solid #a7f3d0 !important;
+      color: #065f46 !important;
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.25) !important;
+    }
+
+    /* Metric Cards */
+    .metric-card {
+      background: #ffffff !important;
+      border: 1px solid #e2e8f0 !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+    }
+
+    .metric-label {
+      color: #64748b !important;
+    }
+
+    .metric-val {
+      color: #0f172a !important;
+    }
+
+    .metric-val.green { color: #059669 !important; }
+    .metric-val.red { color: #dc2626 !important; }
+    .metric-val.blue { color: #0284c7 !important; }
+
+    .metric-sub {
+      color: #94a3b8 !important;
+    }
+
+    .pill-green {
+      background: #ecfdf5 !important;
+      color: #059669 !important;
+      border: 1px solid #a7f3d0 !important;
+    }
+
+    .pill-red {
+      background: #fef2f2 !important;
+      color: #dc2626 !important;
+      border: 1px solid #fecaca !important;
+    }
+
+    .pill-blue {
+      background: #eff6ff !important;
+      color: #2563eb !important;
+      border: 1px solid #bfdbfe !important;
+    }
+
+    /* Middle Row Cards */
+    .chart-panel, .player-panel {
+      background: #ffffff !important;
+      border: 1px solid #e2e8f0 !important;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04) !important;
+    }
+
+    .panel-title {
+      color: #0f172a !important;
+    }
+
+    .panel-desc {
+      color: #64748b !important;
+    }
+
+    .legend-item {
+      color: #64748b !important;
+    }
+
+    .player-canvas-wrapper {
+      border: 1px solid #e2e8f0 !important;
+    }
+
+    .buffer-track-label {
+      color: #64748b !important;
+    }
+
+    .buffer-progress-bg {
+      background: #f1f5f9 !important;
+    }
+
+    /* Lower Row Info Panels */
+    .info-panel {
+      background: #ffffff !important;
+      border: 1px solid #e2e8f0 !important;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04) !important;
+    }
+
+    .sre-diag-box {
+      background: #f8fafc !important;
+      border: 1px solid #e2e8f0 !important;
+      color: #334155 !important;
+    }
+
+    .sre-stat-cell {
+      background: #f8fafc !important;
+      border: 1px solid #e2e8f0 !important;
+    }
+
+    .sre-stat-title {
+      color: #64748b !important;
+    }
+
+    .sre-stat-num {
+      color: #059669 !important;
+    }
+
+    .cdn-item-header {
+      color: #334155 !important;
+    }
+
+    .cdn-bar-bg {
+      background: #f1f5f9 !important;
+    }
+
+    .log-stream-box {
+      background: #f8fafc !important;
+      border: 1px solid #e2e8f0 !important;
+    }
+
+    .log-line.green { color: #059669 !important; }
+    .log-line.red { color: #dc2626 !important; font-weight: 600 !important; }
+    .log-line.purple { color: #7c3aed !important; font-weight: 700 !important; }
+    .log-line.cyan { color: #0284c7 !important; font-weight: 700 !important; }
+
+    .chaos-suite-bar {
+      background: #ffffff !important;
+      border: 1px solid #e2e8f0 !important;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03) !important;
+    }
+
+    .chaos-icon-box {
+      background: #ecfdf5 !important;
+      border: 1px solid #a7f3d0 !important;
+    }
+
+    .chaos-icon-box svg {
+      fill: #059669 !important;
+    }
+
+    .chaos-btn {
+      background: #f8fafc !important;
+      border: 1px solid #e2e8f0 !important;
+      color: #334155 !important;
+    }
+
+    .chaos-btn.inject-outage {
+      background: #fef2f2 !important;
+      border-color: #fecaca !important;
+      color: #dc2626 !important;
+    }
+
+    .chaos-btn.inject-outage.clicked {
+      background: #ef4444 !important;
+      border-color: #dc2626 !important;
+      color: #ffffff !important;
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.4) !important;
+    }
+
+    .chaos-btn.auto-heal {
+      background: #ecfdf5 !important;
+      border-color: #a7f3d0 !important;
+      color: #059669 !important;
+    }
+
+    /* Executive Gemini 3.7 Flash Modal in Light Mode */
+    #gemini-modal {
+      background: rgba(255, 255, 255, 0.98) !important;
+      border: 1px solid #cbd5e1 !important;
+      box-shadow: 0 25px 60px -12px rgba(99, 102, 241, 0.18), 0 12px 28px -6px rgba(0, 0, 0, 0.08) !important;
+    }
+
+    .modal-header {
+      border-bottom: 1px solid #f1f5f9 !important;
+    }
+
+    .modal-title {
+      color: #0f172a !important;
+    }
+
+    .modal-sub {
+      color: #7c3aed !important;
+    }
+
+    .modal-pill {
+      background: #f8fafc !important;
+      border: 1px solid #e2e8f0 !important;
+    }
+
+    .modal-pill-lbl {
+      color: #64748b !important;
+    }
+
+    .modal-pill-val {
+      color: #0f172a !important;
+    }
+
+    .modal-terminal-window {
+      background: #f8fafc !important;
+      border: 1px solid #e2e8f0 !important;
+      color: #1e293b !important;
+    }
+
+    .term-prompt {
+      color: #7c3aed !important;
+    }
+
+    /* Lower Third Dock in Light Mode */
+    .lower-third-dock {
+      background: rgba(255, 255, 255, 0.96) !important;
+      border-top: 1px solid #e2e8f0 !important;
+      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.03) !important;
+    }
+
+    .hud-card, .subtitle-card, .terminal-card {
+      background: #f8fafc !important;
+      border: 1px solid #e2e8f0 !important;
+    }
+
+    .hud-header {
+      color: #64748b !important;
+    }
+
+    .hud-stat-num {
+      color: #0f172a !important;
+    }
+
+    .subtitle-speaker-label {
+      color: #0284c7 !important;
+    }
+
+    .subtitle-text {
+      color: #0f172a !important;
+    }
+
+    .subtitle-text .highlight {
+      color: #0284c7 !important;
+      text-shadow: none !important;
+    }
+
+    .subtitle-text .highlight-red {
+      color: #dc2626 !important;
+      text-shadow: none !important;
+    }
+
+    .subtitle-text .highlight-purple {
+      color: #7c3aed !important;
+      text-shadow: none !important;
+    }
+
+    .terminal-card {
+      color: #475569 !important;
+    }
+
+    .terminal-title {
+      color: #0284c7 !important;
+    }
+  </style>
+
+</head>
+<body>
+  <div
+    id="root"
+    data-composition-id="continuity_demo"
+    data-start="0"
+    data-width="1920"
+    data-height="1080"
+    data-duration="143"
+  >
+    <div class="cyber-grid"></div>
+
+    <!-- Audio Tracks -->
+    <audio id="audio-voice" src="audio/narration_master.mp3" data-start="0" data-duration="143" data-volume="1.0"></audio>
+    <audio id="audio-ambient" src="audio/ambient_bed.mp3" data-start="0" data-duration="143" data-volume="0.12"></audio>
+
+    <!-- Top Broadcast Header -->
+    <header class="broadcast-header">
+      <div class="brand-cluster">
+        <div class="brand-shield">
+          <img src="assets/continuity-logo-dark.svg" alt="CONTINUITY" style="width: 38px; height: 38px; object-fit: contain;" />
+        </div>
+        <div>
+          <div class="brand-title">CONTINUITY</div>
+          <div class="brand-subtitle">AUTONOMOUS STREAM INCIDENT COMMANDER</div>
+        </div>
+      </div>
+
+      <div class="target-stream-pill">
+        <span id="target-stream-dot" class="live-dot"></span>
+        <span>Continuity Premiere: Global Broadcast (Live 4K)</span>
+      </div>
+
+      <div class="header-badges">
+        <div id="header-status-badge" class="status-badge normal">
+          <span id="header-status-dot" class="live-dot"></span>
+          <span id="header-status-text">SLA OPERATIONAL (99.98%)</span>
+        </div>
+        <div class="model-badge">GOOGLE CLOUD GEMINI 3.7 FLASH</div>
+      </div>
+    </header>
+
+    <!-- Main Dashboard Viewport -->
+    <main class="dashboard-viewport">
+      <!-- 1. Top 5 Metric Cards Row -->
+      <div class="metrics-row">
+        <!-- Metric 1: VPF -->
+        <div class="metric-card" id="mcard-vpf">
+          <div class="metric-header">
+            <span class="metric-label">Playback Failure Rate</span>
+            <span id="mpill-vpf" class="metric-pill pill-green">+0.02%</span>
+          </div>
+          <div class="metric-val-row">
+            <span id="mval-vpf" class="metric-val green">0.15%</span>
+          </div>
+          <span id="msub-vpf" class="metric-sub">Target: Under 1.00% SLA</span>
+        </div>
+
+        <!-- Metric 2: CDN Latency -->
+        <div class="metric-card" id="mcard-latency">
+          <div class="metric-header">
+            <span class="metric-label">CDN Edge Latency</span>
+            <span id="mpill-latency" class="metric-pill pill-green">Fastly Edge</span>
+          </div>
+          <div class="metric-val-row">
+            <span id="mval-latency" class="metric-val">48<span style="font-size:14px; color:#64748b; font-weight:600;">ms</span></span>
+          </div>
+          <span id="msub-latency" class="metric-sub">Down 4ms this hour</span>
+        </div>
+
+        <!-- Metric 3: DRM Handshake -->
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-label">DRM Auth Handshake</span>
+            <span class="metric-pill pill-blue">Widevine L1</span>
+          </div>
+          <div class="metric-val-row">
+            <span id="mval-drm" class="metric-val">125<span style="font-size:14px; color:#64748b; font-weight:600;">ms</span></span>
+          </div>
+          <span class="metric-sub">License Key Verified</span>
+        </div>
+
+        <!-- Metric 4: Concurrent Viewers -->
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-label">Concurrent Viewers</span>
+            <span class="metric-pill pill-green">+3.4% Live</span>
+          </div>
+          <div class="metric-val-row">
+            <span class="metric-val">4,284,458</span>
+          </div>
+          <span class="metric-sub">4.28M Global Viewers</span>
+        </div>
+
+        <!-- Metric 5: Buffer Health -->
+        <div class="metric-card" id="mcard-buffer">
+          <div class="metric-header">
+            <span class="metric-label">Forward Buffer Health</span>
+            <span id="mpill-buffer" class="metric-pill pill-green">4K HEVC</span>
+          </div>
+          <div class="metric-val-row">
+            <span id="mval-buffer" class="metric-val green">28.5<span style="font-size:14px; color:#64748b; font-weight:600;">sec</span></span>
+          </div>
+          <span id="msub-buffer" class="metric-sub">Buffer Healthy (&gt;20s)</span>
+        </div>
+      </div>
+
+      <!-- 2. Middle Row: Playback Quality Chart (63%) + Live Stream Monitor (37%) -->
+      <div class="middle-row">
+        <!-- Left: Playback Quality & Failure Rate Chart -->
+        <div class="chart-panel">
+          <div class="panel-top">
+            <div>
+              <div class="panel-title">Playback Quality & Failure Rate (VPF)</div>
+              <div class="panel-desc">Real-time video playback failures vs 1.00% SLA limit (60s rolling)</div>
+            </div>
+            <div class="chart-legend">
+              <div class="legend-item">
+                <div class="legend-line-red"></div>
+                <span>SLA Limit (1.00%)</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-line-green"></div>
+                <span id="chart-legend-label">Current: 0.15%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="chart-svg-container">
+            <svg viewBox="0 0 1000 280" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="areaGradGreen" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#22c55e" stop-opacity="0.3"/>
+                  <stop offset="100%" stop-color="#10b981" stop-opacity="0.0"/>
+                </linearGradient>
+                <linearGradient id="areaGradRed" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#ef4444" stop-opacity="0.25"/>
+                  <stop offset="100%" stop-color="#ef4444" stop-opacity="0.0"/>
+                </linearGradient>
+              </defs>
+
+              <!-- SLA Threshold Dashed Line (y=110 corresponds to 1.00%) -->
+              <line x1="0" y1="110" x2="1000" y2="110" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="6,6" stroke-opacity="0.65"/>
+              <text x="30" y="102" fill="#f87171" font-size="11" font-weight="700" font-family="'JetBrains Mono', monospace">SLA LIMIT: 1.00%</text>
+
+              <!-- Chart Area Fill -->
+              <polygon id="chart-area-fill" points="0,220 1000,220 1000,280 0,280" fill="url(#areaGradGreen)" />
+
+              <!-- Chart Line Path -->
+              <path id="chart-line-path" d="M 0 220 L 1000 220" fill="none" stroke="#22c55e" stroke-width="3" stroke-linecap="round"/>
+
+              <!-- Pulse Tip Dot -->
+              <circle id="chart-tip-dot" cx="1000" cy="220" r="5" fill="#22c55e" filter="drop-shadow(0 0 8px #22c55e)"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Right: Live Stream Monitor -->
+        <div class="player-panel">
+          <div class="panel-top" style="margin-bottom: 8px;">
+            <div>
+              <div class="panel-title">Live Stream Monitor</div>
+              <div class="panel-desc">Continuity Premiere: Global Broadcast (4K UHD 60fps)</div>
+            </div>
+            <div id="player-bitrate" class="bitrate-tag">14.8 Mbps</div>
+          </div>
+
+          <div class="player-canvas-wrapper">
+            <canvas id="stream-canvas" width="640" height="360"></canvas>
+
+            <div class="player-meta-overlay">
+              <div class="stream-tag">4K UHD HDR</div>
+              <div id="player-route-tag" class="stream-tag">Fastly Edge POP (100%)</div>
+            </div>
+
+            <!-- Outage Glitch Overlay -->
+            <div id="stall-overlay" class="stall-overlay">
+              <div class="stall-icon-pulse">
+                <svg viewBox="0 0 24 24">
+                  <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+                </svg>
+              </div>
+              <div class="stall-title">EDGE BUFFER STALL DETECTED</div>
+              <div class="stall-desc">Fastly POP 'iad-01' packet loss (loss: 68%)</div>
+            </div>
+
+            <div class="player-bottom-bar">
+              <span id="player-route-status">Route: Fastly Edge POP (100% Primary)</span>
+              <span id="player-buffer-readout">Buffer: 28.5s</span>
+            </div>
+          </div>
+
+          <div class="buffer-track-container">
+            <div class="buffer-track-label">
+              <span>Forward Playback Buffer</span>
+              <span id="buffer-val-label">28.5s</span>
+            </div>
+            <div class="buffer-progress-bg">
+              <div id="buffer-progress-bar" class="buffer-progress-bar"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Lower Row: SRE Commander + Multi-CDN Split + Live Logs Stream -->
+      <div class="lower-row">
+        <!-- SRE Commander Card -->
+        <div class="info-panel">
+          <div class="panel-top" style="margin-bottom:0;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:13px; font-weight:700; color:#fff;">Autonomous SRE Commander</span>
+            </div>
+            <span id="sre-badge" class="metric-pill pill-green">Standby Active</span>
+          </div>
+
+          <div class="sre-diag-box">
+            <span style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; display:block; margin-bottom:2px;">Latest Diagnosis & Resolution</span>
+            <div id="sre-diag-text">All streaming telemetry within normal operating SLA. Continuous 1Hz edge monitoring active.</div>
+          </div>
+
+          <div class="sre-stats-grid">
+            <div class="sre-stat-cell">
+              <div class="sre-stat-title">Mean Resolution Time</div>
+              <div id="sre-stat-mttr" class="sre-stat-num">1.28s MTTR</div>
+            </div>
+            <div class="sre-stat-cell">
+              <div class="sre-stat-title">Grounded SLA Restored</div>
+              <div id="sre-stat-churn" class="sre-stat-num">VPF &le; 0.21%</div>
+            </div>
+          </div>
+
+          <button id="sre-action-btn" class="sre-action-btn">
+            <span id="sre-btn-text">Trigger Autonomous SRE Failover</span>
+          </button>
+        </div>
+
+        <!-- Multi-CDN Traffic Distribution Card -->
+        <div class="info-panel">
+          <div class="panel-top" style="margin-bottom:0;">
+            <span style="font-size:13px; font-weight:700; color:#fff;">Multi-CDN Traffic Distribution</span>
+            <span id="cdn-route-badge" class="metric-pill pill-blue">Primary Route</span>
+          </div>
+
+          <div class="cdn-item">
+            <div class="cdn-item-header">
+              <span>Fastly Edge (Primary Ingest)</span>
+              <span id="cdn-val-fastly" style="font-family:'JetBrains Mono', monospace; font-weight:700;">100%</span>
+            </div>
+            <div class="cdn-bar-bg">
+              <div id="cdn-bar-fastly" class="cdn-bar-fill" style="width: 100%; background: #22c55e;"></div>
+            </div>
+          </div>
+
+          <div class="cdn-item">
+            <div class="cdn-item-header">
+              <span>Akamai Cloud (Secondary Failover)</span>
+              <span id="cdn-val-akamai" style="font-family:'JetBrains Mono', monospace; font-weight:700;">0%</span>
+            </div>
+            <div class="cdn-bar-bg">
+              <div id="cdn-bar-akamai" class="cdn-bar-fill" style="width: 0%; background: #0ea5e9;"></div>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#64748b; font-weight:600; margin-top:8px;">
+            <span>Global Peak Egress</span>
+            <span style="color:#cbd5e1; font-family:'JetBrains Mono', monospace;">~63.4 Gbps Total</span>
+          </div>
+        </div>
+
+        <!-- Live Edge Error & Ingest Stream Card -->
+        <div class="info-panel">
+          <div class="panel-top" style="margin-bottom:0;">
+            <span style="font-size:13px; font-weight:700; color:#fff;">Live Edge Error & Ingest Stream</span>
+            <span class="metric-pill pill-blue">1Hz Loki Live</span>
+          </div>
+
+          <div class="log-stream-box" id="log-stream-container">
+            <div class="log-line green" id="log-line-1">[14:04:15] 200 OK Fastly Edge POP (iad-01) - chunk #89204 (48ms)</div>
+            <div class="log-line green" id="log-line-2">[14:04:16] LOKI INGEST [Fastly POP us-east-2] 200 OK segment.ts</div>
+            <div class="log-line green" id="log-line-3">[14:04:17] Stream delivery nominal across 14 edge distribution POPs</div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:#64748b; font-family:'JetBrains Mono', monospace; margin-top:4px;">
+            <span>Prometheus & Loki Data Ingest</span>
+            <span style="color:#059669;">100% INGEST RATE</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Chaos Injection Suite Bar -->
+      <div class="chaos-suite-bar">
+        <div class="chaos-title-box">
+          <div class="chaos-icon-box">
+            <svg viewBox="0 0 24 24">
+              <path d="M7 2v11h3v9l7-12h-4l4-8z"/>
+            </svg>
+          </div>
+          <div>
+            <div style="font-size:12px; font-weight:700; color:#f8fafc;">Chaos Injection Suite</div>
+            <div style="font-size:10px; color:#64748b;">Simulate live delivery failures and verify autonomous self-healing</div>
+          </div>
+        </div>
+
+        <div class="chaos-btns-group">
+          <button id="btn-inject-cdn" class="chaos-btn inject-outage">Inject CDN Outage</button>
+          <button class="chaos-btn">Inject DRM Timeout</button>
+          <button class="chaos-btn">Inject ISP Drop</button>
+          <button class="chaos-btn auto-heal">SRE Auto-Heal</button>
+          <button class="chaos-btn">Reset</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Virtual Mouse Cursor & Click Wave -->
+    <div id="virtual-cursor">
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M4 2l16 10-7 2 4 8-3 1.5-4-8-6 5V2z" fill="#38bdf8" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div id="cursor-ripple"></div>
+
+    <!-- Executive Gemini 3.7 Flash Reasoning Terminal Modal Overlay (52s - 72s) -->
+    <div id="gemini-modal">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-ai-icon">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 15h-2v-6h2zm0-8h-2V7h2z"/>
+            </svg>
+          </div>
+          <div>
+            <div class="modal-title">GOOGLE CLOUD GEMINI 3.7 FLASH REASONING ENGINE</div>
+            <div class="modal-sub">Model Context Protocol • Real-time Prometheus Vector & Loki Log Ingest</div>
+          </div>
+        </div>
+        <div class="metric-pill pill-blue" style="font-size:11px;">REASONING ACTIVE</div>
+      </div>
+
+      <div class="modal-pills-row">
+        <div class="modal-pill">
+          <div class="modal-pill-lbl">ANOMALY DETECTED</div>
+          <div class="modal-pill-val" style="color:#ef4444;">VPF 5.08% (CRITICAL)</div>
+        </div>
+        <div class="modal-pill">
+          <div class="modal-pill-lbl">ROOT CAUSE ISOLATED</div>
+          <div class="modal-pill-val" style="color:#c084fc;">ASN 3356 Transit Drop</div>
+        </div>
+        <div class="modal-pill">
+          <div class="modal-pill-lbl">FAILOVER ACTION</div>
+          <div class="modal-pill-val" style="color:#38bdf8;">Akamai Edge (80% Egress)</div>
+        </div>
+        <div class="modal-pill">
+          <div class="modal-pill-lbl">MEAN TIME TO RESOLVE</div>
+          <div class="modal-pill-val" style="color:#059669;">1.28s MTTR</div>
+        </div>
+      </div>
+
+      <div class="modal-terminal-window">
+        <div class="term-row" id="term-row-1">
+          <span class="term-prompt">&gt;</span>
+          <span style="color:#475569;">[08:33:28] Ingesting live Prometheus time series &amp; Loki error log streams...</span>
+        </div>
+        <div class="term-row" id="term-row-2">
+          <span class="term-prompt">&gt;</span>
+          <span style="color:#f87171;">[08:33:28] Anomaly Confirmed: VPF spiked to 5.08% (SLA breach &gt; 1.00%). Buffer: 2.9s.</span>
+        </div>
+        <div class="term-row" id="term-row-3">
+          <span class="term-prompt">&gt;</span>
+          <span style="color:#f87171;">[08:33:29] Fastly POP iad-01 packet loss: 68%. 502 Bad Gateway storm across 14 edge nodes.</span>
+        </div>
+        <div class="term-row" id="term-row-4">
+          <span class="term-prompt">&gt;</span>
+          <span style="color:#c084fc; font-weight:700;">[08:33:29] Deep Reasoning Diagnosis: Upstream transit peering collapse on ASN 3356.</span>
+        </div>
+        <div class="term-row" id="term-row-5">
+          <span class="term-prompt">&gt;</span>
+          <span style="color:#38bdf8; font-weight:700;">[08:33:30] Autonomous Remediation: Throttling Fastly to 20%, shifting 80% egress to Akamai Cloud CDN.</span>
+        </div>
+        <div class="term-row" id="term-row-6">
+          <span class="term-prompt">&gt;</span>
+          <span style="color:#4ade80; font-weight:700;">[08:33:30] Mean Time to Resolution: 1.28 seconds. Telemetry Restored: VPF 0.21%, Forward Buffer 27.9s.</span>
+        </div>
+        <div class="term-row" id="term-row-7">
+          <span class="term-prompt">&gt;</span>
+          <span style="color:#94a3b8;">[08:33:30] Visual incident annotation logged to live Grafana Cloud dashboard (ID: 48).</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Broadcast Lower Third Dock -->
+    <footer class="lower-third-dock">
+      <!-- Live Metrics HUD -->
+      <div class="hud-card">
+        <div class="hud-header">
+          <span>REAL-TIME STREAM QOS</span>
+          <span id="hud-status-indicator" style="color:#059669;">HEALTHY</span>
+        </div>
+        <div class="hud-stat-grid">
+          <div class="hud-stat-item">
+            <div id="hud-vpf-val" class="hud-stat-num" style="color:#059669;">0.15%</div>
+            <div class="hud-stat-desc">Playback Failure Rate</div>
+          </div>
+          <div class="hud-stat-item">
+            <div id="hud-buffer-val" class="hud-stat-num" style="color:#ffffff;">28.5s</div>
+            <div class="hud-stat-desc">Forward Buffer Health</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kinetic Subtitles & Teleprompter Track -->
+      <div class="subtitle-card">
+        <div class="subtitle-speaker-label">INCIDENT COMMANDER VOICE TRACK</div>
+        <div id="caption-box" class="subtitle-text">
+          Loading broadcast stream...
+        </div>
+        <div id="caption-progress" class="subtitle-progress-bar"></div>
+      </div>
+
+      <!-- Agent Reasoning Stream -->
+      <div class="terminal-card">
+        <div class="terminal-title">
+          <span style="width:6px; height:6px; border-radius:50%; background:#0ea5e9;"></span>
+          AGENT REASONING STREAM
+        </div>
+        <div id="bottom-term-1" style="color:#475569;">[14:04:15] OpenMetrics QoS Ingest: 100% OK</div>
+        <div id="bottom-term-2" style="color:#475569;">[14:04:16] Stream Continuity Live 4K @ 14.8 Mbps</div>
+        <div id="bottom-term-3" style="color:#059669;">[14:04:17] Egress routed to Fastly Edge POP (100%)</div>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    // Procedural 4K Stream Canvas Simulation
+    const canvas = document.getElementById('stream-canvas');
+    const ctx = canvas.getContext('2d');
+    let canvasTime = 0;
+    let isStreamGlitching = false;
+
+    function renderStream() {
+      if (!isStreamGlitching) {
+        canvasTime += 0.02;
+      }
+      const w = canvas.width;
+      const h = canvas.height;
+
+      // Dark space background
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+      bgGrad.addColorStop(0, '#060a14');
+      bgGrad.addColorStop(0.5, '#0f172a');
+      bgGrad.addColorStop(1, '#1e110a');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      // Glowing Planet Horizon
+      const planetGrad = ctx.createRadialGradient(w * 0.72, h * 0.42, 10, w * 0.72, h * 0.42, 120);
+      planetGrad.addColorStop(0, '#ffb800');
+      planetGrad.addColorStop(0.3, '#f97316');
+      planetGrad.addColorStop(0.7, '#991b1b');
+      planetGrad.addColorStop(1, 'transparent');
+      ctx.fillStyle = planetGrad;
+      ctx.beginPath();
+      ctx.arc(w * 0.72, h * 0.42, 90, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Atmospheric haze ridges
+      ctx.fillStyle = '#0a0604';
+      ctx.beginPath();
+      ctx.moveTo(0, h);
+      for (let x = 0; x <= w; x += 10) {
+        const y = h * 0.75 + Math.sin(x * 0.015 + canvasTime) * 10 + Math.cos(x * 0.03) * 5;
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(w, h);
+      ctx.closePath();
+      ctx.fill();
+
+      // If glitching during outage, draw scanlines
+      if (isStreamGlitching) {
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.18)';
+        ctx.fillRect(0, 0, w, h);
+        for (let y = 0; y < h; y += 4) {
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+          ctx.fillRect(0, y, w, 1.5);
+        }
+      }
+
+      requestAnimationFrame(renderStream);
+    }
+    requestAnimationFrame(renderStream);
+
+    // Register exactly one paused GSAP timeline for HyperFrames
+    const tl = gsap.timeline({ paused: true });
+
+    // Subtitle Segments with exact timing matching Derek ElevenLabs master audio
+    const subtitleSegments = [
+      { start: 0.0, end: 9.2, text: "After months of nonstop engineering work, Friday night was the one release I had blocked off all summer: the midnight premiere of our <span class='highlight'>Global 4K Live Broadcast</span>." },
+      { start: 9.3, end: 24.5, text: "But five minutes in, four million viewers hit a frozen screen: <span class='highlight-red'>Error 502</span>. For 40 agonizing minutes, human SREs scrambled across dozens of dashboard tabs trying to isolate the failure." },
+      { start: 24.7, end: 33.7, text: "In Hollywood, continuity is the sacred craft of making sure no flaw breaks the cinematic illusion. In streaming, <span class='highlight'>continuity is zero downtime</span>." },
+      { start: 33.8, end: 42.1, text: "That is why I built <span class='highlight'>CONTINUITY</span>: an autonomous incident commander powered by <span class='highlight-purple'>Google Cloud Gemini 3.7 Flash</span>." },
+      { start: 42.3, end: 55.8, text: "When an edge transit link collapses on our primary Fastly POP, Prometheus telemetry immediately catches the breach: video playback failures surge past <span class='highlight-red'>5%</span>, and player buffers collapse to under <span class='highlight-red'>three seconds</span>." },
+      { start: 56.1, end: 77.8, text: "<span class='highlight'>CONTINUITY</span> activates instantly. Ingesting live Prometheus metric streams and Loki edge logs, the <span class='highlight-purple'>Google Cloud Gemini 3.7 Flash</span> reasoning engine diagnoses the root cause in just <span class='highlight'>1.28 seconds</span>: an upstream transit peering drop on ASN 3356." },
+      { start: 78.0, end: 92.8, text: "Without waiting for a human on-call engineer, the agent autonomously executes a traffic failover, rerouting <span class='highlight'>80% of egress to our secondary Akamai edge</span> and logging the incident signature for Grafana Cloud telemetry." },
+      { start: 93.0, end: 99.1, text: "Mean Time to Resolution: <span class='highlight'>1.28 seconds</span>. Full stream SLA verified restored." },
+      { start: 99.3, end: 109.1, text: "Now, here is the secret behind what you are watching right now: this entire demo video was autonomously scripted, voiced, and edited by our AI agent, <span class='highlight'>Antigravity</span>." },
+      { start: 109.3, end: 121.4, text: "To guarantee broadcast audio fidelity, Antigravity synthesized my voice using ElevenLabs, splitting the teleprompter into precise chunks to completely eliminate acoustic drift and model fatigue." },
+      { start: 121.8, end: 135.5, text: "The entire production was assembled using <span class='highlight'>HyperFrames</span>, rendering seekable GSAP motion graphics, real-time Prometheus telemetry cards, and multi-track audio at <span class='highlight'>60 frames per second</span>." },
+      { start: 135.9, end: 141.0, text: "Self-healing infrastructure. Self-producing media. <span class='highlight'>This is CONTINUITY.</span>" }
+    ];
+
+    // State update engine invoked on every seek / tick
+    function updateStateAtTime(t) {
+      // 1. Subtitles & Progress
+      const captionBox = document.getElementById('caption-box');
+      const progressBar = document.getElementById('caption-progress');
+      let currentSub = subtitleSegments.find(s => t >= s.start && t < s.end);
+      if (!currentSub && t >= subtitleSegments[subtitleSegments.length - 1].end) {
+        currentSub = subtitleSegments[subtitleSegments.length - 1];
+      }
+      if (currentSub) {
+        captionBox.innerHTML = currentSub.text;
+        const segProgress = Math.max(0, Math.min(1, (t - currentSub.start) / (currentSub.end - currentSub.start)));
+        progressBar.style.width = (segProgress * 100) + '%';
+      }
+
+      // 2. Incident Phases: Normal (0-42.2s) -> Outage (42.2-81.0s) -> Recovered (81.0-143s)
+      const isOutage = (t >= 42.2 && t < 81.0);
+      const isRecovered = (t >= 81.0);
+
+      const headerBadge = document.getElementById('header-status-badge');
+      const headerText = document.getElementById('header-status-text');
+      const stallOverlay = document.getElementById('stall-overlay');
+      const playerBitrate = document.getElementById('player-bitrate');
+      const playerRouteTag = document.getElementById('player-route-tag');
+      const playerRouteStatus = document.getElementById('player-route-status');
+      const playerBufferReadout = document.getElementById('player-buffer-readout');
+      const bufferValLabel = document.getElementById('buffer-val-label');
+      const bufferProgressBar = document.getElementById('buffer-progress-bar');
+      const sreBadge = document.getElementById('sre-badge');
+      const sreDiagText = document.getElementById('sre-diag-text');
+      const sreActionBtn = document.getElementById('sre-action-btn');
+      const sreBtnText = document.getElementById('sre-btn-text');
+      const cdnRouteBadge = document.getElementById('cdn-route-badge');
+      const cdnValFastly = document.getElementById('cdn-val-fastly');
+      const cdnBarFastly = document.getElementById('cdn-bar-fastly');
+      const cdnValAkamai = document.getElementById('cdn-val-akamai');
+      const cdnBarAkamai = document.getElementById('cdn-bar-akamai');
+      const mvalVpf = document.getElementById('mval-vpf');
+      const mpillVpf = document.getElementById('mpill-vpf');
+      const mvalLatency = document.getElementById('mval-latency');
+      const mvalBuffer = document.getElementById('mval-buffer');
+      const hudVpf = document.getElementById('hud-vpf-val');
+      const hudBuffer = document.getElementById('hud-buffer-val');
+      const hudStatus = document.getElementById('hud-status-indicator');
+      const chartLegendLabel = document.getElementById('chart-legend-label');
+      const chartLinePath = document.getElementById('chart-line-path');
+      const chartAreaFill = document.getElementById('chart-area-fill');
+      const chartTipDot = document.getElementById('chart-tip-dot');
+      const logContainer = document.getElementById('log-stream-container');
+      const bottomTerm1 = document.getElementById('bottom-term-1');
+      const bottomTerm2 = document.getElementById('bottom-term-2');
+      const bottomTerm3 = document.getElementById('bottom-term-3');
+
+      isStreamGlitching = isOutage;
+
+      if (!isOutage && !isRecovered) {
+        // Phase 1: Normal Operation
+        headerBadge.className = "status-badge normal";
+        headerText.innerText = "SLA OPERATIONAL (99.98%)";
+        stallOverlay.className = "stall-overlay";
+        playerBitrate.innerText = "14.8 Mbps";
+        playerBitrate.className = "bitrate-tag";
+        playerRouteTag.innerText = "Fastly Edge POP (100%)";
+        playerRouteStatus.innerText = "Route: Fastly Edge POP (100% Primary)";
+        playerBufferReadout.innerText = "Buffer: 28.5s";
+        bufferValLabel.innerText = "28.5s";
+        bufferProgressBar.style.width = "95%";
+        bufferProgressBar.style.background = "linear-gradient(90deg, #22c55e, #4ade80)";
+        sreBadge.className = "metric-pill pill-green";
+        sreBadge.innerText = "Standby Active";
+        sreDiagText.innerText = "All streaming telemetry within normal operating SLA. Continuous 1Hz edge monitoring active.";
+        sreActionBtn.className = "sre-action-btn";
+        sreBtnText.innerText = "Trigger Autonomous SRE Failover";
+        cdnRouteBadge.className = "metric-pill pill-blue";
+        cdnRouteBadge.innerText = "Primary Route";
+        cdnValFastly.innerText = "100%";
+        cdnBarFastly.style.width = "100%";
+        cdnBarFastly.style.background = "#22c55e";
+        cdnValAkamai.innerText = "0%";
+        cdnBarAkamai.style.width = "0%";
+        mvalVpf.className = "metric-val green";
+        mvalVpf.innerText = "0.15%";
+        mpillVpf.className = "metric-pill pill-green";
+        mpillVpf.innerText = "+0.02%";
+        mvalLatency.innerHTML = '48<span style="font-size:14px; color:#64748b; font-weight:600;">ms</span>';
+        mvalBuffer.className = "metric-val green";
+        mvalBuffer.innerHTML = '28.5<span style="font-size:14px; color:#64748b; font-weight:600;">sec</span>';
+        hudVpf.style.color = "#4ade80";
+        hudVpf.innerText = "0.15%";
+        hudBuffer.innerText = "28.5s";
+        hudStatus.style.color = "#4ade80";
+        hudStatus.innerText = "HEALTHY";
+        chartLegendLabel.innerText = "Current: 0.15%";
+
+        // SVG Normal Line
+        chartLinePath.setAttribute("d", "M 0 220 C 250 218, 500 222, 750 219 L 1000 220");
+        chartLinePath.setAttribute("stroke", "#22c55e");
+        chartAreaFill.setAttribute("points", "0,220 1000,220 1000,280 0,280");
+        chartAreaFill.setAttribute("fill", "url(#areaGradGreen)");
+        chartTipDot.setAttribute("cy", "220");
+        chartTipDot.setAttribute("fill", "#22c55e");
+
+        logContainer.innerHTML = `
+          <div class="log-line green">[14:04:15] 200 OK Fastly Edge POP (iad-01) - chunk #89204 (48ms)</div>
+          <div class="log-line green">[14:04:16] LOKI INGEST [Fastly POP us-east-2] 200 OK segment.ts</div>
+          <div class="log-line green">[14:04:17] Stream delivery nominal across 14 edge distribution POPs</div>
+        `;
+
+        bottomTerm1.innerText = "[14:04:15] OpenMetrics QoS Ingest: 100% OK";
+        bottomTerm2.innerText = "[14:04:16] Stream Continuity Live 4K @ 14.8 Mbps";
+        bottomTerm3.className = "terminal-line success";
+        bottomTerm3.innerText = "[14:04:17] Egress routed to Fastly Edge POP (100%)";
+
+      } else if (isOutage) {
+        // Phase 2: Active Outage
+        headerBadge.className = "status-badge outage";
+        headerText.innerText = "CRITICAL EDGE OUTAGE";
+        stallOverlay.className = "stall-overlay active";
+        playerBitrate.innerText = "3.2 Mbps";
+        playerBitrate.className = "bitrate-tag pill-red";
+        playerRouteTag.innerText = "Fastly Edge (Transit Dropped)";
+        playerRouteStatus.innerText = "Route: Fastly POP 'iad-01' (PACKET LOSS)";
+        playerBufferReadout.innerText = "Buffer: 2.9s (CRITICAL)";
+        bufferValLabel.innerText = "2.9s";
+        bufferProgressBar.style.width = "10%";
+        bufferProgressBar.style.background = "linear-gradient(90deg, #ef4444, #f87171)";
+        sreBadge.className = "metric-pill pill-red";
+        sreBadge.innerText = "Anomaly Detected";
+        sreDiagText.innerText = "Edge POP transit failure detected via [Fastly Edge POP us-east-2] 502 Bad Gateway - upstream transit link connection refused (loss: 68%).";
+        
+        if (t >= 56.8) {
+          sreActionBtn.className = "sre-action-btn active-healing";
+          sreBtnText.innerText = "Diagnosing & Healing Stream...";
+        } else {
+          sreActionBtn.className = "sre-action-btn";
+          sreBtnText.innerText = "Trigger Autonomous SRE Failover";
+        }
+
+        cdnRouteBadge.className = "metric-pill pill-red";
+        cdnRouteBadge.innerText = "Primary Outage";
+        cdnValFastly.innerText = "100% (STALLED)";
+        cdnBarFastly.style.width = "100%";
+        cdnBarFastly.style.background = "#ef4444";
+        cdnValAkamai.innerText = "0%";
+        cdnBarAkamai.style.width = "0%";
+        mvalVpf.className = "metric-val red";
+        mvalVpf.innerText = "5.08%";
+        mpillVpf.className = "metric-pill pill-red";
+        mpillVpf.innerText = "+4.93% SLA BREACH";
+        mvalLatency.innerHTML = '457<span style="font-size:14px; color:#ef4444; font-weight:600;">ms</span>';
+        mvalBuffer.className = "metric-val red";
+        mvalBuffer.innerHTML = '2.9<span style="font-size:14px; color:#ef4444; font-weight:600;">sec</span>';
+        hudVpf.style.color = "#f87171";
+        hudVpf.innerText = "5.08%";
+        hudBuffer.innerText = "2.9s";
+        hudStatus.style.color = "#f87171";
+        hudStatus.innerText = "CRITICAL BREACH";
+        chartLegendLabel.innerText = "Current: 5.08% (BREACH)";
+
+        // SVG Outage Spike Curve
+        chartLinePath.setAttribute("d", "M 0 220 L 450 220 C 520 220, 560 40, 680 40 L 1000 40");
+        chartLinePath.setAttribute("stroke", "#ef4444");
+        chartAreaFill.setAttribute("points", "0,220 450,220 680,40 1000,40 1000,280 0,280");
+        chartAreaFill.setAttribute("fill", "url(#areaGradRed)");
+        chartTipDot.setAttribute("cy", "40");
+        chartTipDot.setAttribute("fill", "#ef4444");
+
+        logContainer.innerHTML = `
+          <div class="log-line red">[14:04:17] 502 BAD GATEWAY Upstream transit connection failed...</div>
+          <div class="log-line red">[14:04:18] LOKI INGEST [Fastly Edge POP us-east-2] 502 Bad Gateway</div>
+          <div class="log-line purple">[14:04:18] GEMINI 3.7 FLASH: Root Cause: Level 3 ASN 3356 transit drop</div>
+        `;
+
+        bottomTerm1.innerText = "[14:04:17] 502 BAD GATEWAY Upstream failure";
+        bottomTerm2.innerText = "[14:04:17] VPF surged to 5.08% (SLA breach)";
+        bottomTerm3.className = "terminal-line alert";
+        bottomTerm3.innerText = "[14:04:18] Gemini 3.7 Flash triage: ASN 3356 drop";
+
+      } else {
+        // Phase 3: Autonomous Failover Restored
+        headerBadge.className = "status-badge recovered";
+        headerText.innerText = "FAILOVER RESTORED (AKAMAI 80%)";
+        stallOverlay.className = "stall-overlay";
+        playerBitrate.innerText = "14.6 Mbps";
+        playerBitrate.className = "bitrate-tag";
+        playerRouteTag.innerText = "Akamai Cloud CDN (80% Failover)";
+        playerRouteStatus.innerText = "Route: Akamai Cloud CDN (80% Failover)";
+        playerBufferReadout.innerText = "Buffer: 27.8s";
+        bufferValLabel.innerText = "27.8s";
+        bufferProgressBar.style.width = "92%";
+        bufferProgressBar.style.background = "linear-gradient(90deg, #0ea5e9, #38bdf8)";
+        sreBadge.className = "metric-pill pill-green";
+        sreBadge.innerText = "Incident Resolved";
+        sreDiagText.innerText = "Shifted 80% egress to Akamai Cloud CDN. ASN 3356 bypassed. Forward buffer restored to 27.8s.";
+        sreActionBtn.className = "sre-action-btn";
+        sreBtnText.innerText = "Stream Stabilized (1.28s MTTR)";
+        cdnRouteBadge.className = "metric-pill pill-green";
+        cdnRouteBadge.innerText = "Dual Failover Active";
+        cdnValFastly.innerText = "20%";
+        cdnBarFastly.style.width = "20%";
+        cdnBarFastly.style.background = "#64748b";
+        cdnValAkamai.innerText = "80%";
+        cdnBarAkamai.style.width = "80%";
+        cdnBarAkamai.style.background = "#0ea5e9";
+        mvalVpf.className = "metric-val green";
+        mvalVpf.innerText = "0.18%";
+        mpillVpf.className = "metric-pill pill-green";
+        mpillVpf.innerText = "+0.03%";
+        mvalLatency.innerHTML = '44<span style="font-size:14px; color:#64748b; font-weight:600;">ms</span>';
+        mvalBuffer.className = "metric-val green";
+        mvalBuffer.innerHTML = '27.8<span style="font-size:14px; color:#64748b; font-weight:600;">sec</span>';
+        hudVpf.style.color = "#4ade80";
+        hudVpf.innerText = "0.18%";
+        hudBuffer.innerText = "27.8s";
+        hudStatus.style.color = "#38bdf8";
+        hudStatus.innerText = "FAILOVER RESTORED";
+        chartLegendLabel.innerText = "Current: 0.18% (RECOVERED)";
+
+        // SVG Plunge Recovery Line
+        chartLinePath.setAttribute("d", "M 0 220 L 400 220 C 440 220, 480 40, 520 40 L 600 40 C 650 40, 700 216, 750 216 L 1000 216");
+        chartLinePath.setAttribute("stroke", "#22c55e");
+        chartAreaFill.setAttribute("points", "0,220 400,220 520,40 600,40 750,216 1000,216 1000,280 0,280");
+        chartAreaFill.setAttribute("fill", "url(#areaGradGreen)");
+        chartTipDot.setAttribute("cy", "216");
+        chartTipDot.setAttribute("fill", "#22c55e");
+
+        logContainer.innerHTML = `
+          <div class="log-line cyan">[14:04:19] AUTO-FAILOVER: Scaling Akamai Cloud CDN to 80% egress</div>
+          <div class="log-line green">[14:04:20] 200 OK Akamai Cloud CDN - Segment verified (44ms)</div>
+          <div class="log-line green">[14:04:21] Forward playback buffer restabilized to 27.8s</div>
+        `;
+
+        bottomTerm1.innerText = "[14:04:19] Gemini: Root Cause ASN 3356 drop";
+        bottomTerm2.innerText = "[14:04:19] Failover: 80% traffic -> Akamai Edge";
+        bottomTerm3.className = "terminal-line success";
+        bottomTerm3.innerText = "[14:04:20] MTTR: 1.28s. Zero buffer stalls.";
+      }
+    }
+
+    // Expose engine to window
+    window.__updateState = updateStateAtTime;
+
+    // Build deterministic GSAP Timeline
+    tl.call(() => updateStateAtTime(0), null, 0);
+
+    // Virtual Cursor Movement 1: Moving to Inject CDN Outage at 38.5s - 42.0s
+    tl.set("#virtual-cursor", { opacity: 1, x: 960, y: 540 }, 38.5);
+    tl.to("#virtual-cursor", { x: 1352, y: 822, duration: 3.3, ease: "power2.inOut" }, 38.7);
+    
+    // Click Inject CDN Outage at 42.0s
+    tl.call(() => {
+      document.getElementById('btn-inject-cdn').classList.add('clicked');
+      const ripple = document.getElementById('cursor-ripple');
+      ripple.style.left = '1352px';
+      ripple.style.top = '822px';
+    }, null, 41.8);
+    tl.fromTo("#cursor-ripple", { opacity: 1, scale: 0.2 }, { opacity: 0, scale: 1.8, duration: 0.5 }, 41.8);
+    tl.call(() => {
+      document.getElementById('btn-inject-cdn').classList.remove('clicked');
+      updateStateAtTime(42.2);
+    }, null, 42.2);
+
+    // Virtual Cursor Movement 2: Moving to SRE Action Button at 53.5s - 56.8s
+    tl.to("#virtual-cursor", { x: 342, y: 752, duration: 2.8, ease: "power2.inOut" }, 53.8);
+    
+    // Click Trigger SRE Failover at 56.8s
+    tl.call(() => {
+      const ripple = document.getElementById('cursor-ripple');
+      ripple.style.left = '342px';
+      ripple.style.top = '752px';
+    }, null, 56.8);
+    tl.fromTo("#cursor-ripple", { opacity: 1, scale: 0.2 }, { opacity: 0, scale: 1.8, duration: 0.5 }, 56.8);
+    tl.to("#virtual-cursor", { opacity: 0, duration: 0.6 }, 57.8);
+
+    // Executive Gemini 3.7 Flash Reasoning Terminal Modal (57.5s - 80.5s)
+    tl.fromTo("#gemini-modal", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 57.5);
+    tl.call(() => document.getElementById('term-row-1').classList.add('visible'), null, 58.0);
+    tl.call(() => document.getElementById('term-row-2').classList.add('visible'), null, 61.0);
+    tl.call(() => document.getElementById('term-row-3').classList.add('visible'), null, 64.5);
+    tl.call(() => document.getElementById('term-row-4').classList.add('visible'), null, 68.0);
+    tl.call(() => document.getElementById('term-row-5').classList.add('visible'), null, 71.5);
+    tl.call(() => document.getElementById('term-row-6').classList.add('visible'), null, 75.0);
+    tl.call(() => document.getElementById('term-row-7').classList.add('visible'), null, 77.5);
+    tl.to("#gemini-modal", { opacity: 0, y: -15, duration: 0.5, ease: "power2.in" }, 80.5);
+
+    // Autonomous Recovery Trigger at 81.0s
+    tl.call(() => updateStateAtTime(81.0), null, 81.0);
+
+    // Keep state updated on every tick
+    tl.eventCallback("onUpdate", () => {
+      updateStateAtTime(tl.time());
+    });
+
+    // Register with HyperFrames global
+    window.__timelines = {
+      'continuity_demo': tl
+    };
+  </script>
+</body>
+</html>
