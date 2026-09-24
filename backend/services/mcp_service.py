@@ -272,71 +272,86 @@ official_mcp_bridge = OfficialGrafanaMCPBridge()
 async def grafana_query_prometheus(promql: str) -> PrometheusQueryResult:
     """Queries real-time OpenMetrics and Prometheus telemetry via official Grafana Cloud MCP Server or direct REST."""
     logger.info(f"[MCP Tool] Executing PromQL: {promql}")
-    res = await official_mcp_bridge.call_official_tool("query_prometheus", {
-        "datasourceUid": GRAFANA_PROM_UID,
-        "expr": promql,
-        "endTime": "now",
-        "queryType": "instant"
-    })
-    if res is not None and isinstance(res, dict) and ("data" in res or "status" in res):
-        return normalize_prometheus_result(res, query=promql, source="official_mcp")
+    try:
+        res = await official_mcp_bridge.call_official_tool("query_prometheus", {
+            "datasourceUid": GRAFANA_PROM_UID,
+            "expr": promql,
+            "endTime": "now",
+            "queryType": "instant"
+        })
+        if res is not None and isinstance(res, dict) and ("data" in res or "status" in res):
+            return normalize_prometheus_result(res, query=promql, source="official_mcp")
+    except Exception as e:
+        logger.warning(f"[MCP Tool] Official MCP query_prometheus failed: {e}. Executing direct REST fallback...")
     direct_res = await grafana_client.query_prometheus(promql)
     return normalize_prometheus_result(direct_res, query=promql, source="direct_rest")
 
 async def grafana_query_loki(logql: str, limit: int = 20) -> LokiQueryResult:
     """Queries distributed edge router and transcode logs via official Grafana Cloud MCP Server or direct REST."""
     logger.info(f"[MCP Tool] Executing LogQL: {logql} (limit={limit})")
-    res = await official_mcp_bridge.call_official_tool("query_loki_logs", {
-        "datasourceUid": GRAFANA_LOKI_UID,
-        "logql": logql,
-        "limit": limit
-    })
-    if res is not None and isinstance(res, (dict, list)):
-        return normalize_loki_result(res, query=logql, source="official_mcp")
+    try:
+        res = await official_mcp_bridge.call_official_tool("query_loki_logs", {
+            "datasourceUid": GRAFANA_LOKI_UID,
+            "logql": logql,
+            "limit": limit
+        })
+        if res is not None and isinstance(res, (dict, list)):
+            return normalize_loki_result(res, query=logql, source="official_mcp")
+    except Exception as e:
+        logger.warning(f"[MCP Tool] Official MCP query_loki_logs failed: {e}. Executing direct REST fallback...")
     direct_res = await grafana_client.query_loki_logs(logql, limit=limit)
     return normalize_loki_result(direct_res, query=logql, source="direct_rest")
 
 async def grafana_create_annotation(text: str, tags: Optional[List[str]] = None) -> GrafanaAnnotationRef:
     """Drops a visible timestamped vertical annotation pin on live Grafana dashboard via official MCP Server."""
     logger.info(f"[MCP Tool] Creating dashboard annotation: {text}")
-    res = await official_mcp_bridge.call_official_tool("create_annotation", {
-        "text": text,
-        "tags": tags or []
-    })
-    if res is not None and isinstance(res, dict):
-        if "Payload" in res and isinstance(res["Payload"], dict) and "id" in res["Payload"]:
-            return normalize_annotation_result({"id": res["Payload"]["id"], "text": text, "tags": tags or []}, source="official_mcp")
-        if "id" in res:
-            return normalize_annotation_result(res, source="official_mcp")
+    try:
+        res = await official_mcp_bridge.call_official_tool("create_annotation", {
+            "text": text,
+            "tags": tags or []
+        })
+        if res is not None and isinstance(res, dict):
+            if "Payload" in res and isinstance(res["Payload"], dict) and "id" in res["Payload"]:
+                return normalize_annotation_result({"id": res["Payload"]["id"], "text": text, "tags": tags or []}, source="official_mcp")
+            if "id" in res:
+                return normalize_annotation_result(res, source="official_mcp")
+    except Exception as e:
+        logger.warning(f"[MCP Tool] Official MCP create_annotation failed: {e}. Executing direct REST fallback...")
     direct_res = await grafana_client.create_annotation(text, tags)
     return normalize_annotation_result(direct_res, source="direct_rest")
 
 async def grafana_create_incident(title: str, severity: str, summary: str) -> GrafanaIncidentRef:
     """Opens a structured P1/P2 incident record in Grafana Cloud IRM via official MCP Server."""
     logger.info(f"[MCP Tool] Opening Grafana IRM incident: {title} [{severity}]")
-    res = await official_mcp_bridge.call_official_tool("create_incident", {
-        "title": title,
-        "severity": severity,
-        "roomPrefix": "stream-incident"
-    })
-    if res is not None and isinstance(res, dict) and ("incident_id" in res or "id" in res or "incident" in res):
-        return normalize_incident_result(res, default_title=title, default_severity=severity, source="official_mcp")
+    try:
+        res = await official_mcp_bridge.call_official_tool("create_incident", {
+            "title": title,
+            "severity": severity,
+            "roomPrefix": "stream-incident"
+        })
+        if res is not None and isinstance(res, dict) and ("incident_id" in res or "id" in res or "incident" in res):
+            return normalize_incident_result(res, default_title=title, default_severity=severity, source="official_mcp")
+    except Exception as e:
+        logger.warning(f"[MCP Tool] Official MCP create_incident failed: {e}. Executing direct REST fallback...")
     direct_res = await grafana_client.create_incident(title, severity, summary)
     return normalize_incident_result(direct_res, default_title=title, default_severity=severity, source="direct_rest")
 
 async def grafana_resolve_incident(incident_id: str, summary: str = "Verified closed-loop recovery.") -> GrafanaIncidentRef:
     """Resolves an existing incident in Grafana Cloud IRM via official MCP Server or direct API."""
     logger.info(f"[MCP Tool] Resolving Grafana IRM incident: {incident_id}")
-    res = await official_mcp_bridge.call_official_tool("update_incident", {
-        "incidentId": incident_id,
-        "status": "resolved"
-    })
-    if res is not None and isinstance(res, dict) and res.get("status") != "error":
-        if "incident_id" not in res and "id" not in res:
-            res["incident_id"] = incident_id
-        if "lifecycle_status" not in res and res.get("status") != "resolved":
-            res["lifecycle_status"] = "resolved"
-        return normalize_incident_result(res, source="official_mcp")
+    try:
+        res = await official_mcp_bridge.call_official_tool("update_incident", {
+            "incidentId": incident_id,
+            "status": "resolved"
+        })
+        if res is not None and isinstance(res, dict) and res.get("status") != "error":
+            if "incident_id" not in res and "id" not in res:
+                res["incident_id"] = incident_id
+            if "lifecycle_status" not in res and res.get("status") != "resolved":
+                res["lifecycle_status"] = "resolved"
+            return normalize_incident_result(res, source="official_mcp")
+    except Exception as e:
+        logger.warning(f"[MCP Tool] Official MCP update_incident failed: {e}. Executing direct REST fallback...")
     direct_res = await grafana_client.resolve_incident(incident_id, summary)
     return normalize_incident_result(direct_res, source="direct_rest")
 
