@@ -139,7 +139,7 @@ async def test_continuity_native_tools_invariants():
     assert rem_res["status"] == "APPLIED"
     state = chaos_manager.get_state()
     assert state.current_mode == "RECOVERING"
-    assert state.lifecycle_state == "RECOVERING"
+    assert state.lifecycle.value == "RECOVERING"
 
     # Only verification gate can mark verified recovery
     mock_prom_recovered = {
