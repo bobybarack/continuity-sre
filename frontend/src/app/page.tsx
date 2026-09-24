@@ -5,9 +5,9 @@ import { TopBar } from "../components/TopBar";
 import { MetricCardsRow } from "../components/MetricCardsRow";
 import { PlaybackChartCard } from "../components/PlaybackChartCard";
 import { LivePlayerCard } from "../components/LivePlayerCard";
-import { SreCommanderCard } from "../components/SreCommanderCard";
+import { PremiereCrewDispatchCard } from "../components/PremiereCrewDispatchCard";
 import { CdnSplitCard } from "../components/CdnSplitCard";
-import { LiveLogsCard } from "../components/LiveLogsCard";
+import { CrewRadioDispatchCard } from "../components/CrewRadioDispatchCard";
 import { ChaosDock } from "../components/ChaosDock";
 import { IncidentDrawer } from "../components/IncidentDrawer";
 import { ApiService } from "../services/api";
@@ -403,15 +403,19 @@ export default function ContinuityDashboard() {
           </div>
         </div>
 
-        {/* 3. Bottom Row: SRE Commander (50%) + Live Logs Stream (50%) */}
+        {/* 3. Bottom Row: Premiere Crew Dispatch (50%) + Crew Radio Comms & Ingest Stream (50%) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <SreCommanderCard
+          <PremiereCrewDispatchCard
             latestInvestigation={latestInvestigation}
             isInvestigating={isInvestigating}
             onTriggerInvestigation={handleTriggerAutonomousInvestigation}
             isOutage={isOutage}
           />
-          <LiveLogsCard telemetry={telemetry} history={history} />
+          <CrewRadioDispatchCard
+            telemetry={telemetry}
+            history={history}
+            latestInvestigation={latestInvestigation}
+          />
         </div>
 
         {/* 4. Chaos Injection & Self-Healing Control Dock */}
