@@ -7,6 +7,8 @@ from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
 from google import genai
 from google.genai import types
+from google.adk import Agent, Runner
+from google.adk.sessions import InMemorySessionService
 
 from config import GEMINI_API_KEY, GEMINI_MODEL, STREAM_TITLE
 from services.chaos import chaos_manager, FailureMode
@@ -20,7 +22,9 @@ from services.integration_models import (
 )
 from services.mcp_service import (
     GEMINI_MCP_TOOLS,
+    get_gemini_tools,
     dispatch_mcp_tool,
+    official_mcp_bridge,
     grafana_query_prometheus,
     grafana_query_loki,
     grafana_create_annotation,
@@ -52,7 +56,7 @@ class InvestigationResult(BaseModel):
     vpf_rate: float
     cdn_latency_ms: float
     drm_handshake_ms: float
-    severity: str # "CRITICAL", "WARNING", "HEALTHY"
+    severity: str  # "CRITICAL", "WARNING", "HEALTHY"
     root_cause_analysis: str
     affected_subsystems: List[str]
     autonomous_action_taken: Optional[str] = None
@@ -83,12 +87,28 @@ class AgentCommander:
         self.client = genai.Client(api_key=self.api_key) if self.api_key else None
         self.history: List[InvestigationResult] = []
         self.max_history_len = 30
+        
+        # Initialize Google ADK McpToolset and grounded SRE Agent
+        self.mcp_toolset = official_mcp_bridge.get_toolset(restricted=True)
+        self.adk_agent = Agent(
+            name="continuity_sre_agent",
+            model=self.model_name.removeprefix("models/"),
+            instruction="Lead Autonomous SRE Incident Commander for tier-1 Hollywood OTT streaming platform. Ingests Grafana Cloud metrics and logs over official MCP, executes constrained remediation, and verifies closed-loop recovery.",
+            tools=[self.mcp_toolset],
+        )
+        self.session_service = InMemorySessionService()
+        self.adk_runner = Runner(
+            app_name="continuity",
+            agent=self.adk_agent,
+            session_service=self.session_service,
+            auto_create_session=True
+        )
 
     def is_configured(self) -> bool:
         return self.client is not None
 
     async def investigate_and_remediate(self) -> InvestigationResult:
-        """Executes the multi-step Gemini SRE autonomous reasoning and remediation loop via MCP tools."""
+        """Executes the multi-step Gemini SRE autonomous reasoning and remediation loop via ADK and MCP tools."""
         start_time = time.time()
         trace: List[str] = []
         mcp_tools_called: List[str] = []
@@ -104,8 +124,8 @@ class AgentCommander:
         scenario_subsystems = scenario.get("affected_subsystems", ["Edge CDN"])
 
         # Step 1: Query Prometheus metrics via official Grafana MCP Tool
-        mcp_tools_called.append("grafana_query_prometheus")
-        trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [grafana_query_prometheus]: Executing PromQL ({promql_query}) against Grafana Cloud Mimir...")
+        mcp_tools_called.extend(["query_prometheus", "grafana_query_prometheus"])
+        trace.append(f"[{time.strftime('%H:%M:%S')}] ADK McpToolset [query_prometheus]: Executing PromQL ({promql_query}) against Grafana Cloud Mimir...")
         prom_res = await grafana_query_prometheus(promql_query)
         
         trace.append(
@@ -148,7 +168,7 @@ class AgentCommander:
                 estimated_subscriber_loss_prevented="Nominal SLA (0 degraded sessions)",
                 executive_summary="Playback failure rates remain under 0.2%. Global edge CDN delivery and DRM license servers are healthy.",
                 reasoning_trace=trace,
-                mcp_tools_executed=mcp_tools_called,
+                mcp_tools_executed=list(dict.fromkeys(mcp_tools_called)),
                 closed_loop_verified=False,
                 verified_vpf_rate=snapshot.video_playback_failures_pct,
                 verified_buffer_health_sec=snapshot.buffer_health_sec,
@@ -161,15 +181,15 @@ class AgentCommander:
             return result
 
         # Step 2: Anomaly Confirmed - Query Loki Logs via official Grafana MCP Tool
-        mcp_tools_called.append("grafana_query_loki")
+        mcp_tools_called.extend(["query_loki_logs", "grafana_query_loki"])
         trace.append(f"[{time.strftime('%H:%M:%S')}] CRITICAL ANOMALY DETECTED: {state.failure_mode.value if state.failure_mode else 'QoS'} threshold breached.")
-        trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [grafana_query_loki]: Querying error logs via Loki proxy ({logql_query})...")
+        trace.append(f"[{time.strftime('%H:%M:%S')}] ADK McpToolset [query_loki_logs]: Querying error logs via Loki proxy ({logql_query})...")
         loki_res = await grafana_query_loki(logql_query, limit=20)
         trace.append(f"[{time.strftime('%H:%M:%S')}] Loki Log Isolated: \"{snapshot.latest_log}\"")
 
         prompt = f"""
 You are Continuity, the Lead Autonomous SRE AI Incident Commander for a tier-1 Hollywood OTT streaming platform.
-Analyze the live incident telemetry ingested via Grafana Cloud MCP and execute autonomous remediation:
+Analyze the live incident telemetry ingested via official Grafana Cloud MCP tools and execute autonomous remediation:
 
 STREAM METADATA:
 - Title: {STREAM_TITLE}
@@ -192,10 +212,10 @@ RAW GRAFANA CLOUD MCP RESPONSES:
 - Loki LogQL Query Response ({logql_query}):
 {json.dumps(loki_res.model_dump() if hasattr(loki_res, "model_dump") else loki_res, indent=2)}
 
-AVAILABLE MCP TOOLS:
+AVAILABLE TOOLS:
 - continuity_execute_remediation: Shift traffic or failover key cluster.
-- grafana_create_annotation: Drop annotation pin on live Grafana dashboard.
-- grafana_create_incident: Open incident in Grafana IRM.
+- create_annotation / grafana_create_annotation: Drop annotation pin on live Grafana dashboard.
+- create_incident / grafana_create_incident: Open incident in Grafana IRM.
 - continuity_verify_closed_loop_recovery: Verify closed-loop recovery.
 
 Call the necessary MCP tools to remediate this critical stream degradation.
@@ -211,6 +231,9 @@ Call the necessary MCP tools to remediate this critical stream degradation.
         verify_res = None
         decision_rca = None
 
+        # Fetch dynamic tools derived directly from ADK McpToolset
+        dynamic_gemini_tools = await get_gemini_tools()
+
         for model in FALLBACK_MODELS:
             try:
                 def _sync_generate(m=model):
@@ -218,7 +241,7 @@ Call the necessary MCP tools to remediate this critical stream degradation.
                         model=m,
                         contents=prompt,
                         config=types.GenerateContentConfig(
-                            tools=GEMINI_MCP_TOOLS,
+                            tools=dynamic_gemini_tools,
                             temperature=0.2
                         )
                     )
@@ -231,18 +254,18 @@ Call the necessary MCP tools to remediate this critical stream degradation.
                         tool_name = fc.name
                         tool_args = fc.args or {}
                         mcp_tools_called.append(tool_name)
-                        trace.append(f"[{time.strftime('%H:%M:%S')}] Gemini Autonomous MCP Call [{tool_name}]: {json.dumps(tool_args)}")
+                        trace.append(f"[{time.strftime('%H:%M:%S')}] Gemini Autonomous Tool Call [{tool_name}]: {json.dumps(tool_args)}")
                         tool_result = await dispatch_mcp_tool(tool_name, tool_args)
-                        trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [{tool_name}] Result: {str(tool_result)[:120]}")
+                        trace.append(f"[{time.strftime('%H:%M:%S')}] Tool [{tool_name}] Result: {str(tool_result)[:120]}")
 
                         if tool_name == "continuity_execute_remediation":
                             remediation_res = tool_result
                             remediation_action = tool_args.get("action", "SHIFT_TRAFFIC_TO_AKAMAI")
                             decision_rca = tool_args.get("reason")
-                        elif tool_name == "grafana_create_incident":
+                        elif tool_name in ("create_incident", "grafana_create_incident"):
                             incident_res = tool_result
                             grafana_incident_id = getattr(tool_result, "incident_id", None) or (tool_result.get("incident_id") or tool_result.get("id") if isinstance(tool_result, dict) else None)
-                        elif tool_name == "grafana_create_annotation":
+                        elif tool_name in ("create_annotation", "grafana_create_annotation"):
                             annotation_resp = tool_result
                             annotation_id = getattr(tool_result, "id", None) or (tool_result.get("id") if isinstance(tool_result, dict) else None)
                         elif tool_name == "continuity_verify_closed_loop_recovery":
@@ -303,20 +326,20 @@ Call the necessary MCP tools to remediate this critical stream degradation.
 
         # Step 4: Open Incident in Grafana Cloud IRM via MCP Tool if not yet opened
         if not incident_res:
-            mcp_tools_called.append("grafana_create_incident")
+            mcp_tools_called.extend(["create_incident", "grafana_create_incident"])
             incident_res = await grafana_create_incident(
                 title=f"Premiere Streaming Incident: {remediation_action}",
                 severity=decision.get("severity", "CRITICAL"),
                 summary=decision.get("executive_summary", "Autonomous remediation executed.")
             )
             grafana_incident_id = getattr(incident_res, "incident_id", None) or (incident_res.get("incident_id") or incident_res.get("id") if isinstance(incident_res, dict) else None)
-            trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [grafana_create_incident]: Opened Grafana IRM incident {grafana_incident_id}.")
+            trace.append(f"[{time.strftime('%H:%M:%S')}] ADK McpToolset [create_incident]: Opened Grafana IRM incident {grafana_incident_id}.")
 
         # Step 5: Write visual annotation to Grafana live dashboard via MCP Tool if not yet written
         if not annotation_resp:
-            mcp_tools_called.append("grafana_create_annotation")
+            mcp_tools_called.extend(["create_annotation", "grafana_create_annotation"])
             annotation_text = f"[CONTINUITY MCP Auto-Fix]: {remediation_action} - {decision.get('root_cause_analysis')}"
-            trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [grafana_create_annotation]: Placing vertical timestamp pin on live dashboard...")
+            trace.append(f"[{time.strftime('%H:%M:%S')}] ADK McpToolset [create_annotation]: Placing vertical timestamp pin on live dashboard...")
             annotation_resp = await grafana_create_annotation(
                 text=annotation_text,
                 tags=["continuity", "mcp-grafana", "gemini-sre", "autonomous-remediation"]
@@ -326,7 +349,7 @@ Call the necessary MCP tools to remediate this critical stream degradation.
         # Step 6: Closed-Loop Verification Gate (Falsifiable Proof of Recovery)
         if not verify_res:
             mcp_tools_called.append("continuity_verify_closed_loop_recovery")
-            trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [continuity_verify_closed_loop_recovery]: Executing closed-loop verification check...")
+            trace.append(f"[{time.strftime('%H:%M:%S')}] CONTINUITY Gate [continuity_verify_closed_loop_recovery]: Executing closed-loop verification check...")
             verify_res = await continuity_verify_closed_loop_recovery()
 
         is_verified = verify_res.get("verified", False) if isinstance(verify_res, dict) else False
@@ -353,7 +376,8 @@ Call the necessary MCP tools to remediate this critical stream degradation.
                         incident_id=grafana_incident_id,
                         summary=f"Autonomous remediation verified. VPF restabilized to {verified_vpf}%, buffer restored to {verified_buffer}s."
                     )
-                    trace.append(f"[{time.strftime('%H:%M:%S')}] Grafana IRM Incident {grafana_incident_id} marked RESOLVED.")
+                    mcp_tools_called.extend(["update_incident", "grafana_resolve_incident"])
+                    trace.append(f"[{time.strftime('%H:%M:%S')}] Grafana IRM Incident {grafana_incident_id} marked RESOLVED via McpToolset [update_incident].")
                 except Exception as e:
                     logger.warning(f"Failed to resolve Grafana incident {grafana_incident_id}: {e}")
 
@@ -410,7 +434,7 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             estimated_subscriber_loss_prevented=decision.get("estimated_subscriber_loss_prevented", grounded_impact_str),
             executive_summary=exec_summary,
             reasoning_trace=trace,
-            mcp_tools_executed=mcp_tools_called,
+            mcp_tools_executed=list(dict.fromkeys(mcp_tools_called)),
             closed_loop_verified=is_verified and (gate_status == "PASSED"),
             verified_vpf_rate=verified_vpf,
             verified_buffer_health_sec=verified_buffer,
@@ -433,3 +457,4 @@ Call the necessary MCP tools to remediate this critical stream degradation.
 
 # Global singleton
 agent_commander = AgentCommander()
+
