@@ -11,6 +11,9 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from google.genai import types
 
+from google.adk.tools.mcp_tool import McpToolset
+from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
+
 from config import (
     GRAFANA_INSTANCE_URL,
     GRAFANA_TOKEN,
@@ -33,12 +36,20 @@ from services.integration_models import (
 
 logger = logging.getLogger("continuity.mcp")
 
+ALLOWED_GRAFANA_TOOLS = [
+    "query_prometheus",
+    "query_loki_logs",
+    "create_annotation",
+    "create_incident",
+    "update_incident",
+]
+
 def parse_mcp_tool_result(res: Any) -> Any:
     """Parses full MCP CallToolResult handling isError, multiple content items, structured content, and fallbacks."""
     if res is None:
         return None
 
-    is_error = getattr(res, "isError", False)
+    is_error = getattr(res, "isError", False) or getattr(res, "is_error", False)
     content = getattr(res, "content", None)
 
     if not content:
@@ -83,10 +94,12 @@ def parse_mcp_tool_result(res: Any) -> Any:
     return parsed_items
 
 class OfficialGrafanaMCPBridge:
-    """Manages stdio JSON-RPC sessions to the official grafana/mcp-grafana runtime server with robust lifecycle."""
+    """Manages stdio sessions to the official grafana/mcp-grafana runtime server via Google ADK McpToolset."""
     def __init__(self):
         self.cached_tools: List[Dict[str, Any]] = []
         self._session: Optional[ClientSession] = None
+        self._toolset: Optional[McpToolset] = None
+        self._full_toolset: Optional[McpToolset] = None
         self.init_timeout = float(os.getenv("MCP_INIT_TIMEOUT", "15.0"))
         self.call_timeout = float(os.getenv("MCP_CALL_TIMEOUT", "15.0"))
 
@@ -102,12 +115,55 @@ class OfficialGrafanaMCPBridge:
                 return str(c)
         return shutil.which("mcp-grafana")
 
-    async def close(self):
-        """Explicitly resets session state on shutdown."""
-        self._session = None
+    def _create_toolset(self, tool_filter: Optional[List[str]] = None) -> McpToolset:
+        bin_path = self.get_binary_path() or "mcp-grafana"
+        env = {
+            **os.environ,
+            "GRAFANA_URL": GRAFANA_INSTANCE_URL,
+            "GRAFANA_SERVICE_ACCOUNT_TOKEN": GRAFANA_TOKEN,
+        }
+        params = StdioServerParameters(
+            command=bin_path,
+            args=["-t", "stdio"],
+            env=env,
+        )
+        return McpToolset(
+            connection_params=StdioConnectionParams(
+                server_params=params,
+                timeout=self.init_timeout,
+            ),
+            tool_filter=tool_filter,
+        )
 
-    async def list_official_tools(self) -> List[Dict[str, Any]]:
-        """Discovers tools exposed by the official mcp-grafana binary."""
+    def get_toolset(self, restricted: bool = True) -> McpToolset:
+        """Returns the Google ADK McpToolset instance. Restricted exposes only CONTINUITY required tools."""
+        if restricted:
+            if self._toolset is None:
+                self._toolset = self._create_toolset(tool_filter=ALLOWED_GRAFANA_TOOLS)
+            return self._toolset
+        else:
+            if self._full_toolset is None:
+                self._full_toolset = self._create_toolset(tool_filter=None)
+            return self._full_toolset
+
+    async def close(self):
+        """Explicitly resets session state and closes ADK McpToolset sessions on shutdown."""
+        self._session = None
+        if self._toolset is not None:
+            try:
+                await self._toolset.close()
+            except Exception as e:
+                logger.warning(f"[Official MCP] Error closing restricted McpToolset: {e}")
+            self._toolset = None
+        if self._full_toolset is not None:
+            try:
+                await self._full_toolset.close()
+            except Exception as e:
+                logger.warning(f"[Official MCP] Error closing full McpToolset: {e}")
+            self._full_toolset = None
+
+    async def list_official_tools(self, restricted: bool = False) -> List[Dict[str, Any]]:
+        """Discovers tools exposed by the official mcp-grafana binary via ADK McpToolset or active mock session."""
         if self._session is not None:
             try:
                 tools_resp = await asyncio.wait_for(
@@ -123,7 +179,7 @@ class OfficialGrafanaMCPBridge:
                 logger.warning(f"[Official MCP] Session list_tools failed: {e}")
                 self._session = None
 
-        if self.cached_tools:
+        if self.cached_tools and not restricted:
             return self.cached_tools
 
         bin_path = self.get_binary_path()
@@ -131,32 +187,26 @@ class OfficialGrafanaMCPBridge:
             logger.warning("[Official MCP] mcp-grafana binary not located.")
             return []
 
-        env = {
-            **os.environ,
-            "GRAFANA_URL": GRAFANA_INSTANCE_URL,
-            "GRAFANA_SERVICE_ACCOUNT_TOKEN": GRAFANA_TOKEN,
-        }
-        params = StdioServerParameters(command=bin_path, args=[], env=env)
         try:
-            async with stdio_client(params) as (read, write):
-                async with ClientSession(read, write) as session:
-                    await asyncio.wait_for(session.initialize(), timeout=self.init_timeout)
-                    tools_resp = await asyncio.wait_for(
-                        session.list_tools(),
-                        timeout=self.call_timeout,
-                    )
-                    self.cached_tools = [
-                        {"name": t.name, "description": t.description or ""}
-                        for t in tools_resp.tools
-                    ]
-                    logger.info(f"[Official MCP] Successfully discovered {len(self.cached_tools)} tools from {bin_path}")
-                    return self.cached_tools
+            toolset = self.get_toolset(restricted=restricted)
+            tools = await asyncio.wait_for(
+                toolset.get_tools(),
+                timeout=self.init_timeout,
+            )
+            discovered = [
+                {"name": t.name, "description": t.description or ""}
+                for t in tools
+            ]
+            if not restricted:
+                self.cached_tools = discovered
+            logger.info(f"[Official MCP] Discovered {len(discovered)} tools via ADK McpToolset from {bin_path}")
+            return discovered
         except Exception as e:
-            logger.warning(f"[Official MCP] Tool enumeration via stdio failed: {e}")
+            logger.warning(f"[Official MCP] Tool enumeration via ADK McpToolset failed: {e}")
             return self.cached_tools
 
     async def call_official_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[Any]:
-        """Calls a tool on the official mcp-grafana binary over stdio with timeout and error handling."""
+        """Calls a tool on official mcp-grafana via ADK McpToolset or active mock session with timeout and error handling."""
         if self._session is not None:
             try:
                 res = await asyncio.wait_for(
@@ -177,29 +227,39 @@ class OfficialGrafanaMCPBridge:
         if not bin_path:
             return None
 
-        env = {
-            **os.environ,
-            "GRAFANA_URL": GRAFANA_INSTANCE_URL,
-            "GRAFANA_SERVICE_ACCOUNT_TOKEN": GRAFANA_TOKEN,
-        }
-        params = StdioServerParameters(command=bin_path, args=[], env=env)
         try:
-            async with stdio_client(params) as (read, write):
-                async with ClientSession(read, write) as session:
-                    await asyncio.wait_for(session.initialize(), timeout=self.init_timeout)
-                    res = await asyncio.wait_for(
-                        session.call_tool(tool_name, arguments),
-                        timeout=self.call_timeout,
-                    )
-                    return parse_mcp_tool_result(res)
+            toolset = self.get_toolset(restricted=True)
+            raw_res = await asyncio.wait_for(
+                toolset._execute_with_session(
+                    lambda session: session.call_tool(tool_name, arguments),
+                    f"Failed to execute tool {tool_name}"
+                ),
+                timeout=self.call_timeout,
+            )
+            return parse_mcp_tool_result(raw_res)
         except (asyncio.TimeoutError, TimeoutError) as te:
             logger.warning(f"[Official MCP] Tool {tool_name} timed out after {self.call_timeout}s: {te}")
             return None
         except Exception as e:
-            logger.warning(f"[Official MCP] Tool {tool_name} stdio execution failed: {e}. Falling back to direct client.")
+            logger.warning(f"[Official MCP] Tool {tool_name} ADK McpToolset execution failed: {e}. Falling back to direct client.")
             return None
 
+    async def get_gemini_declarations(self) -> List[types.FunctionDeclaration]:
+        """Discovers official Grafana MCP tool schemas via Google ADK McpToolset and converts to Gemini FunctionDeclarations."""
+        try:
+            toolset = self.get_toolset(restricted=True)
+            tools = await asyncio.wait_for(toolset.get_tools(), timeout=self.init_timeout)
+            decls = []
+            for t in tools:
+                if hasattr(t, "_get_declaration"):
+                    decls.append(t._get_declaration())
+            return decls
+        except Exception as e:
+            logger.warning(f"[Official MCP] Failed to retrieve ADK tool declarations: {e}")
+            return []
+
 official_mcp_bridge = OfficialGrafanaMCPBridge()
+
 
 # Tool Functions implementing runtime Grafana Cloud MCP capabilities
 async def grafana_query_prometheus(promql: str) -> PrometheusQueryResult:
@@ -425,96 +485,196 @@ async def continuity_verify_closed_loop_recovery(
 
     return last_evidence
 
-# Gemini function declaration schemas for native Google GenAI Tool Calling
+# Continuous CONTINUITY-owned tools (never delegated to Grafana MCP)
+CONTINUITY_FUNCTION_DECLARATIONS = [
+    types.FunctionDeclaration(
+        name="continuity_execute_remediation",
+        description="Execute an autonomous edge traffic failover or BGP transit rerouting across Multi-CDN providers.",
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={
+                "action": types.Schema(type="STRING", description="The remediation policy: SHIFT_TRAFFIC_TO_AKAMAI, FAILOVER_DRM_KEY_CLUSTER, or REROUTE_BGP_TRANSIT."),
+                "primary_cdn_pct": types.Schema(type="INTEGER", description="Egress percentage for primary CDN (e.g. 20)."),
+                "secondary_cdn_pct": types.Schema(type="INTEGER", description="Egress percentage for secondary CDN (e.g. 80)."),
+                "reason": types.Schema(type="STRING", description="Technical justification for the traffic shift.")
+            },
+            required=["action", "primary_cdn_pct", "secondary_cdn_pct", "reason"]
+        )
+    ),
+    types.FunctionDeclaration(
+        name="continuity_verify_closed_loop_recovery",
+        description="Re-query Prometheus to verify that VPF dropped below 0.5% and forward buffer restabilized, providing falsifiable proof of resolution.",
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={}
+        )
+    )
+]
+
+STATIC_OFFICIAL_GRAFANA_DECLARATIONS = [
+    types.FunctionDeclaration(
+        name="query_prometheus",
+        description="Query real-time Prometheus / Mimir QoS metrics such as VPF error rate, egress latency, and buffer health from Grafana Cloud.",
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={
+                "expr": types.Schema(type="STRING", description="The PromQL query string to execute against Grafana Cloud Prometheus.")
+            },
+            required=["expr"]
+        )
+    ),
+    types.FunctionDeclaration(
+        name="query_loki_logs",
+        description="Query structured error logs from Grafana Cloud Loki to isolate HTTP 502 bad gateways, BGP peering drops, and DRM auth timeouts.",
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={
+                "logql": types.Schema(type="STRING", description="The LogQL query string to execute against Grafana Cloud Loki."),
+                "limit": types.Schema(type="INTEGER", description="Maximum number of log entries to retrieve (default 20).")
+            },
+            required=["logql"]
+        )
+    ),
+    types.FunctionDeclaration(
+        name="create_annotation",
+        description="Place a visible vertical annotation pin on the live Grafana Cloud dashboard documenting the autonomous incident diagnosis and fix.",
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={
+                "text": types.Schema(type="STRING", description="The descriptive annotation text."),
+                "tags": types.Schema(type="ARRAY", items=types.Schema(type="STRING"), description="List of metadata tags for the annotation.")
+            },
+            required=["text"]
+        )
+    ),
+    types.FunctionDeclaration(
+        name="create_incident",
+        description="Programmatically create a structured P1/P2 incident record in Grafana Cloud IRM.",
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={
+                "title": types.Schema(type="STRING", description="Incident title."),
+                "severity": types.Schema(type="STRING", description="Severity level: CRITICAL, MAJOR, or MINOR."),
+                "summary": types.Schema(type="STRING", description="Executive summary of the incident and impacted audience.")
+            },
+            required=["title", "severity", "summary"]
+        )
+    ),
+    types.FunctionDeclaration(
+        name="update_incident",
+        description="Update an existing Grafana incident in Grafana Cloud IRM (e.g. resolve upon verified recovery).",
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={
+                "incidentId": types.Schema(type="STRING", description="Incident ID to update."),
+                "status": types.Schema(type="STRING", description="Status string: active or resolved.")
+            },
+            required=["incidentId", "status"]
+        )
+    ),
+]
+
+LEGACY_GRAFANA_DECLARATION_ALIASES = [
+    types.FunctionDeclaration(
+        name="grafana_query_prometheus",
+        description="Query real-time Prometheus / Mimir QoS metrics such as VPF error rate, egress latency, and buffer health from Grafana Cloud.",
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={
+                "promql": types.Schema(type="STRING", description="The PromQL query string to execute against Grafana Cloud Prometheus.")
+            },
+            required=["promql"]
+        )
+    ),
+    types.FunctionDeclaration(
+        name="grafana_query_loki",
+        description="Query structured error logs from Grafana Cloud Loki to isolate HTTP 502 bad gateways, BGP peering drops, and DRM auth timeouts.",
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={
+                "logql": types.Schema(type="STRING", description="The LogQL query string to execute against Grafana Cloud Loki."),
+                "limit": types.Schema(type="INTEGER", description="Maximum number of log entries to retrieve (default 20).")
+            },
+            required=["logql"]
+        )
+    ),
+    types.FunctionDeclaration(
+        name="grafana_create_annotation",
+        description="Place a visible vertical annotation pin on the live Grafana Cloud dashboard documenting the autonomous incident diagnosis and fix.",
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={
+                "text": types.Schema(type="STRING", description="The descriptive annotation text."),
+                "tags": types.Schema(type="ARRAY", items=types.Schema(type="STRING"), description="List of metadata tags for the annotation.")
+            },
+            required=["text"]
+        )
+    ),
+    types.FunctionDeclaration(
+        name="grafana_create_incident",
+        description="Programmatically create a structured P1/P2 incident record in Grafana Cloud IRM.",
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={
+                "title": types.Schema(type="STRING", description="Incident title."),
+                "severity": types.Schema(type="STRING", description="Severity level: CRITICAL, MAJOR, or MINOR."),
+                "summary": types.Schema(type="STRING", description="Executive summary of the incident and impacted audience.")
+            },
+            required=["title", "severity", "summary"]
+        )
+    ),
+]
+
+# Static fallback schemas guaranteeing deterministic validation offline
 GEMINI_MCP_TOOLS = [
     types.Tool(
         function_declarations=[
-            types.FunctionDeclaration(
-                name="grafana_query_prometheus",
-                description="Query real-time Prometheus / Mimir QoS metrics such as VPF error rate, egress latency, and buffer health from Grafana Cloud.",
-                parameters=types.Schema(
-                    type="OBJECT",
-                    properties={
-                        "promql": types.Schema(type="STRING", description="The PromQL query string to execute against Grafana Cloud Prometheus.")
-                    },
-                    required=["promql"]
-                )
-            ),
-            types.FunctionDeclaration(
-                name="grafana_query_loki",
-                description="Query structured error logs from Grafana Cloud Loki to isolate HTTP 502 bad gateways, BGP peering drops, and DRM auth timeouts.",
-                parameters=types.Schema(
-                    type="OBJECT",
-                    properties={
-                        "logql": types.Schema(type="STRING", description="The LogQL query string to execute against Grafana Cloud Loki."),
-                        "limit": types.Schema(type="INTEGER", description="Maximum number of log entries to retrieve (default 20).")
-                    },
-                    required=["logql"]
-                )
-            ),
-            types.FunctionDeclaration(
-                name="grafana_create_annotation",
-                description="Place a visible vertical annotation pin on the live Grafana Cloud dashboard documenting the autonomous incident diagnosis and fix.",
-                parameters=types.Schema(
-                    type="OBJECT",
-                    properties={
-                        "text": types.Schema(type="STRING", description="The descriptive annotation text."),
-                        "tags": types.Schema(type="ARRAY", items=types.Schema(type="STRING"), description="List of metadata tags for the annotation.")
-                    },
-                    required=["text"]
-                )
-            ),
-            types.FunctionDeclaration(
-                name="grafana_create_incident",
-                description="Programmatically create a structured P1/P2 incident record in Grafana Cloud IRM.",
-                parameters=types.Schema(
-                    type="OBJECT",
-                    properties={
-                        "title": types.Schema(type="STRING", description="Incident title."),
-                        "severity": types.Schema(type="STRING", description="Severity level: CRITICAL, MAJOR, or MINOR."),
-                        "summary": types.Schema(type="STRING", description="Executive summary of the incident and impacted audience.")
-                    },
-                    required=["title", "severity", "summary"]
-                )
-            ),
-            types.FunctionDeclaration(
-                name="continuity_execute_remediation",
-                description="Execute an autonomous edge traffic failover or BGP transit rerouting across Multi-CDN providers.",
-                parameters=types.Schema(
-                    type="OBJECT",
-                    properties={
-                        "action": types.Schema(type="STRING", description="The remediation policy: SHIFT_TRAFFIC_TO_AKAMAI, FAILOVER_DRM_KEY_CLUSTER, or REROUTE_BGP_TRANSIT."),
-                        "primary_cdn_pct": types.Schema(type="INTEGER", description="Egress percentage for primary CDN (e.g. 20)."),
-                        "secondary_cdn_pct": types.Schema(type="INTEGER", description="Egress percentage for secondary CDN (e.g. 80)."),
-                        "reason": types.Schema(type="STRING", description="Technical justification for the traffic shift.")
-                    },
-                    required=["action", "primary_cdn_pct", "secondary_cdn_pct", "reason"]
-                )
-            ),
-            types.FunctionDeclaration(
-                name="continuity_verify_closed_loop_recovery",
-                description="Re-query Prometheus to verify that VPF dropped below 0.5% and forward buffer restabilized, providing falsifiable proof of resolution.",
-                parameters=types.Schema(
-                    type="OBJECT",
-                    properties={}
-                )
-            )
+            *STATIC_OFFICIAL_GRAFANA_DECLARATIONS,
+            *LEGACY_GRAFANA_DECLARATION_ALIASES,
+            *CONTINUITY_FUNCTION_DECLARATIONS,
         ]
     )
 ]
 
+async def get_gemini_tools() -> List[types.Tool]:
+    """Returns dynamic Gemini tool definitions leveraging ADK McpToolset discovered schemas with CONTINUITY fallbacks."""
+    adk_decls = await official_mcp_bridge.get_gemini_declarations()
+    if adk_decls:
+        return [
+            types.Tool(
+                function_declarations=[
+                    *adk_decls,
+                    *LEGACY_GRAFANA_DECLARATION_ALIASES,
+                    *CONTINUITY_FUNCTION_DECLARATIONS,
+                ]
+            )
+        ]
+    return GEMINI_MCP_TOOLS
+
 # Dispatcher for executing tool calls made by Gemini or client runners
 async def dispatch_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
-    """Dispatches and executes an MCP tool call by name."""
+    """Dispatches and executes an MCP tool call by name, supporting both official ADK names and legacy aliases."""
     logger.info(f"[MCP Dispatcher] Calling {name} with args {args}")
-    if name == "grafana_query_prometheus":
-        return await grafana_query_prometheus(args.get("promql", ""))
-    elif name == "grafana_query_loki":
-        return await grafana_query_loki(args.get("logql", ""), int(args.get("limit", 20)))
-    elif name == "grafana_create_annotation":
-        return await grafana_create_annotation(args.get("text", ""), args.get("tags"))
-    elif name == "grafana_create_incident":
-        return await grafana_create_incident(args.get("title", ""), args.get("severity", "CRITICAL"), args.get("summary", ""))
+    if name in ("query_prometheus", "grafana_query_prometheus"):
+        promql = args.get("expr") or args.get("promql", "")
+        return await grafana_query_prometheus(promql)
+    elif name in ("query_loki_logs", "grafana_query_loki"):
+        logql = args.get("logql") or args.get("query", "")
+        limit = int(args.get("limit", 20))
+        return await grafana_query_loki(logql, limit=limit)
+    elif name in ("create_annotation", "grafana_create_annotation"):
+        text = args.get("text", "")
+        tags = args.get("tags")
+        return await grafana_create_annotation(text, tags)
+    elif name in ("create_incident", "grafana_create_incident"):
+        title = args.get("title", "")
+        severity = args.get("severity", "CRITICAL")
+        summary = args.get("summary") or args.get("description", "")
+        return await grafana_create_incident(title, severity, summary)
+    elif name in ("update_incident", "grafana_resolve_incident"):
+        incident_id = args.get("incidentId") or args.get("incident_id", "")
+        summary = args.get("summary", "Verified closed-loop recovery.")
+        return await grafana_resolve_incident(incident_id, summary)
     elif name == "grafana_search_dashboards":
         return await grafana_search_dashboards(args.get("query", ""))
     elif name == "continuity_execute_remediation":
@@ -528,3 +688,4 @@ async def dispatch_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
         return await continuity_verify_closed_loop_recovery()
     else:
         raise ValueError(f"Unknown MCP tool: {name}")
+
