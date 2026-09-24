@@ -164,6 +164,10 @@ class ChaosStateManager:
             )
             return self.state.model_copy(deep=True)
 
+    def inject_isp_drop(self) -> ChaosState:
+        """Alias for inject_isp_peering_drop."""
+        return self.inject_isp_peering_drop()
+
     def apply_autonomous_remediation(
         self,
         action: str = "SHIFT_TRAFFIC_TO_AKAMAI",
@@ -283,6 +287,10 @@ class ChaosStateManager:
                 "INFO"
             )
             return self.state.model_copy(deep=True)
+
+    def reset(self) -> ChaosState:
+        """Alias for reset_to_normal."""
+        return self.reset_to_normal()
 
 # Global singleton instance
 chaos_manager = ChaosStateManager()

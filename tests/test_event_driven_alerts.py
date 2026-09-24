@@ -16,9 +16,9 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def reset_state():
-    chaos_manager.reset()
+    chaos_manager.reset_to_normal()
     yield
-    chaos_manager.reset()
+    chaos_manager.reset_to_normal()
 
 def test_webhook_unauthorized():
     response = client.post(
@@ -132,7 +132,7 @@ def test_webhook_failure_mode_mapping():
     assert res_drm.status_code == 200
     assert res_drm.json()["failure_mode"] == "DRM_TIMEOUT"
 
-    chaos_manager.reset()
+    chaos_manager.reset_to_normal()
 
     # ISP failure mapping
     isp_payload = {
