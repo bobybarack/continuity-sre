@@ -415,7 +415,7 @@ Call the necessary MCP tools to remediate this critical stream degradation.
 
         result = InvestigationResult(
             timestamp=time.time(),
-            incident_id=state.active_incident_id or grafana_incident_id or f"INC-{int(time.time())}",
+            incident_id=incident_id or state.active_incident_id or grafana_incident_id or f"INC-{int(time.time())}",
             failure_mode=state.failure_mode.value if state.failure_mode else "NONE",
             stream_title=STREAM_TITLE,
             initial_anomaly_detected=True,

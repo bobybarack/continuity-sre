@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routes.chaos import router as chaos_router
 from routes.telemetry import router as telemetry_router
 from routes.agent import router as agent_router
+from routes.alerts import router as alerts_router
 from services.telemetry import telemetry_engine
 from services.mcp_service import official_mcp_bridge
 from services.grafana_client import grafana_client
@@ -44,6 +45,7 @@ app.add_middleware(
 app.include_router(chaos_router)
 app.include_router(telemetry_router)
 app.include_router(agent_router)
+app.include_router(alerts_router)
 
 @app.get("/healthz")
 async def health_check():
@@ -86,7 +88,8 @@ async def root_info():
             "inject_drm_timeout": "/api/chaos/inject-drm-timeout",
             "inject_isp_drop": "/api/chaos/inject-isp-drop",
             "remediate_outage": "/api/chaos/remediate",
-            "reset_chaos": "/api/chaos/reset"
+            "reset_chaos": "/api/chaos/reset",
+            "grafana_alert_webhook": "/api/alerts/grafana"
         }
     }
 
