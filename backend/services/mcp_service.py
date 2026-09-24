@@ -146,6 +146,10 @@ class OfficialGrafanaMCPBridge:
                 self._full_toolset = self._create_toolset(tool_filter=None)
             return self._full_toolset
 
+    def get_allowed_tools(self) -> List[str]:
+        """Returns the bounded list of Grafana MCP tools exposed to the agent."""
+        return list(ALLOWED_GRAFANA_TOOLS)
+
     async def close(self):
         """Explicitly resets session state and closes ADK McpToolset sessions on shutdown."""
         self._session = None
