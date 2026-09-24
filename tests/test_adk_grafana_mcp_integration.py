@@ -147,12 +147,14 @@ async def test_continuity_native_tools_invariants():
         "data": {
             "resultType": "vector",
             "result": [
-                {"metric": {}, "value": [1700000000.0, "0.15"]}
+                {"metric": {}, "value": [1700000000.0, "0.0015"]}
             ]
         }
     }
+    chaos_manager.state.convergence_duration_sec = 0.1
+    await asyncio.sleep(0.15)
     with patch("services.mcp_service.grafana_query_prometheus", new=AsyncMock(return_value=mock_prom_recovered)):
-        verify_res = await continuity_verify_closed_loop_recovery()
+        verify_res = await continuity_verify_closed_loop_recovery(timeout_sec=1.0, poll_interval_sec=0.05)
         assert verify_res["verified"] is True
         assert verify_res["status"] == "PASSED"
 
