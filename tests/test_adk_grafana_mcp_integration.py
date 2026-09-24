@@ -138,7 +138,7 @@ async def test_continuity_native_tools_invariants():
     rem_res = await continuity_execute_remediation("SHIFT_TRAFFIC_TO_AKAMAI", 20, 80, "Primary edge down")
     assert rem_res["status"] == "APPLIED"
     state = chaos_manager.get_state()
-    assert state.current_mode == "REMEDIATING"
+    assert state.current_mode == "RECOVERING"
     assert state.lifecycle_state == "RECOVERING"
 
     # Only verification gate can mark verified recovery
@@ -162,8 +162,9 @@ async def test_continuity_native_tools_invariants():
 @pytest.mark.asyncio
 async def test_mcp_timeout_and_fallback_resilience():
     """Ensures MCP timeout or connection error degrades safely without crashing."""
+    from services.grafana_client import grafana_client
     with patch.object(official_mcp_bridge, "call_official_tool", side_effect=asyncio.TimeoutError("MCP call timed out")):
-        with patch.object(official_mcp_bridge._rest_fallback, "query_prometheus", new=AsyncMock()) as mock_rest:
+        with patch.object(grafana_client, "query_prometheus", new=AsyncMock()) as mock_rest:
             mock_rest.return_value = {
                 "status": "success",
                 "data": {"resultType": "vector", "result": []}
