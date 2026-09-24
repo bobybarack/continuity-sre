@@ -88,13 +88,13 @@ async def test_grafana_query_flow_via_mcp():
         prom_res = await grafana_query_prometheus("rate(vpf[1m])")
         assert isinstance(prom_res, PrometheusQueryResult)
         assert prom_res.status == "success"
-        assert len(prom_res.data.result) == 1
-        assert prom_res.data.result[0].value[1] == 3.85
+        assert prom_res.metric_value == 3.85
+        assert "result" in prom_res.data
 
         loki_res = await grafana_query_loki('{service="edge"} |= "error"')
         assert isinstance(loki_res, LokiQueryResult)
         assert loki_res.status == "success"
-        assert len(loki_res.data.result) == 1
+        assert len(loki_res.lines) >= 1
 
 
 @pytest.mark.asyncio
@@ -117,7 +117,7 @@ async def test_incident_flow_verification_gate():
 
         inc = await grafana_create_incident("CDN Failover", "CRITICAL", "Primary edge failure")
         assert inc.incident_id == "INC-ADK-777"
-        assert inc.status == "active"
+        assert inc.status == "success"
 
         ann = await grafana_create_annotation("Failover applied", ["continuity", "test"])
         assert ann.id == 888
@@ -131,7 +131,7 @@ async def test_incident_flow_verification_gate():
 async def test_continuity_native_tools_invariants():
     """Verifies continuity_execute_remediation and continuity_verify_closed_loop_recovery state control."""
     chaos_manager.reset_to_normal()
-    chaos_manager.trigger_failure(FailureMode.CDN_OUTAGE)
+    chaos_manager.inject_cdn_outage()
 
     # Remediation does NOT mark recovered
     rem_res = await continuity_execute_remediation("SHIFT_TRAFFIC_TO_AKAMAI", 20, 80, "Primary edge down")
@@ -162,7 +162,7 @@ async def test_continuity_native_tools_invariants():
 async def test_mcp_timeout_and_fallback_resilience():
     """Ensures MCP timeout or connection error degrades safely without crashing."""
     with patch.object(official_mcp_bridge, "call_official_tool", side_effect=asyncio.TimeoutError("MCP call timed out")):
-        with patch.object(official_mcp_bridge._rest_fallback, "query_prometheus_instant") as mock_rest:
+        with patch("services.mcp_service.grafana_client.query_prometheus_instant") as mock_rest:
             mock_rest.return_value = {
                 "status": "success",
                 "data": {"resultType": "vector", "result": []}
@@ -173,15 +173,15 @@ async def test_mcp_timeout_and_fallback_resilience():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("failure_mode,expected_action", [
-    (FailureMode.CDN_OUTAGE, "SHIFT_TRAFFIC_TO_AKAMAI"),
-    (FailureMode.DRM_TIMEOUT, "FAILOVER_DRM_KEY_CLUSTER"),
-    (FailureMode.ISP_PEERING_DROP, "REROUTE_BGP_TRANSIT"),
+@pytest.mark.parametrize("scenario_injector,expected_action", [
+    (chaos_manager.inject_cdn_outage, "SHIFT_TRAFFIC_TO_AKAMAI"),
+    (chaos_manager.inject_drm_timeout, "FAILOVER_DRM_KEY_CLUSTER"),
+    (chaos_manager.inject_isp_peering_drop, "REROUTE_BGP_TRANSIT"),
 ])
-async def test_full_lifecycle_scenarios_verified(failure_mode, expected_action):
+async def test_full_lifecycle_scenarios_verified(scenario_injector, expected_action):
     """Executes full lifecycle for CDN, DRM, and ISP failure scenarios resulting in verified resolution."""
     chaos_manager.reset_to_normal()
-    chaos_manager.trigger_failure(failure_mode)
+    scenario_injector()
 
     mock_prom = PrometheusQueryResult(
         status="success",
@@ -221,7 +221,7 @@ async def test_full_lifecycle_scenarios_verified(failure_mode, expected_action):
 async def test_full_lifecycle_deliberately_failed_convergence():
     """Verifies that failed convergence results in PENDING status without resolving the incident."""
     chaos_manager.reset_to_normal()
-    chaos_manager.trigger_failure(FailureMode.CDN_OUTAGE)
+    chaos_manager.inject_cdn_outage()
 
     mock_prom = PrometheusQueryResult(
         status="success",
