@@ -107,17 +107,25 @@ class AgentCommander:
     def is_configured(self) -> bool:
         return self.client is not None
 
-    async def investigate_and_remediate(self) -> InvestigationResult:
+    async def investigate_and_remediate(
+        self,
+        incident_id: Optional[str] = None,
+        failure_mode_override: Optional[str] = None,
+        trigger_source: str = "manual"
+    ) -> InvestigationResult:
         """Executes the multi-step Gemini SRE autonomous reasoning and remediation loop via ADK and MCP tools."""
         start_time = time.time()
         trace: List[str] = []
         mcp_tools_called: List[str] = []
         
+        if trigger_source == "grafana_alert_webhook":
+            trace.append(f"[{time.strftime('%H:%M:%S')}] Automated Event Trigger: Grafana Cloud Alert Webhook (Incident ID: {incident_id})")
+        
         snapshot = telemetry_engine.get_current_snapshot()
         state = chaos_manager.get_state()
         
         # Route initial PromQL and LogQL based on active scenario failure mode
-        failure_key = state.failure_mode.value if (state.failure_mode and state.failure_mode.value in SCENARIOS) else FailureMode.CDN_OUTAGE.value
+        failure_key = failure_mode_override or (state.failure_mode.value if (state.failure_mode and state.failure_mode.value in SCENARIOS) else FailureMode.CDN_OUTAGE.value)
         scenario = SCENARIOS.get(failure_key, SCENARIOS[FailureMode.CDN_OUTAGE.value])
         promql_query = scenario["promql"]
         logql_query = scenario["logql"]

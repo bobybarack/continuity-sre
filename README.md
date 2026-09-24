@@ -124,6 +124,19 @@ Streaming degradation
 
 ---
 
+## The Premiere Continuity Crew
+
+CONTINUITY bridges the Agentic Cinema theme with real-world OTT streaming operations by framing multi-agent incident response around authentic Hollywood production set and master control room roles:
+
+| Crew Member | On-Set Responsibility | Architectural Mapping & MCP Tools |
+| :--- | :--- | :--- |
+| **1st AD** *(First Assistant Director)* | Set commander running call sheet, directing emergency positions, and delivering post-incident wrap report. | **API Control Plane & Orchestrator**: Triggers Gemini multi-agent workflow, tracks MTTR, and calculates SLA subscriber impact. |
+| **DIT** *(Digital Imaging Technician)* | On-set technical engineer inspecting raw digital camera feeds, pixel accuracy, bitrates, and card integrity. | **Grafana Observability Ingestion**: Queries Grafana Cloud Prometheus (`grafana_query_prometheus`) and Loki (`grafana_query_loki`) for objective ground truth. |
+| **Key Grip** *(Infrastructure Rigger)* | Master of physical cabling, power distribution, and backup generator switchovers. | **Remediation Control Plane**: Executes `continuity_execute_remediation` (shifting 80% egress to secondary Akamai CDN, BGP rerouting, DRM key failover). |
+| **Continuity Supervisor** | Detail guardian ensuring zero continuity breaks between takes. | **Closed-Loop Recovery Gate**: The platform namesake enforcing `Command executed != Service recovered`. Validates downstream buffer depth and VPF before stamping `VERIFIED_RECOVERED`. |
+
+---
+
 ## Incident Lifecycle
 
 Failure type and incident lifecycle are deliberately modeled separately.
