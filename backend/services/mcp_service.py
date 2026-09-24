@@ -115,6 +115,9 @@ class OfficialGrafanaMCPBridge:
                 return str(c)
         return shutil.which("mcp-grafana")
 
+    def get_allowed_tools(self) -> List[str]:
+        return list(ALLOWED_GRAFANA_TOOLS)
+
     def _create_toolset(self, tool_filter: Optional[List[str]] = None) -> McpToolset:
         bin_path = self.get_binary_path() or "mcp-grafana"
         env = {
