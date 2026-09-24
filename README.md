@@ -610,8 +610,10 @@ continuity-sre/
 │   │   └── telemetry.py
 │   ├── services/
 │   │   ├── agent_commander.py
+│   │   ├── auth.py
 │   │   ├── chaos.py
 │   │   ├── grafana_client.py
+│   │   ├── integration_models.py
 │   │   ├── mcp_service.py
 │   │   ├── scenarios.py
 │   │   └── telemetry.py
@@ -620,9 +622,6 @@ continuity-sre/
 │   └── requirements.txt
 ├── frontend/
 ├── tests/
-├── docs/
-├── devpost-gallery/
-├── video-production/
 ├── Dockerfile
 ├── docker-compose.yml
 ├── deploy.sh

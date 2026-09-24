@@ -26,17 +26,16 @@ Thumbs.db
 
 # Internal AI agent tooling (skills, hyperframes, prompt configs)
 .agents/
+skills-lock.json
 
-# Video production pipeline (HyperFrames, capture states, render pipeline)
+# Video production & presentation assets (private/internal)
 videos/
+video-production/
+devpost-gallery/
+docs/
 
-# Internal build & utility scripts (gallery builder, screen capture, audio gen,
-# arch diagram renderer, live demo recorder, credential inspector, etc.)
+# Internal build & utility scripts
 backend/scripts/
-
-# Devpost submission draft and internal demo script
-docs/DEVPOST_SUBMISSION.md
-docs/DEMO_SCRIPT.md
 
 # Raw exported arch diagram (published via Devpost, not judge-source-of-truth)
 devpost_arch_diagram_*.jpg
