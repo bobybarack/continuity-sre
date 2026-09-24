@@ -24,15 +24,19 @@ out/
 .DS_Store
 Thumbs.db
 
-# Internal AI agent tooling (skills, hyperframes, prompt configs)
+# Internal AI agent tooling & instructions
 .agents/
 skills-lock.json
+AGENTS.md
 
 # Video production & presentation assets (private/internal)
 videos/
 video-production/
 devpost-gallery/
 docs/
+frontend/public/assets/
+frontend/public/*.png
+frontend/public/*.svg
 
 # Internal build & utility scripts
 backend/scripts/
