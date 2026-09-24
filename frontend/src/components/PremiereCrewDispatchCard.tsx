@@ -162,8 +162,9 @@ export function PremiereCrewDispatchCard({
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-mono font-bold px-1 py-0.2 rounded bg-slate-200 text-slate-800">
-                  1ST AD
+                <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-800">
+                  <Film01Icon className="w-3 h-3 text-slate-700" />
+                  <span>1ST AD</span>
                 </span>
                 <span className="text-[11px] font-bold text-gray-800">
                   Commander
@@ -198,8 +199,9 @@ export function PremiereCrewDispatchCard({
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-mono font-bold px-1 py-0.2 rounded bg-amber-100 text-amber-900">
-                  DIT
+                <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-900">
+                  <Activity01Icon className="w-3 h-3 text-amber-700" />
+                  <span>DIT</span>
                 </span>
                 <span className="text-[11px] font-bold text-gray-800">
                   Signal Scout
@@ -234,8 +236,9 @@ export function PremiereCrewDispatchCard({
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-mono font-bold px-1 py-0.2 rounded bg-sky-100 text-sky-900">
-                  KEY GRIP
+                <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-sky-100 text-sky-900">
+                  <FlashIcon className="w-3 h-3 text-sky-700" />
+                  <span>KEY GRIP</span>
                 </span>
                 <span className="text-[11px] font-bold text-gray-800">
                   Infra Rigger
@@ -272,8 +275,9 @@ export function PremiereCrewDispatchCard({
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-mono font-bold px-1 py-0.2 rounded bg-emerald-100 text-emerald-900">
-                  CONTINUITY
+                <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900">
+                  <Shield01Icon className="w-3 h-3 text-emerald-700" />
+                  <span>CONTINUITY</span>
                 </span>
                 <span className="text-[11px] font-bold text-gray-800">
                   Quality Gate
