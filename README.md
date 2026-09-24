@@ -81,14 +81,13 @@ flowchart TD
     API["FastAPI Control Plane"]
     STATE["Incident + Scenario State"]
     TELEMETRY["Canonical Telemetry Engine"]
-    BRIDGE["Grafana MCP Bridge"]
+    ADK_AGENT["Google ADK Gemini SRE Agent"]
+    MCP_TOOLSET["Google ADK McpToolset"]
     MCP["Official grafana/mcp-grafana"]
-    REST["Direct Grafana API Fallback"]
+    REST["Direct Grafana REST Client"]
     GRAFANA["Grafana Cloud"]
     PROM["Prometheus / Mimir"]
     LOKI["Loki"]
-    GEMINI["Google Gemini"]
-    TOOLS["Constrained Function Surface"]
     ACTION["Scenario-Specific Remediation"]
     VERIFY["Recovery Gate"]
 
@@ -96,18 +95,16 @@ flowchart TD
     API --> STATE
     STATE --> TELEMETRY
     TELEMETRY --> UI
-    API --> BRIDGE
-    BRIDGE -->|"stdio JSON-RPC"| MCP
+    API --> ADK_AGENT
+    ADK_AGENT -->|"Bounded tools"| MCP_TOOLSET
+    MCP_TOOLSET -->|"stdio JSON-RPC"| MCP
     MCP --> GRAFANA
-    BRIDGE -. "fallback" .-> REST
+    API -. "fallback / health" .-> REST
     REST --> GRAFANA
     GRAFANA --> PROM
     GRAFANA --> LOKI
-    API --> GEMINI
-    GEMINI -->|"Native function calls"| TOOLS
-    TOOLS --> BRIDGE
-    TOOLS --> ACTION
-    TOOLS --> VERIFY
+    ADK_AGENT --> ACTION
+    ADK_AGENT --> VERIFY
     ACTION --> STATE
     VERIFY -->|"PASSED"| RECOVERED["Verified Recovered"]
     VERIFY -->|"PENDING"| OPEN["Incident Remains Open"]
@@ -115,7 +112,14 @@ flowchart TD
 
 At a high level:
 ```
-Streaming degradation ↓ Prometheus + Loki evidence ↓ Grafana MCP ↓ Gemini reasoning ↓ Constrained remediation ↓ Recovery convergence ↓ Prometheus-backed verification ↓ PASSED / PENDING
+Streaming degradation
+  ↓ Prometheus + Loki evidence
+  ↓ Google ADK McpToolset (official mcp-grafana)
+  ↓ Gemini reasoning
+  ↓ Constrained remediation
+  ↓ Recovery convergence
+  ↓ Prometheus-backed verification
+  ↓ PASSED / PENDING
 ```
 
 ---
@@ -194,48 +198,53 @@ When degradation is detected, CONTINUITY selects observability queries based on 
 The returned Prometheus and Loki responses are included directly in Gemini's incident context alongside the structured application telemetry.
 Gemini therefore reasons over observability evidence rather than receiving only a generic description of the incident.
 
-### Official Grafana MCP Integration
+### Official Grafana MCP Integration via Google ADK
 
-CONTINUITY integrates with the official:
-`grafana/mcp-grafana`
-runtime.
+CONTINUITY integrates with the official `grafana/mcp-grafana` binary directly using Google ADK's `McpToolset`.
 
 The primary integration path is:
 ```
-CONTINUITY ↓ MCP ClientSession ↓ stdio JSON-RPC ↓ mcp-grafana ↓ Grafana Cloud
+Google ADK Gemini SRE Agent
+  ↓
+Google ADK McpToolset
+  ↓
+official grafana/mcp-grafana (stdio)
+  ↓
+Grafana Cloud (Mimir / Prometheus + Loki)
 ```
 
-The bridge can:
-- locate the installed Grafana MCP binary
-- initialize an MCP session
-- dynamically discover the available tool catalog
-- invoke supported Grafana tools
-- normalize returned results for the application
+The ADK integration:
+- configures `StdioConnectionParams` targeting the official `mcp-grafana` binary over stdio
+- applies a strict `tool_filter` bounding the tool surface exposed to Gemini
+- discovers runtime schemas directly from the MCP server without manual schema duplication
+- converts MCP tools to native Gemini function declarations via ADK reflection
+- preserves session reuse across investigation steps
 
-The discovered runtime catalog can be inspected through:
+The discovered runtime catalog and tool availability can be inspected through:
 ```http
 GET /api/agent/mcp-tools
 ```
 
-CONTINUITY uses Grafana capabilities for operations including:
+CONTINUITY uses the official Grafana MCP server for:
 - `query_prometheus`
 - `query_loki_logs`
 - `create_annotation`
 - `create_incident`
 - `update_incident`
-- `search_dashboards`
 
-The complete Grafana MCP capability surface is larger than the subset exposed to Gemini.
-That is intentional.
+The complete Grafana MCP capability surface (>60 tools) is filtered down to this bounded set before reaching the agent.
+Remediation and recovery verification remain custom CONTINUITY control plane operations:
+- `continuity_execute_remediation`
+- `continuity_verify_closed_loop_recovery`
 
-### Grafana REST Fallback
+### Direct Grafana REST Fallback
 
-CONTINUITY also includes a direct Grafana HTTP client.
-If a supported MCP operation cannot complete, the application can fall back to the corresponding Grafana API path.
+CONTINUITY preserves a direct Grafana HTTP client outside the agent's MCP path.
+If an MCP subprocess operation cannot complete or during degraded-mode operations, the control plane falls back to the corresponding Grafana REST API:
 
 ```
-Primary:  CONTINUITY ↓ mcp-grafana ↓ Grafana Cloud
-Fallback: CONTINUITY ↓ Grafana HTTP Client ↓ Grafana Cloud
+Primary:  Gemini / ADK Agent ↓ McpToolset ↓ mcp-grafana (stdio) ↓ Grafana Cloud
+Fallback: CONTINUITY Engine ↓ Direct Grafana REST Client ↓ Grafana Cloud
 ```
 
 The HTTP client uses connection pooling and retry handling for transient network/server failures.
