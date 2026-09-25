@@ -293,55 +293,68 @@ Call the necessary MCP tools to remediate this critical stream degradation.
         verify_res = None
         decision_rca = None
 
-        # Fetch dynamic tools derived directly from ADK McpToolset
-        dynamic_gemini_tools = await get_gemini_tools()
+        # Execute Gemini reasoning if client is configured
+        if self.client:
+            dynamic_gemini_tools = await get_gemini_tools()
 
-        for model in FALLBACK_MODELS:
-            try:
-                def _sync_generate(m=model):
-                    return self.client.models.generate_content(
-                        model=m,
-                        contents=prompt,
-                        config=types.GenerateContentConfig(
-                            tools=dynamic_gemini_tools,
-                            temperature=0.2
+            for model in FALLBACK_MODELS:
+                try:
+                    if hasattr(self.client, "aio") and hasattr(self.client.aio, "models"):
+                        response = await asyncio.wait_for(
+                            self.client.aio.models.generate_content(
+                                model=model,
+                                contents=prompt,
+                                config=types.GenerateContentConfig(
+                                    tools=dynamic_gemini_tools,
+                                    temperature=0.2
+                                )
+                            ),
+                            timeout=9.0
                         )
-                    )
+                    else:
+                        def _sync_generate(m=model):
+                            return self.client.models.generate_content(
+                                model=m,
+                                contents=prompt,
+                                config=types.GenerateContentConfig(
+                                    tools=dynamic_gemini_tools,
+                                    temperature=0.2
+                                )
+                            )
+                        response = await asyncio.wait_for(asyncio.to_thread(_sync_generate), timeout=9.0)
+                    trace.append(f"[{time.strftime('%H:%M:%S')}] Gemini Model [{model}] multi-step reasoning completed successfully.")
 
-                response = await asyncio.wait_for(asyncio.to_thread(_sync_generate), timeout=9.0)
-                trace.append(f"[{time.strftime('%H:%M:%S')}] Gemini Model [{model}] multi-step reasoning completed successfully.")
+                    if response.function_calls:
+                        for fc in response.function_calls:
+                            tool_name = fc.name
+                            tool_args = fc.args or {}
+                            mcp_tools_called.append(tool_name)
+                            trace.append(f"[{time.strftime('%H:%M:%S')}] Gemini Autonomous Tool Call [{tool_name}]: {json.dumps(tool_args)}")
+                            tool_result = await dispatch_mcp_tool(tool_name, tool_args)
+                            trace.append(f"[{time.strftime('%H:%M:%S')}] Tool [{tool_name}] Result: {str(tool_result)[:120]}")
 
-                if response.function_calls:
-                    for fc in response.function_calls:
-                        tool_name = fc.name
-                        tool_args = fc.args or {}
-                        mcp_tools_called.append(tool_name)
-                        trace.append(f"[{time.strftime('%H:%M:%S')}] Gemini Autonomous Tool Call [{tool_name}]: {json.dumps(tool_args)}")
-                        tool_result = await dispatch_mcp_tool(tool_name, tool_args)
-                        trace.append(f"[{time.strftime('%H:%M:%S')}] Tool [{tool_name}] Result: {str(tool_result)[:120]}")
+                            if tool_name == "continuity_execute_remediation":
+                                remediation_res = tool_result
+                                remediation_action = tool_args.get("action", "SHIFT_TRAFFIC_TO_AKAMAI")
+                                decision_rca = tool_args.get("reason")
+                            elif tool_name in ("create_incident", "grafana_create_incident"):
+                                incident_res = tool_result
+                                grafana_incident_id = getattr(tool_result, "incident_id", None) or (tool_result.get("incident_id") or tool_result.get("id") if isinstance(tool_result, dict) else None)
+                            elif tool_name in ("create_annotation", "grafana_create_annotation"):
+                                annotation_resp = tool_result
+                                annotation_id = getattr(tool_result, "id", None) or (tool_result.get("id") if isinstance(tool_result, dict) else None)
+                            elif tool_name == "continuity_verify_closed_loop_recovery":
+                                verify_res = tool_result
 
-                        if tool_name == "continuity_execute_remediation":
-                            remediation_res = tool_result
-                            remediation_action = tool_args.get("action", "SHIFT_TRAFFIC_TO_AKAMAI")
-                            decision_rca = tool_args.get("reason")
-                        elif tool_name in ("create_incident", "grafana_create_incident"):
-                            incident_res = tool_result
-                            grafana_incident_id = getattr(tool_result, "incident_id", None) or (tool_result.get("incident_id") or tool_result.get("id") if isinstance(tool_result, dict) else None)
-                        elif tool_name in ("create_annotation", "grafana_create_annotation"):
-                            annotation_resp = tool_result
-                            annotation_id = getattr(tool_result, "id", None) or (tool_result.get("id") if isinstance(tool_result, dict) else None)
-                        elif tool_name == "continuity_verify_closed_loop_recovery":
-                            verify_res = tool_result
+                    if response.text:
+                        try:
+                            decision = json.loads(response.text)
+                        except Exception:
+                            pass
 
-                if response.text:
-                    try:
-                        decision = json.loads(response.text)
-                    except Exception:
-                        pass
-
-                break
-            except Exception as e:
-                logger.warning(f"Model {model} tool calling attempt failed: {e}. Trying fallback...")
+                    break
+                except Exception as e:
+                    logger.warning(f"Model {model} tool calling attempt failed: {e}. Trying fallback...")
 
         # Grounded audience SLA impact calculated from active viewers and measured VPF failure rate
         impacted_audience = int(snapshot.active_viewers * (snapshot.video_playback_failures_pct / 100.0))

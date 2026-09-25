@@ -98,6 +98,7 @@ class OfficialGrafanaMCPBridge:
     """Manages stdio sessions to the official grafana/mcp-grafana runtime server via Google ADK McpToolset."""
     def __init__(self):
         self.cached_tools: List[Dict[str, Any]] = []
+        self._cached_declarations: Optional[List[types.FunctionDeclaration]] = None
         self._session: Optional[ClientSession] = None
         self._toolset: Optional[McpToolset] = None
         self._full_toolset: Optional[McpToolset] = None
@@ -157,6 +158,7 @@ class OfficialGrafanaMCPBridge:
     async def close(self):
         """Explicitly resets session state and closes ADK McpToolset sessions on shutdown."""
         self._session = None
+        self._cached_declarations = None
         if self._toolset is not None:
             try:
                 await self._toolset.close()
@@ -254,6 +256,8 @@ class OfficialGrafanaMCPBridge:
 
     async def get_gemini_declarations(self) -> List[types.FunctionDeclaration]:
         """Discovers official Grafana MCP tool schemas via Google ADK McpToolset and converts to Gemini FunctionDeclarations."""
+        if self._cached_declarations is not None:
+            return self._cached_declarations
         try:
             toolset = self.get_toolset(restricted=True)
             tools = await asyncio.wait_for(toolset.get_tools(), timeout=self.init_timeout)
@@ -261,6 +265,8 @@ class OfficialGrafanaMCPBridge:
             for t in tools:
                 if hasattr(t, "_get_declaration"):
                     decls.append(t._get_declaration())
+            if decls:
+                self._cached_declarations = decls
             return decls
         except Exception as e:
             logger.warning(f"[Official MCP] Failed to retrieve ADK tool declarations: {e}")
@@ -501,14 +507,16 @@ async def _evaluate_single_recovery_sample() -> Dict[str, Any]:
     }
 
 async def continuity_verify_closed_loop_recovery(
-    timeout_sec: float = 5.0,
-    poll_interval_sec: float = 0.25,
+    timeout_sec: Optional[float] = None,
+    poll_interval_sec: Optional[float] = None,
     transaction_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """Executes a closed-loop falsifiable recovery verification query against Prometheus and client telemetry with convergence polling."""
-    logger.info(f"[MCP Tool] Verifying closed-loop recovery (timeout={timeout_sec}s, poll={poll_interval_sec}s)...")
+    eff_timeout = timeout_sec if timeout_sec is not None else float(os.getenv("CONTINUITY_VERIFY_TIMEOUT_SEC", "5.0"))
+    eff_poll = poll_interval_sec if poll_interval_sec is not None else float(os.getenv("CONTINUITY_VERIFY_POLL_INTERVAL_SEC", "0.25"))
+    logger.info(f"[MCP Tool] Verifying closed-loop recovery (timeout={eff_timeout}s, poll={eff_poll}s)...")
     loop = asyncio.get_event_loop()
-    deadline = loop.time() + timeout_sec
+    deadline = loop.time() + eff_timeout
     last_evidence: Dict[str, Any] = {}
 
     pre_snapshot = transaction_manager.build_health_snapshot()
@@ -531,10 +539,10 @@ async def continuity_verify_closed_loop_recovery(
                 evidence["remediation_transaction_id"] = active_tx.transaction_id
             return evidence
             
-        if loop.time() + poll_interval_sec > deadline:
+        if loop.time() + eff_poll > deadline:
             break
             
-        await asyncio.sleep(poll_interval_sec)
+        await asyncio.sleep(eff_poll)
 
     active_tx = transaction_manager.get_transaction(transaction_id) if transaction_id else transaction_manager.get_active_transaction()
     if active_tx:

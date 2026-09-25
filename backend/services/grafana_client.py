@@ -27,22 +27,40 @@ class GrafanaCloudClient:
 
     async def get_client(self) -> httpx.AsyncClient:
         """Returns or lazily creates a shared persistent httpx.AsyncClient with connection pooling."""
-        if self._client is None or self._client.is_closed:
-            async with self._lock:
-                if self._client is None or self._client.is_closed:
-                    self._client = httpx.AsyncClient(
-                        timeout=10.0,
-                        headers=self.headers,
-                        limits=httpx.Limits(max_keepalive_connections=10, max_connections=20)
-                    )
+        try:
+            running_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            running_loop = None
+
+        if (
+            self._client is None
+            or self._client.is_closed
+            or (getattr(self, "_loop", None) is not None and getattr(self, "_loop", None) is not running_loop)
+        ):
+            if self._client and not self._client.is_closed:
+                try:
+                    await self._client.aclose()
+                except Exception:
+                    pass
+            self._loop = running_loop
+            self._client = httpx.AsyncClient(
+                timeout=10.0,
+                headers=self.headers,
+                limits=httpx.Limits(max_keepalive_connections=10, max_connections=20)
+            )
+        elif getattr(self, "_loop", None) is None:
+            self._loop = running_loop
         return self._client
 
     async def close(self):
         """Cleanly terminates the underlying connection pool on application shutdown."""
-        async with self._lock:
-            if self._client and not self._client.is_closed:
+        if self._client and not self._client.is_closed:
+            try:
                 await self._client.aclose()
-                self._client = None
+            except Exception:
+                pass
+            self._client = None
+            self._loop = None
 
     async def _execute_with_retry(self, method: str, url: str, **kwargs) -> httpx.Response:
         """Executes an HTTP request with exponential backoff retries using the shared pooled client."""
