@@ -20,6 +20,7 @@ from services.integration_models import (
     GrafanaIncidentRef,
     GrafanaAnnotationRef
 )
+from services.transaction_manager import transaction_manager
 from services.mcp_service import (
     GEMINI_MCP_TOOLS,
     get_gemini_tools,
@@ -79,6 +80,12 @@ class InvestigationResult(BaseModel):
     verification_status: Optional[str] = "PENDING"
     verification_source: Optional[str] = None
     verification_authoritative: bool = False
+    remediation_transaction_id: Optional[str] = None
+    idempotency_key: Optional[str] = None
+    rollback_action: Optional[str] = None
+    rollback_status: Optional[str] = None
+    recovery_proof: Optional[Dict[str, Any]] = None
+    escalation_package: Optional[Dict[str, Any]] = None
 
 class AgentCommander:
     def __init__(self):
@@ -371,11 +378,22 @@ Call the necessary MCP tools to remediate this critical stream degradation.
         verify_source = verify_res.get("prometheus_source", "none") if isinstance(verify_res, dict) else "none"
         is_authoritative = verify_res.get("prometheus_authoritative", False) if isinstance(verify_res, dict) else False
 
+        tx_id = remediation_res.get("transaction_id") if isinstance(remediation_res, dict) else None
+        idempotency_key = remediation_res.get("idempotency_key") if isinstance(remediation_res, dict) else None
+        rollback_action = remediation_res.get("rollback_action") if isinstance(remediation_res, dict) else None
+        proof_data = verify_res.get("recovery_proof") if isinstance(verify_res, dict) else None
+        rollback_happened = verify_res.get("rollback_executed", False) if isinstance(verify_res, dict) else False
+
+        effective_inc_id = incident_id or state.active_incident_id or grafana_incident_id or f"INC-{int(time.time())}"
+        escalation_obj = transaction_manager.get_escalation(effective_inc_id)
+        escalation_data = escalation_obj.model_dump() if escalation_obj else None
+
         if is_verified and gate_status == "PASSED":
             chaos_manager.mark_verified_recovered(verify_res if isinstance(verify_res, dict) else {})
             mttr_value = elapsed
             workflow_status = "RESOLVED"
             remediation_status = "SUCCESS"
+            rollback_status = "NONE"
 
             # Synchronize Grafana IRM incident lifecycle: resolve incident only after verification passes
             if grafana_incident_id:
@@ -398,12 +416,19 @@ Call the necessary MCP tools to remediate this critical stream degradation.
         else:
             chaos_manager.mark_recovery_failed("Closed-loop verification pending or incomplete", details=verify_res if isinstance(verify_res, dict) else {})
             mttr_value = None
-            workflow_status = "PENDING_VERIFICATION"
-            remediation_status = "PENDING_CONVERGENCE"
+            if rollback_happened:
+                workflow_status = "ESCALATED"
+                remediation_status = "ROLLED_BACK"
+                rollback_status = "EXECUTED"
+                trace.append(f"[{time.strftime('%H:%M:%S')}] ROLLBACK EXECUTED: Reverted via {rollback_action or 'safe snapshot'}. Escalation package assembled.")
+            else:
+                workflow_status = "PENDING_VERIFICATION"
+                remediation_status = "PENDING_CONVERGENCE"
+                rollback_status = "PENDING"
 
-            # Do NOT resolve Grafana IRM incident while verification is PENDING
+            # Do NOT resolve Grafana IRM incident while verification is PENDING or FAILED
             if grafana_incident_id:
-                trace.append(f"[{time.strftime('%H:%M:%S')}] Grafana IRM Incident {grafana_incident_id} remains ACTIVE (Verification Gate: PENDING).")
+                trace.append(f"[{time.strftime('%H:%M:%S')}] Grafana IRM Incident {grafana_incident_id} remains ACTIVE (Verification Gate: PENDING/ESCALATED).")
 
             trace.append(
                 f"[{time.strftime('%H:%M:%S')}] CLOSED-LOOP VERIFICATION PENDING: Stream QoE metrics have not yet crossed recovery SLA threshold. "
@@ -411,11 +436,11 @@ Call the necessary MCP tools to remediate this critical stream degradation.
                 f"Verification Gate: PENDING (Source: {verify_source})."
             )
             trace.append(f"[{time.strftime('%H:%M:%S')}] Closed-loop verification pending at {elapsed}s. Awaiting telemetry convergence; incident not marked resolved.")
-            exec_summary = f"Autonomous remediation applied; closed-loop recovery verification is PENDING (VPF={verified_vpf}%, Buffer={verified_buffer}s). Incident not yet marked resolved."
+            exec_summary = f"Autonomous remediation applied; closed-loop recovery verification is PENDING/ESCALATED (VPF={verified_vpf}%, Buffer={verified_buffer}s). Incident not marked resolved."
 
         result = InvestigationResult(
             timestamp=time.time(),
-            incident_id=incident_id or state.active_incident_id or grafana_incident_id or f"INC-{int(time.time())}",
+            incident_id=effective_inc_id,
             failure_mode=state.failure_mode.value if state.failure_mode else "NONE",
             stream_title=STREAM_TITLE,
             initial_anomaly_detected=True,
@@ -449,7 +474,13 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             verified_latency_ms=verified_latency,
             verification_status=gate_status,
             verification_source=verify_source,
-            verification_authoritative=is_authoritative
+            verification_authoritative=is_authoritative,
+            remediation_transaction_id=tx_id,
+            idempotency_key=idempotency_key,
+            rollback_action=rollback_action,
+            rollback_status=rollback_status,
+            recovery_proof=proof_data,
+            escalation_package=escalation_data
         )
 
         self._record_result(result)

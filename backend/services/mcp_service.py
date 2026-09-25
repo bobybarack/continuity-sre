@@ -23,6 +23,7 @@ from config import (
 from services.grafana_client import grafana_client
 from services.chaos import chaos_manager
 from services.telemetry import telemetry_engine
+from services.transaction_manager import transaction_manager
 from services.integration_models import (
     PrometheusQueryResult,
     LokiQueryResult,
@@ -364,16 +365,28 @@ async def grafana_search_dashboards(query: str = "") -> Dict[str, Any]:
     return await grafana_client.search_dashboards(query)
 
 
-async def continuity_execute_remediation(action: str, primary_cdn_pct: int = 20, secondary_cdn_pct: int = 80, reason: str = "") -> Dict[str, Any]:
-    """Executes autonomous multi-CDN egress traffic failover, DRM cluster switch, or BGP transit rerouting."""
+async def continuity_execute_remediation(
+    action: str,
+    primary_cdn_pct: int = 20,
+    secondary_cdn_pct: int = 80,
+    reason: str = "",
+    incident_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """Executes autonomous multi-CDN egress traffic failover, DRM cluster switch, or BGP transit rerouting as an idempotent transaction."""
     logger.info(f"[MCP Tool] Executing autonomous remediation: {action} (Primary={primary_cdn_pct}%, Secondary={secondary_cdn_pct}%)")
-    updated_state = chaos_manager.apply_autonomous_remediation(
+    inc_id = incident_id or chaos_manager.get_state().active_incident_id or f"INC-{int(time.time())}"
+    tx, was_newly_applied = transaction_manager.execute_transaction(
+        incident_id=inc_id,
         action=action,
         primary_cdn_pct=primary_cdn_pct,
         secondary_cdn_pct=secondary_cdn_pct
     )
+    updated_state = chaos_manager.get_state()
     return {
-        "status": "APPLIED",
+        "status": tx.status,
+        "transaction_id": tx.transaction_id,
+        "idempotency_key": tx.idempotency_key,
+        "rollback_action": tx.rollback_action,
         "action": action,
         "primary_cdn": updated_state.primary_cdn,
         "primary_cdn_traffic_pct": updated_state.primary_cdn_traffic_pct,
@@ -382,7 +395,9 @@ async def continuity_execute_remediation(action: str, primary_cdn_pct: int = 20,
         "active_drm_cluster": updated_state.active_drm_cluster,
         "active_transit_route": updated_state.active_transit_route,
         "reason": reason,
-        "timestamp": time.time()
+        "was_newly_applied": was_newly_applied,
+        "previous_state": tx.previous_state,
+        "timestamp": tx.applied_at
     }
 
 async def _evaluate_single_recovery_sample() -> Dict[str, Any]:
@@ -485,7 +500,8 @@ async def _evaluate_single_recovery_sample() -> Dict[str, Any]:
 
 async def continuity_verify_closed_loop_recovery(
     timeout_sec: float = 5.0,
-    poll_interval_sec: float = 0.25
+    poll_interval_sec: float = 0.25,
+    transaction_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """Executes a closed-loop falsifiable recovery verification query against Prometheus and client telemetry with convergence polling."""
     logger.info(f"[MCP Tool] Verifying closed-loop recovery (timeout={timeout_sec}s, poll={poll_interval_sec}s)...")
@@ -493,11 +509,24 @@ async def continuity_verify_closed_loop_recovery(
     deadline = loop.time() + timeout_sec
     last_evidence: Dict[str, Any] = {}
 
+    pre_snapshot = transaction_manager.build_health_snapshot()
+
     while True:
         evidence = await _evaluate_single_recovery_sample()
         last_evidence = evidence
         
         if evidence.get("verified", False) and evidence.get("status") == "PASSED":
+            active_tx = transaction_manager.get_transaction(transaction_id) if transaction_id else transaction_manager.get_active_transaction()
+            if active_tx:
+                proof = transaction_manager.verify_and_commit(
+                    transaction_id=active_tx.transaction_id,
+                    pre_action_snapshot=pre_snapshot,
+                    verification_source=evidence.get("prometheus_source", "Grafana Cloud Prometheus"),
+                    authoritative=evidence.get("prometheus_authoritative", True)
+                )
+                evidence["recovery_proof"] = proof.model_dump()
+                evidence["transaction_status"] = "COMMITTED"
+                evidence["remediation_transaction_id"] = active_tx.transaction_id
             return evidence
             
         if loop.time() + poll_interval_sec > deadline:
@@ -505,7 +534,41 @@ async def continuity_verify_closed_loop_recovery(
             
         await asyncio.sleep(poll_interval_sec)
 
+    active_tx = transaction_manager.get_transaction(transaction_id) if transaction_id else transaction_manager.get_active_transaction()
+    if active_tx:
+        proof = transaction_manager.verify_and_commit(
+            transaction_id=active_tx.transaction_id,
+            pre_action_snapshot=pre_snapshot,
+            verification_source=last_evidence.get("prometheus_source", "none"),
+            authoritative=last_evidence.get("prometheus_authoritative", False)
+        )
+        last_evidence["recovery_proof"] = proof.model_dump()
+        last_evidence["transaction_status"] = "ROLLED_BACK"
+        last_evidence["remediation_transaction_id"] = active_tx.transaction_id
+        last_evidence["status"] = "PENDING"
+        last_evidence["verified"] = False
+        last_evidence["rollback_executed"] = True
+
     return last_evidence
+
+async def continuity_rollback_remediation(transaction_id: str) -> Dict[str, Any]:
+    """Rolls back a remediation transaction to its previous safe state snapshot."""
+    tx = transaction_manager.rollback_transaction(transaction_id)
+    return {
+        "status": tx.status,
+        "transaction_id": tx.transaction_id,
+        "rollback_action": tx.rollback_action,
+        "restored_state": tx.previous_state
+    }
+
+async def continuity_escalate_incident(incident_id: str, reason: str = "Unrecoverable incident") -> Dict[str, Any]:
+    """Escalates an unrecoverable incident to human operator with full diagnostic dossier."""
+    pkg = transaction_manager.create_escalation_package(
+        incident_id=incident_id,
+        diagnosis=reason,
+        failed_gates=["Manual or policy-based escalation trigger"]
+    )
+    return pkg.model_dump()
 
 # Continuous CONTINUITY-owned tools (never delegated to Grafana MCP)
 CONTINUITY_FUNCTION_DECLARATIONS = [
@@ -529,6 +592,29 @@ CONTINUITY_FUNCTION_DECLARATIONS = [
         parameters=types.Schema(
             type="OBJECT",
             properties={}
+        )
+    ),
+    types.FunctionDeclaration(
+        name="continuity_rollback_remediation",
+        description="Roll back a previous remediation transaction if health gates fail, restoring pre-action infrastructure snapshot.",
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={
+                "transaction_id": types.Schema(type="STRING", description="The ID of the transaction to roll back.")
+            },
+            required=["transaction_id"]
+        )
+    ),
+    types.FunctionDeclaration(
+        name="continuity_escalate_incident",
+        description="Escalate an unrecoverable incident to human SRE with an automated diagnostic package.",
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={
+                "incident_id": types.Schema(type="STRING", description="The active incident ID to escalate."),
+                "reason": types.Schema(type="STRING", description="Detailed technical reason for human escalation.")
+            },
+            required=["incident_id", "reason"]
         )
     )
 ]
@@ -708,6 +794,13 @@ async def dispatch_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
         )
     elif name == "continuity_verify_closed_loop_recovery":
         return await continuity_verify_closed_loop_recovery()
+    elif name == "continuity_rollback_remediation":
+        return await continuity_rollback_remediation(args.get("transaction_id", ""))
+    elif name == "continuity_escalate_incident":
+        return await continuity_escalate_incident(
+            incident_id=args.get("incident_id", ""),
+            reason=args.get("reason", "Autonomous escalation triggered")
+        )
     else:
         raise ValueError(f"Unknown MCP tool: {name}")
 

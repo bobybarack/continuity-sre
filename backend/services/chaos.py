@@ -254,6 +254,46 @@ class ChaosStateManager:
             )
             return self.state.model_copy(deep=True)
 
+    def apply_rollback(
+        self,
+        previous_state: Dict[str, Any],
+        action: str = "RESTORE_PREVIOUS_STATE"
+    ) -> ChaosState:
+        """Restores previous infrastructure snapshot upon failed or rejected remediation (Thread-Safe)."""
+        with self._lock:
+            if "primary_cdn_traffic_pct" in previous_state:
+                self.state.primary_cdn_traffic_pct = previous_state["primary_cdn_traffic_pct"]
+            if "secondary_cdn_traffic_pct" in previous_state:
+                self.state.secondary_cdn_traffic_pct = previous_state["secondary_cdn_traffic_pct"]
+            if "edge_route_status" in previous_state:
+                self.state.edge_route_status = previous_state["edge_route_status"]
+            if "active_drm_cluster" in previous_state:
+                self.state.active_drm_cluster = previous_state["active_drm_cluster"]
+            if "primary_drm_cluster_status" in previous_state:
+                self.state.primary_drm_cluster_status = previous_state["primary_drm_cluster_status"]
+            if "secondary_drm_cluster_status" in previous_state:
+                self.state.secondary_drm_cluster_status = previous_state["secondary_drm_cluster_status"]
+            if "active_transit_route" in previous_state:
+                self.state.active_transit_route = previous_state["active_transit_route"]
+            if "primary_transit_status" in previous_state:
+                self.state.primary_transit_status = previous_state["primary_transit_status"]
+            if "secondary_transit_status" in previous_state:
+                self.state.secondary_transit_status = previous_state["secondary_transit_status"]
+            if "packet_loss_pct" in previous_state:
+                self.state.packet_loss_pct = previous_state["packet_loss_pct"]
+
+            self.state.lifecycle = IncidentLifecycle.ESCALATED
+            self.state.is_outage_active = True
+            self.state.remediation_action_applied = f"ROLLED_BACK:{action}"
+
+            self._record_event(
+                "REMEDIATION_ROLLED_BACK",
+                f"Autonomous rollback executed: {action}. Pre-action snapshot state restored.",
+                "WARNING",
+                {"rollback_action": action, "restored_state": previous_state}
+            )
+            return self.state.model_copy(deep=True)
+
     def reset_to_normal(self) -> ChaosState:
         """Restores healthy baseline operation (Thread-Safe)."""
         with self._lock:

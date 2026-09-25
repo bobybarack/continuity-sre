@@ -56,6 +56,12 @@ export interface InvestigationResult {
   verification_status?: string;
   verification_source?: string | null;
   verification_authoritative?: boolean;
+  remediation_transaction_id?: string | null;
+  idempotency_key?: string | null;
+  rollback_action?: string | null;
+  rollback_status?: string | null;
+  recovery_proof?: Record<string, unknown> | null;
+  escalation_package?: Record<string, unknown> | null;
 }
 
 export interface GrafanaHealth {
