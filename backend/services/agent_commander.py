@@ -21,6 +21,8 @@ from services.integration_models import (
     GrafanaAnnotationRef
 )
 from services.transaction_manager import transaction_manager
+from services.telemetry import PROM_AGENT_GEMINI_LATENCY
+from services.remediation_models import DiagnosisClaim, EvidenceReference
 from services.mcp_service import (
     GEMINI_MCP_TOOLS,
     get_gemini_tools,
@@ -86,11 +88,15 @@ class InvestigationResult(BaseModel):
     rollback_status: Optional[str] = None
     recovery_proof: Optional[Dict[str, Any]] = None
     escalation_package: Optional[Dict[str, Any]] = None
+    diagnosis_claims: List[Dict[str, Any]] = Field(default_factory=list)
 
 class AgentCommander:
     def __init__(self):
         self.api_key = GEMINI_API_KEY
         self.model_name = GEMINI_MODEL
+        self._incident_locks: Dict[str, asyncio.Lock] = {}
+        self._guard_lock = asyncio.Lock()
+        self._active_incidents: set[str] = set()
         self.client = genai.Client(api_key=self.api_key) if self.api_key else None
         self.history: List[InvestigationResult] = []
         self.max_history_len = 30
@@ -114,6 +120,17 @@ class AgentCommander:
     def is_configured(self) -> bool:
         return self.client is not None
 
+    async def _get_incident_lock(self, incident_id: str) -> asyncio.Lock:
+        async with self._guard_lock:
+            if incident_id not in self._incident_locks:
+                self._incident_locks[incident_id] = asyncio.Lock()
+                if len(self._incident_locks) > 100:
+                    keys = list(self._incident_locks.keys())[:-50]
+                    for k in keys:
+                        if k != incident_id and not self._incident_locks[k].locked():
+                            self._incident_locks.pop(k, None)
+            return self._incident_locks[incident_id]
+
     async def investigate_and_remediate(
         self,
         incident_id: Optional[str] = None,
@@ -122,6 +139,36 @@ class AgentCommander:
     ) -> InvestigationResult:
         """Executes the multi-step Gemini SRE autonomous reasoning and remediation loop via ADK and MCP tools."""
         start_time = time.time()
+        actual_incident_id = incident_id or f"INC-{int(start_time * 1000)}"
+        incident_lock = await self._get_incident_lock(actual_incident_id)
+
+        async with incident_lock:
+            for past_res in self.history:
+                if past_res.incident_id == actual_incident_id and past_res.workflow_status in ("COMPLETED", "RESOLVED", "RECOVERED", "ESCALATED"):
+                    logger.info(f"[Agent Commander] Returning existing result for incident {actual_incident_id}")
+                    return past_res
+
+            async with self._guard_lock:
+                self._active_incidents.add(actual_incident_id)
+            try:
+                return await self._run_investigation(
+                    incident_id=actual_incident_id,
+                    failure_mode_override=failure_mode_override,
+                    trigger_source=trigger_source,
+                    start_time=start_time
+                )
+            finally:
+                async with self._guard_lock:
+                    self._active_incidents.discard(actual_incident_id)
+
+    async def _run_investigation(
+        self,
+        incident_id: str,
+        failure_mode_override: Optional[str] = None,
+        trigger_source: str = "manual",
+        start_time: float = 0.0
+    ) -> InvestigationResult:
+        start_time = start_time or time.time()
         trace: List[str] = []
         mcp_tools_called: List[str] = []
         
@@ -438,6 +485,46 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             trace.append(f"[{time.strftime('%H:%M:%S')}] Closed-loop verification pending at {elapsed}s. Awaiting telemetry convergence; incident not marked resolved.")
             exec_summary = f"Autonomous remediation applied; closed-loop recovery verification is PENDING/ESCALATED (VPF={verified_vpf}%, Buffer={verified_buffer}s). Incident not marked resolved."
 
+        # Phase 9: Structured Evidence-Addressed Diagnosis
+        diagnosis_claims_data: List[Dict[str, Any]] = []
+        try:
+            ev_list = [
+                EvidenceReference(
+                    query_type="promql",
+                    query=promql_query,
+                    target_metric="ott_video_playback_failures_ratio" if failure_key in (FailureMode.CDN_OUTAGE.value, FailureMode.SECONDARY_PATH_DEGRADED.value) else ("ott_drm_handshake_ms" if failure_key == FailureMode.DRM_TIMEOUT.value else "ott_stream_bitrate_mbps"),
+                    observed_value=snapshot.video_playback_failures_pct if failure_key in (FailureMode.CDN_OUTAGE.value, FailureMode.SECONDARY_PATH_DEGRADED.value) else (snapshot.drm_handshake_ms if failure_key == FailureMode.DRM_TIMEOUT.value else snapshot.avg_bitrate_mbps),
+                    threshold="> 1.0%" if failure_key in (FailureMode.CDN_OUTAGE.value, FailureMode.SECONDARY_PATH_DEGRADED.value) else ("> 500.0ms" if failure_key == FailureMode.DRM_TIMEOUT.value else "< 10.0 Mbps"),
+                    status="BREACHED" if is_anomaly else "NORMAL"
+                ),
+                EvidenceReference(
+                    query_type="logql",
+                    query=logql_query,
+                    target_metric="edge_log_stream",
+                    observed_value=snapshot.latest_log,
+                    threshold="Upstream/transit failure pattern",
+                    status="BREACHED" if any(w in snapshot.latest_log for w in ["502", "Timeout", "loss", "refused"]) else "NORMAL"
+                )
+            ]
+            claim_obj = DiagnosisClaim(
+                subsystem=scenario_subsystems[0] if scenario_subsystems else "Edge CDN",
+                claim=decision.get("root_cause_analysis", "Service degradation identified via telemetry correlation"),
+                evidence=ev_list,
+                confidence=0.98 if is_anomaly else 0.50
+            )
+            diagnosis_claims_data.append(claim_obj.model_dump())
+        except Exception as e:
+            logger.warning(f"Error constructing diagnosis claims: {e}")
+
+        # Phase 8: Record Gemini latency
+        try:
+            PROM_AGENT_GEMINI_LATENCY.labels(
+                model=self.model_name,
+                trigger_source=trigger_source
+            ).observe(time.time() - start_time)
+        except Exception:
+            pass
+
         result = InvestigationResult(
             timestamp=time.time(),
             incident_id=effective_inc_id,
@@ -480,7 +567,8 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             rollback_action=rollback_action,
             rollback_status=rollback_status,
             recovery_proof=proof_data,
-            escalation_package=escalation_data
+            escalation_package=escalation_data,
+            diagnosis_claims=diagnosis_claims_data
         )
 
         self._record_result(result)

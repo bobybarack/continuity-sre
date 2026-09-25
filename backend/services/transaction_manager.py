@@ -3,7 +3,13 @@ import uuid
 import logging
 from typing import Dict, Any, List, Optional, Tuple
 from services.chaos import chaos_manager, FailureMode, IncidentLifecycle, ChaosState
-from services.telemetry import telemetry_engine
+from services.telemetry import (
+    telemetry_engine,
+    PROM_AGENT_REMEDIATIONS,
+    PROM_AGENT_ROLLBACKS,
+    PROM_AGENT_ESCALATIONS,
+    PROM_AGENT_VERIFICATION_GATE_OUTCOME
+)
 from services.remediation_models import (
     RemediationTransaction,
     HealthSnapshot,
@@ -96,11 +102,13 @@ class TransactionManager:
 
         rollback_action = self.get_rollback_action(action)
         tx_id = f"tx-{uuid.uuid4().hex[:12]}"
+        failure_mode_str = current_chaos.failure_mode.value if current_chaos.failure_mode else "UNKNOWN"
 
         tx = RemediationTransaction(
             transaction_id=tx_id,
             incident_id=incident_id,
             action=action,
+            failure_mode=failure_mode_str,
             previous_state=previous_state,
             intended_state={
                 "action": action,
@@ -169,7 +177,7 @@ class TransactionManager:
         ))
 
         # Scenario-specific gate
-        if failure_mode == FailureMode.CDN_OUTAGE:
+        if failure_mode in (FailureMode.CDN_OUTAGE, FailureMode.SECONDARY_PATH_DEGRADED):
             lat_val = snapshot.cdn_latency_ms or 0.0
             lat_passed = lat_val <= 150.0
             gates.append(RecoveryGateResult(
@@ -221,9 +229,29 @@ class TransactionManager:
         gates = self.evaluate_recovery_gates(state.failure_mode, post_snapshot)
         all_passed = all(g.passed for g in gates) and not state.force_recovery_failure
 
+        f_mode = tx.failure_mode or (state.failure_mode.value if state.failure_mode else "UNKNOWN")
+        for g in gates:
+            outcome_str = "PASSED" if g.passed else "FAILED"
+            try:
+                PROM_AGENT_VERIFICATION_GATE_OUTCOME.labels(
+                    failure_mode=f_mode,
+                    gate_name=g.name,
+                    outcome=outcome_str
+                ).inc()
+            except Exception:
+                pass
+
         if all_passed:
             tx.status = "COMMITTED"
             outcome = "PASSED"
+            try:
+                PROM_AGENT_REMEDIATIONS.labels(
+                    failure_mode=f_mode,
+                    action=tx.action,
+                    status="COMMITTED"
+                ).inc()
+            except Exception:
+                pass
             chaos_manager.mark_verified_recovered({
                 "transaction_id": transaction_id,
                 "verified_at": time.time(),
@@ -233,6 +261,14 @@ class TransactionManager:
         else:
             tx.status = "ROLLBACK_REQUIRED"
             outcome = "ROLLED_BACK"
+            try:
+                PROM_AGENT_REMEDIATIONS.labels(
+                    failure_mode=f_mode,
+                    action=tx.action,
+                    status="ROLLED_BACK"
+                ).inc()
+            except Exception:
+                pass
             logger.warning(f"[Remediation Transaction] {transaction_id} FAILED gates. Initiating rollback...")
             
             # Execute Rollback
@@ -270,6 +306,14 @@ class TransactionManager:
         action_name = tx.rollback_action or "RESTORE_PREVIOUS_STATE"
         chaos_manager.apply_rollback(previous_state=tx.previous_state, action=action_name)
         tx.status = "ROLLED_BACK"
+        f_mode = tx.failure_mode or "UNKNOWN"
+        try:
+            PROM_AGENT_ROLLBACKS.labels(
+                failure_mode=f_mode,
+                rollback_action=action_name
+            ).inc()
+        except Exception:
+            pass
         logger.warning(f"[Remediation Transaction] {transaction_id} ROLLED_BACK to safe baseline snapshot.")
         return tx
 
@@ -307,6 +351,14 @@ class TransactionManager:
             recommended_next_step="Human SRE intervention required: Manual peering reroute or upstream edge provider ticket."
         )
         self.escalations[incident_id] = pkg
+        f_mode = state.failure_mode.value if state.failure_mode else "UNKNOWN"
+        try:
+            PROM_AGENT_ESCALATIONS.labels(
+                failure_mode=f_mode,
+                reason=diagnosis[:64]
+            ).inc()
+        except Exception:
+            pass
         logger.error(f"[Escalation Contract] Incident {incident_id} ESCALATED to human operator.")
         return pkg
 

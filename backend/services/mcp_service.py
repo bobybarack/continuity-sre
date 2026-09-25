@@ -22,7 +22,7 @@ from config import (
 )
 from services.grafana_client import grafana_client
 from services.chaos import chaos_manager
-from services.telemetry import telemetry_engine
+from services.telemetry import telemetry_engine, PROM_AGENT_MCP_TOOL_CALLS
 from services.transaction_manager import transaction_manager
 from services.integration_models import (
     PrometheusQueryResult,
@@ -473,7 +473,9 @@ async def _evaluate_single_recovery_sample() -> Dict[str, Any]:
     )
     chaos_state = chaos_manager.get_state()
     from services.chaos import IncidentLifecycle
-    if chaos_state.is_outage_active and (chaos_state.lifecycle == IncidentLifecycle.INCIDENT_ACTIVE or chaos_state.remediation_applied_at is None):
+    if chaos_state.force_recovery_failure:
+        is_recovered = False
+    elif chaos_state.is_outage_active and (chaos_state.lifecycle == IncidentLifecycle.INCIDENT_ACTIVE or chaos_state.remediation_applied_at is None):
         is_recovered = False
     else:
         is_recovered = prom_healthy and telemetry_healthy
@@ -763,44 +765,58 @@ async def get_gemini_tools() -> List[types.Tool]:
 async def dispatch_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
     """Dispatches and executes an MCP tool call by name, supporting both official ADK names and legacy aliases."""
     logger.info(f"[MCP Dispatcher] Calling {name} with args {args}")
-    if name in ("query_prometheus", "grafana_query_prometheus"):
-        promql = args.get("expr") or args.get("promql", "")
-        return await grafana_query_prometheus(promql)
-    elif name in ("query_loki_logs", "grafana_query_loki"):
-        logql = args.get("logql") or args.get("query", "")
-        limit = int(args.get("limit", 20))
-        return await grafana_query_loki(logql, limit=limit)
-    elif name in ("create_annotation", "grafana_create_annotation"):
-        text = args.get("text", "")
-        tags = args.get("tags")
-        return await grafana_create_annotation(text, tags)
-    elif name in ("create_incident", "grafana_create_incident"):
-        title = args.get("title", "")
-        severity = args.get("severity", "CRITICAL")
-        summary = args.get("summary") or args.get("description", "")
-        return await grafana_create_incident(title, severity, summary)
-    elif name in ("update_incident", "grafana_resolve_incident"):
-        incident_id = args.get("incidentId") or args.get("incident_id", "")
-        summary = args.get("summary", "Verified closed-loop recovery.")
-        return await grafana_resolve_incident(incident_id, summary)
-    elif name == "grafana_search_dashboards":
-        return await grafana_search_dashboards(args.get("query", ""))
-    elif name == "continuity_execute_remediation":
-        return await continuity_execute_remediation(
-            action=args.get("action", "SHIFT_TRAFFIC_TO_AKAMAI"),
-            primary_cdn_pct=int(args.get("primary_cdn_pct", 20)),
-            secondary_cdn_pct=int(args.get("secondary_cdn_pct", 80)),
-            reason=args.get("reason", "Autonomous failover")
-        )
-    elif name == "continuity_verify_closed_loop_recovery":
-        return await continuity_verify_closed_loop_recovery()
-    elif name == "continuity_rollback_remediation":
-        return await continuity_rollback_remediation(args.get("transaction_id", ""))
-    elif name == "continuity_escalate_incident":
-        return await continuity_escalate_incident(
-            incident_id=args.get("incident_id", ""),
-            reason=args.get("reason", "Autonomous escalation triggered")
-        )
-    else:
-        raise ValueError(f"Unknown MCP tool: {name}")
+    try:
+        if name in ("query_prometheus", "grafana_query_prometheus"):
+            promql = args.get("expr") or args.get("promql", "")
+            res = await grafana_query_prometheus(promql)
+        elif name in ("query_loki_logs", "grafana_query_loki"):
+            logql = args.get("logql") or args.get("query", "")
+            limit = int(args.get("limit", 20))
+            res = await grafana_query_loki(logql, limit=limit)
+        elif name in ("create_annotation", "grafana_create_annotation"):
+            text = args.get("text", "")
+            tags = args.get("tags")
+            res = await grafana_create_annotation(text, tags)
+        elif name in ("create_incident", "grafana_create_incident"):
+            title = args.get("title", "")
+            severity = args.get("severity", "CRITICAL")
+            summary = args.get("summary") or args.get("description", "")
+            res = await grafana_create_incident(title, severity, summary)
+        elif name in ("update_incident", "grafana_resolve_incident"):
+            incident_id = args.get("incidentId") or args.get("incident_id", "")
+            summary = args.get("summary", "Verified closed-loop recovery.")
+            res = await grafana_resolve_incident(incident_id, summary)
+        elif name == "grafana_search_dashboards":
+            res = await grafana_search_dashboards(args.get("query", ""))
+        elif name == "continuity_execute_remediation":
+            res = await continuity_execute_remediation(
+                action=args.get("action", "SHIFT_TRAFFIC_TO_AKAMAI"),
+                primary_cdn_pct=int(args.get("primary_cdn_pct", 20)),
+                secondary_cdn_pct=int(args.get("secondary_cdn_pct", 80)),
+                reason=args.get("reason", "Autonomous failover")
+            )
+        elif name == "continuity_verify_closed_loop_recovery":
+            res = await continuity_verify_closed_loop_recovery()
+        elif name == "continuity_rollback_remediation":
+            res = await continuity_rollback_remediation(args.get("transaction_id", ""))
+        elif name == "continuity_escalate_incident":
+            res = await continuity_escalate_incident(
+                incident_id=args.get("incident_id", ""),
+                reason=args.get("reason", "Autonomous escalation triggered")
+            )
+        else:
+            raise ValueError(f"Unknown MCP tool: {name}")
+
+        try:
+            PROM_AGENT_MCP_TOOL_CALLS.labels(tool_name=name, status="success").inc()
+        except Exception:
+            pass
+        return res
+    except Exception as e:
+        try:
+            PROM_AGENT_MCP_TOOL_CALLS.labels(tool_name=name, status="error").inc()
+        except Exception:
+            pass
+        raise
+
 

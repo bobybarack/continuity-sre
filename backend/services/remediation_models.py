@@ -53,6 +53,7 @@ class RemediationTransaction(BaseModel):
     applied_at: float = Field(default_factory=time.time)
     idempotency_key: str
     rollback_action: Optional[str] = None
+    failure_mode: Optional[str] = None
     status: Literal[
         "PENDING",
         "APPLIED",
@@ -80,3 +81,19 @@ class EscalationPackage(BaseModel):
     rollback_status: Optional[str] = None
     recommended_next_step: str
     generated_at: float = Field(default_factory=time.time)
+
+class EvidenceReference(BaseModel):
+    query_type: str  # "promql" or "logql"
+    query: str
+    target_metric: str
+    observed_value: Any
+    threshold: Optional[str] = None
+    status: str = "BREACHED"  # "BREACHED" or "NORMAL"
+    timestamp: float = Field(default_factory=time.time)
+
+class DiagnosisClaim(BaseModel):
+    subsystem: str
+    claim: str
+    evidence: List[EvidenceReference] = Field(default_factory=list)
+    confidence: float = 1.0
+

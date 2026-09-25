@@ -78,6 +78,50 @@ PROM_OUTAGE_STATUS = Gauge(
     registry=PREMIERE_REGISTRY
 )
 
+# Autonomous SRE Agent Self-Observability Metrics
+PROM_AGENT_GEMINI_LATENCY = Histogram(
+    "continuity_agent_gemini_latency_seconds",
+    "Latency of Gemini reasoning calls in seconds",
+    ["model", "trigger_source"],
+    registry=PREMIERE_REGISTRY,
+    buckets=(0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 60.0)
+)
+
+PROM_AGENT_MCP_TOOL_CALLS = Counter(
+    "continuity_agent_mcp_tool_calls_total",
+    "Total MCP tool invocations executed by autonomous agent",
+    ["tool_name", "status"],
+    registry=PREMIERE_REGISTRY
+)
+
+PROM_AGENT_REMEDIATIONS = Counter(
+    "continuity_agent_remediations_total",
+    "Total remediations executed by autonomous agent",
+    ["failure_mode", "action", "status"],
+    registry=PREMIERE_REGISTRY
+)
+
+PROM_AGENT_ROLLBACKS = Counter(
+    "continuity_agent_rollbacks_total",
+    "Total rollbacks triggered due to unverified convergence",
+    ["failure_mode", "rollback_action"],
+    registry=PREMIERE_REGISTRY
+)
+
+PROM_AGENT_ESCALATIONS = Counter(
+    "continuity_agent_escalations_total",
+    "Total human escalations dispatched",
+    ["failure_mode", "reason"],
+    registry=PREMIERE_REGISTRY
+)
+
+PROM_AGENT_VERIFICATION_GATE_OUTCOME = Counter(
+    "continuity_agent_verification_gate_total",
+    "Outcomes of closed-loop health gate evaluations",
+    ["failure_mode", "gate_name", "outcome"],
+    registry=PREMIERE_REGISTRY
+)
+
 class TelemetrySnapshot(BaseModel):
     timestamp: float = Field(default_factory=time.time)
     stream_title: str = STREAM_TITLE
@@ -261,9 +305,15 @@ class TelemetryEngine:
             return snapshot
 
     def get_current_snapshot(self) -> TelemetrySnapshot:
-        """Returns the canonical current snapshot without side effects or mutation."""
+        """Returns the canonical current snapshot, refreshing if chaos mode has changed."""
         with self._lock:
-            if self.current_snapshot is None:
+            mgr = self._chaos_manager or chaos_manager
+            state = mgr.get_state()
+            if (
+                self.current_snapshot is None
+                or self.current_snapshot.chaos_mode != state.current_mode
+                or self.current_snapshot.is_outage != state.is_outage_active
+            ):
                 self._tick()
             return self.current_snapshot
 

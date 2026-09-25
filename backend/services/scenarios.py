@@ -39,4 +39,16 @@ SCENARIOS: Dict[str, Dict[str, Any]] = {
         "initial_bitrate_mbps": 3.2,
         "initial_vpf": 2.90,
     },
+    FailureMode.SECONDARY_PATH_DEGRADED.value: {
+        "failure_mode": FailureMode.SECONDARY_PATH_DEGRADED,
+        "default_action": "SHIFT_TRAFFIC_TO_AKAMAI",
+        "valid_actions": ["SHIFT_TRAFFIC_TO_AKAMAI"],
+        "promql": "ott_video_playback_failures_ratio",
+        "logql": '{service="ott-edge-router"} |= "502 Bad Gateway"',
+        "affected_subsystems": ["Edge CDN", "Secondary Path", "Transit"],
+        "initial_vpf": 4.85,
+        "initial_latency_ms": 412.0,
+        "initial_buffer_sec": 3.4,
+    },
 }
+

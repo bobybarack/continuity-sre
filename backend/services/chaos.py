@@ -17,6 +17,7 @@ class FailureMode(str, Enum):
     CDN_OUTAGE = "CDN_OUTAGE"
     DRM_TIMEOUT = "DRM_TIMEOUT"
     ISP_PEERING_DROP = "ISP_PEERING_DROP"
+    SECONDARY_PATH_DEGRADED = "SECONDARY_PATH_DEGRADED"
 
 class ChaosEvent(BaseModel):
     timestamp: float = Field(default_factory=time.time)
@@ -168,6 +169,32 @@ class ChaosStateManager:
         """Alias for inject_isp_peering_drop."""
         return self.inject_isp_peering_drop()
 
+    def inject_secondary_path_degradation(self) -> ChaosState:
+        """Injects an adversarial double fault: primary CDN fails AND secondary failover path cannot converge."""
+        with self._lock:
+            self.state.failure_mode = FailureMode.SECONDARY_PATH_DEGRADED
+            self.state.lifecycle = IncidentLifecycle.INCIDENT_ACTIVE
+            self.state.current_mode = "CDN_OUTAGE"
+            self.state.is_outage_active = True
+            self.state.force_recovery_failure = True
+            self.state.remediation_applied_at = None
+            self.state.remediated_at = None
+            self.state.remediation_action = None
+            self.state.remediation_action_applied = None
+            self.state.verified_recovered_at = None
+            self.state.active_incident_id = f"INC-ADV-{int(time.time())}"
+            self.state.edge_route_status = "FAILING"
+            self.state.primary_cdn_traffic_pct = 100
+            self.state.secondary_cdn_traffic_pct = 0
+            
+            self._record_event(
+                "CHAOS_INJECT_SECONDARY_PATH_DEGRADED",
+                "Adversarial double fault: Primary CDN outage active and secondary failover path degraded.",
+                "CRITICAL",
+                {"scenario": "SECONDARY_PATH_DEGRADED", "region": self.state.affected_region}
+            )
+            return self.state.model_copy(deep=True)
+
     def apply_autonomous_remediation(
         self,
         action: str = "SHIFT_TRAFFIC_TO_AKAMAI",
@@ -182,7 +209,11 @@ class ChaosStateManager:
                 raise ValueError(f"Unknown remediation action: {action}")
                 
             expected_failure_mode = SCENARIO_ACTIONS[action]
-            if self.state.failure_mode != FailureMode.NONE and self.state.failure_mode != expected_failure_mode:
+            valid_modes = {expected_failure_mode, FailureMode.NONE}
+            if action == "SHIFT_TRAFFIC_TO_AKAMAI":
+                valid_modes.add(FailureMode.SECONDARY_PATH_DEGRADED)
+
+            if self.state.failure_mode not in valid_modes:
                 raise ValueError(
                     f"Action '{action}' is invalid for active failure mode '{self.state.failure_mode.value}'"
                 )

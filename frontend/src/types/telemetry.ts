@@ -62,6 +62,7 @@ export interface InvestigationResult {
   rollback_status?: string | null;
   recovery_proof?: Record<string, unknown> | null;
   escalation_package?: Record<string, unknown> | null;
+  diagnosis_claims?: Array<Record<string, unknown>> | null;
 }
 
 export interface GrafanaHealth {
