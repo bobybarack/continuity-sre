@@ -145,6 +145,92 @@ export function SreCommanderCard({
           </div>
         </div>
 
+        {/* Transaction Ledger & Idempotency Key */}
+        {latestInvestigation?.remediation_transaction_id && (
+          <div className="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-1.5">
+                <DatabaseIcon className="w-3.5 h-3.5 text-indigo-600" />
+                <span className="text-[10px] font-mono font-bold tracking-wider text-indigo-700 uppercase">
+                  Remediation Transaction
+                </span>
+              </div>
+              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-100/70 text-indigo-800 border border-indigo-200">
+                {latestInvestigation.remediation_transaction_id}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-[10px] font-mono text-gray-600">
+              <span className="truncate max-w-[200px]" title={latestInvestigation.idempotency_key || ""}>
+                Key: {latestInvestigation.idempotency_key || "None"}
+              </span>
+              <span className={`px-1.5 py-0.2 rounded font-bold ${
+                latestInvestigation.rollback_status === "EXECUTED"
+                  ? "bg-red-100 text-red-800"
+                  : "bg-emerald-100 text-emerald-800"
+              }`}>
+                {latestInvestigation.rollback_status === "EXECUTED" ? "ROLLED_BACK" : "COMMITTED"}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Closed-Loop Recovery Proof & Cryptographic Evidence Hash */}
+        {latestInvestigation?.recovery_proof && (
+          <div className="mt-3 p-3 bg-emerald-50/60 rounded-xl border border-emerald-200/70">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-1.5">
+                <Shield01Icon className="w-3.5 h-3.5 text-emerald-700" />
+                <span className="text-[10px] font-mono font-bold tracking-wider text-emerald-800 uppercase">
+                  Cryptographic Recovery Proof
+                </span>
+              </div>
+              {Boolean((latestInvestigation.recovery_proof as { evidence_hash?: string })?.evidence_hash) && (
+                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold" title={(latestInvestigation.recovery_proof as { evidence_hash?: string }).evidence_hash}>
+                  SHA-256: {String((latestInvestigation.recovery_proof as { evidence_hash?: string }).evidence_hash).substring(0, 12)}...
+                </span>
+              )}
+            </div>
+            {/* Gate checklist */}
+            {Array.isArray((latestInvestigation.recovery_proof as { gates?: Array<{ name: string; observed_value: string; required_value: string; passed: boolean }> })?.gates) && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {((latestInvestigation.recovery_proof as { gates: Array<{ name: string; observed_value: string; required_value: string; passed: boolean }> }).gates).map((g, idx) => (
+                  <span
+                    key={idx}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium border ${
+                      g.passed
+                        ? "bg-emerald-100/70 text-emerald-900 border-emerald-300"
+                        : "bg-red-100/70 text-red-900 border-red-300"
+                    }`}
+                  >
+                    <span>{g.passed ? "✓" : "✗"}</span>
+                    <span>{g.name}: {g.observed_value} ({g.required_value})</span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Human Escalation Warning Banner */}
+        {latestInvestigation?.rollback_status === "EXECUTED" && (
+          <div className="mt-3 p-3 bg-red-50 rounded-xl border border-red-300 text-red-900">
+            <div className="flex items-center gap-2 mb-1">
+              <Alert01Icon className="w-4 h-4 text-red-600" />
+              <span className="text-[11px] font-bold uppercase tracking-wide text-red-800">
+                Escalation Contract Dispatched &bull; Human Operator Alert
+              </span>
+            </div>
+            <p className="text-[11px] leading-relaxed text-red-800 font-medium">
+              Remediation applied but recovery gates failed validation. Infrastructure rolled back to safe baseline.
+              {Boolean((latestInvestigation.escalation_package as { recommended_next_step?: string })?.recommended_next_step) && (
+                <span className="block mt-1 font-semibold text-red-900">
+                  Action: {(latestInvestigation.escalation_package as { recommended_next_step?: string }).recommended_next_step}
+                </span>
+              )}
+            </p>
+          </div>
+        )}
+
         {/* Undeniable Official MCP Toolchain Strip */}
         <div className="mt-3 p-3 bg-gray-900 rounded-xl border border-gray-800 text-white">
           <div className="flex items-center justify-between mb-2">
