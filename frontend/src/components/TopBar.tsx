@@ -85,8 +85,23 @@ export function TopBar({
         {/* Gemini Engine Badge */}
         <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
           <CpuIcon className="w-3.5 h-3.5 text-purple-600" />
-          <span>Google Cloud Gemini 3.7 Flash</span>
+          <span>Google Gemini 3.8 Flash</span>
         </div>
+
+        {/* Live Grafana Cloud Public Dashboard Link */}
+        <a
+          href="https://joyfuljasmine1550.grafana.net/public-dashboards/4cf5f0a12aee4d48a3ed18abd2c03db7"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 transition-colors"
+          title="Open live Grafana Cloud dashboard with Prometheus & Loki metrics"
+        >
+          <CloudIcon className="w-3.5 h-3.5 text-orange-600" />
+          <span>Grafana Cloud Live Board</span>
+          <svg className="w-3 h-3 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          </svg>
+        </a>
 
         {/* Live Incident Notification Bell Button */}
         <button
