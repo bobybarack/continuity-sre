@@ -1,5 +1,28 @@
 # CONTINUITY
 
+<p align="left">
+  <a href="https://ai.google.dev/"><img src="https://img.shields.io/badge/Gemini_2.5_Flash-Autonomous_SRE-1A73E8?style=flat-square&logo=google&logoColor=white" alt="Gemini 2.5 Flash" /></a>
+  <a href="https://joyfuljasmine1550.grafana.net/public-dashboards/4cf5f0a12aee4d48a3ed18abd2c03db7"><img src="https://img.shields.io/badge/Grafana_Cloud-Prometheus_%26_Loki-F46800?style=flat-square&logo=grafana&logoColor=white" alt="Grafana Cloud" /></a>
+  <a href="https://github.com/grafana/mcp-grafana"><img src="https://img.shields.io/badge/Official_Grafana_MCP-v1.5.1_stdio-24292E?style=flat-square&logo=json&logoColor=white" alt="Official Grafana MCP" /></a>
+  <a href="https://fastapi.tiangolo.com"><img src="https://img.shields.io/badge/FastAPI-Python_3.11+-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI" /></a>
+  <a href="https://nextjs.org"><img src="https://img.shields.io/badge/Next.js_16-Turbopack-000000?style=flat-square&logo=next.js&logoColor=white" alt="Next.js" /></a>
+  <a href="https://continuity-sre.pages.dev"><img src="https://img.shields.io/badge/Cloudflare_Pages-Edge_Live-F38020?style=flat-square&logo=cloudflare&logoColor=white" alt="Cloudflare Pages" /></a>
+  <a href="https://github.com/bobybarack/continuity-sre/actions"><img src="https://img.shields.io/badge/Tests-129+_Passing-10B981?style=flat-square&logo=pytest&logoColor=white" alt="Tests" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-374151?style=flat-square" alt="License" /></a>
+</p>
+
+> **Autonomous, Closed-Loop SRE Control Plane for High-Concurrency Live 4K OTT Video Streaming**  
+> Powered by Google Gemini 2.5 Flash, Grafana Cloud, official Grafana MCP, and cryptographic transactional verification.
+
+---
+
+<p align="center">
+  <img src="docs/images/continuity_command_center.png" alt="CONTINUITY Command Center Live Display" width="100%" />
+</p>
+<p align="center"><em>Figure 1: CONTINUITY Command Center live production interface — real-time 4K UHD broadcast player, forward buffer telemetry, multi-CDN egress routing, and Hollywood-inspired Premiere Crew dispatch.</em></p>
+
+---
+
 ## Overview
 
 CONTINUITY is an autonomous, closed-loop SRE control plane for high-concurrency OTT video streaming architectures.
@@ -81,6 +104,11 @@ flowchart TD
     PROOF --> UI
     ESCALATION --> UI
 ```
+
+<p align="center">
+  <img src="docs/images/continuity_dashboard_full.png" alt="CONTINUITY Full Operations & Chaos Injection Suite" width="100%" />
+</p>
+<p align="center"><em>Figure 2: Complete operations surface — multi-agent radio intercom, live LogQL & PromQL telemetry ingestion, transactional remediation ledger, and chaos injection suite.</em></p>
 
 ---
 
@@ -271,6 +299,11 @@ CONTINUITY models four distinct failure modes, including a double-fault adversar
 | **DRM Key Proxy Failover** | Widevine license timeouts (>2400ms), 504 Gateway | `FAILOVER_DRM_KEY_CLUSTER` (drm-failover) | VPF <= 0.5%, DRM Handshake <= 250ms |
 | **ISP BGP Route Reroute** | ASN 3356 transit packet drop, bitrate degraded (3.2 Mbps) | `REROUTE_BGP_TRANSIT` (ASN 2914 backup) | VPF <= 0.5%, Bitrate >= 10.0 Mbps |
 | **Adversarial Double-Fault** | Primary CDN outage active AND secondary path degraded | `SHIFT_TRAFFIC_TO_AKAMAI` | **Fails Convergence Gate** -> Automatic Rollback + Escalation |
+
+<p align="center">
+  <img src="docs/images/continuity_incident_active.png" alt="CONTINUITY Live Incident Telemetry & Verification" width="100%" />
+</p>
+<p align="center"><em>Figure 3: Live anomaly triage & remediation — real-time edge failure detection, buffer drain tracking, autonomous failover dispatch, and closed-loop verification.</em></p>
 
 ### Repeatable Chaos Benchmarks (`benchmarks/run_scenarios.py`)
 
