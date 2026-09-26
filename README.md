@@ -1,433 +1,269 @@
 # CONTINUITY
 
-<p align="left">
-  <a href="https://ai.google.dev/"><img src="https://img.shields.io/badge/Gemini_2.5_Flash-Autonomous_SRE-1A73E8?style=flat-square&logo=google&logoColor=white" alt="Gemini 2.5 Flash" /></a>
-  <a href="https://joyfuljasmine1550.grafana.net/public-dashboards/4cf5f0a12aee4d48a3ed18abd2c03db7"><img src="https://img.shields.io/badge/Grafana_Cloud-Prometheus_%26_Loki-F46800?style=flat-square&logo=grafana&logoColor=white" alt="Grafana Cloud" /></a>
-  <a href="https://github.com/grafana/mcp-grafana"><img src="https://img.shields.io/badge/Official_Grafana_MCP-v1.5.1_stdio-24292E?style=flat-square&logo=json&logoColor=white" alt="Official Grafana MCP" /></a>
-  <a href="https://fastapi.tiangolo.com"><img src="https://img.shields.io/badge/FastAPI-Python_3.11+-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI" /></a>
-  <a href="https://nextjs.org"><img src="https://img.shields.io/badge/Next.js_16-Turbopack-000000?style=flat-square&logo=next.js&logoColor=white" alt="Next.js" /></a>
-  <a href="https://continuity-sre.pages.dev"><img src="https://img.shields.io/badge/Cloudflare_Pages-Edge_Live-F38020?style=flat-square&logo=cloudflare&logoColor=white" alt="Cloudflare Pages" /></a>
-  <a href="https://github.com/bobybarack/continuity-sre/actions"><img src="https://img.shields.io/badge/Tests-129+_Passing-10B981?style=flat-square&logo=pytest&logoColor=white" alt="Tests" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-374151?style=flat-square" alt="License" /></a>
-</p>
+**Closed-loop incident response for streaming reliability.**
 
-> **Autonomous, Closed-Loop SRE Control Plane for High-Concurrency Live 4K OTT Video Streaming**  
-> Powered by Google Gemini 2.5 Flash, Grafana Cloud, official Grafana MCP, and cryptographic transactional verification.
+[![Gemini](https://img.shields.io/badge/Gemini-334155?style=flat-square&logo=googlegemini&logoColor=white)](backend/services/agent_commander.py)
+[![Grafana](https://img.shields.io/badge/Grafana-F46800?style=flat-square&logo=grafana&logoColor=white)](backend/services/mcp_service.py)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)](backend/main.py)
+[![Next.js](https://img.shields.io/badge/Next.js-171717?style=flat-square&logo=nextdotjs&logoColor=white)](frontend/package.json)
 
----
+CONTINUITY investigates streaming failures, applies a remediation, and checks recovery before resolving an incident. It combines a Next.js command center, a FastAPI control plane, Gemini reasoning, and Grafana observability around one principle:
 
-<p align="center">
-  <img src="docs/images/continuity_command_center.png" alt="CONTINUITY Command Center Live Display" width="100%" />
-</p>
-<p align="center"><em>Figure 1: CONTINUITY Command Center live production interface — real-time 4K UHD broadcast player, forward buffer telemetry, multi-CDN egress routing, and Hollywood-inspired Premiere Crew dispatch.</em></p>
+> **Command succeeded ≠ service recovered.**
 
----
+**Current scope:** an executable SRE demonstration with simulated streaming telemetry and infrastructure, plus configurable Gemini and Grafana Cloud integrations. CDN traffic shifts, DRM failovers, BGP reroutes, viewer counts, and audience-impact estimates are modeled locally. This repository does not implement production CDN, DRM, or network-provider control adapters.
 
-## Overview
+[Command center](https://continuity-sre.pages.dev) · [Backend API](https://continuity-api-121300560395.us-central1.run.app/) · [Grafana dashboard](https://joyfuljasmine1550.grafana.net/public-dashboards/4cf5f0a12aee4d48a3ed18abd2c03db7) · [Quick start](#quick-start) · [Architecture](#architecture)
 
-CONTINUITY is an autonomous, closed-loop SRE control plane for high-concurrency OTT video streaming architectures.
-It connects Google Gemini, Grafana Cloud, the official Grafana MCP server, Prometheus/Mimir, Loki, and a transactional remediation control plane to automate the entire incident lifecycle:
+*Hosted demo links are project entry points; their availability and integration health must be checked at runtime.*
 
-```
-Alert Ingest → Investigate → Diagnose → Transactional Remediation → Closed-Loop Verification → Recovery Proof / Rollback & Escalation
-```
+![CONTINUITY command center showing baseline streaming metrics, the preview player, CDN split, and incident-response roles](docs/images/continuity_command_center.png)
 
-The system is built on one foundational reliability invariant:
+*Existing application capture, showing a simulated healthy baseline. The preview footage and displayed audience are demonstration content, not evidence of a production broadcast or measured viewer load.*
 
-> **COMMAND SUCCEEDED != SERVICE RECOVERED**
+## How it works
 
-A remediation action succeeding at the control-plane level does not prove that end-user streaming QoS has restabilized. CONTINUITY executes remediation inside an isolated transaction, re-evaluates multi-dimensional streaming health gates against objective Prometheus and client telemetry, and commits the transaction with a cryptographic `RecoveryProof` only when metrics cross operational SLA thresholds. If convergence fails, CONTINUITY automatically triggers infrastructure rollback and compiles an `EscalationPackage` for human SRE handoff.
-
----
-
-## Live System & Resources
-
-| Resource | Description | Endpoint / URL |
-|---|---|---|
-| Command Center UI | Next.js Real-Time Control Center | [https://continuity-sre.pages.dev](https://continuity-sre.pages.dev) |
-| Repository | Source Code & Test Suites | [https://github.com/bobybarack/continuity-sre](https://github.com/bobybarack/continuity-sre) |
-| Backend API | FastAPI Production Control Plane | [https://continuity-api-121300560395.us-central1.run.app/](https://continuity-api-121300560395.us-central1.run.app/) |
-| Grafana Dashboard | Live Streaming QoS & Chaos Board | [https://joyfuljasmine1550.grafana.net/public-dashboards/4cf5f0a12aee4d48a3ed18abd2c03db7](https://joyfuljasmine1550.grafana.net/public-dashboards/4cf5f0a12aee4d48a3ed18abd2c03db7) |
-| Webhook Ingest | Grafana Alertmanager Event Endpoint | `POST /api/alerts/grafana` |
-| Prometheus Metrics | QoS & Agent Self-Observability | `GET /api/telemetry/metrics` |
-| MCP Tool Catalog | Discovered Official Grafana MCP Tools | `GET /api/agent/mcp-tools` |
-
----
-
-## Core Engineering Invariants
-
-1. **Transactional Remediation**: Infrastructure mutations are executed as ledgered transactions (`RemediationTransaction`) capturing pre-action snapshots (`previous_state`), intended state, and reverse rollback actions.
-2. **Deterministic Closed-Loop Verification**: Incidents are never marked resolved based on action dispatch. Resolution requires passing explicit scenario-tailored recovery gates.
-3. **Falsifiable Recovery Proofs**: Verified recoveries emit an immutable `RecoveryProof` artifact anchored by a cryptographic SHA-256 evidence hash covering pre-action telemetry, post-action telemetry, and gate results.
-4. **Automated Rollback & Human Escalation**: Unverified convergence or adversarial degradation triggers automatic state rollback to pre-action baselines and assembles an `EscalationPackage` containing query logs, failed gates, and recommended remediation for human operators.
-5. **Idempotency Guard**: All remediation actions are indexed by `{incident_id}:{action}:{version}` to prevent destructive duplicate execution across webhook retries.
-6. **Per-Incident Concurrency Isolation**: Concurrent alerts and investigations targeting the same incident ID are serialized via asynchronous locks, returning existing results without racing.
-7. **Agent Self-Observability in Grafana**: The autonomous agent instruments its own reasoning latency, tool calls, error rates, rollbacks, and gate outcomes directly into Prometheus for Grafana dashboarding.
-8. **Evidence-Addressed Diagnosis**: Root-cause conclusions link directly to empirical PromQL and LogQL query outputs through structured `DiagnosisClaim` and `EvidenceReference` schemas.
-
----
+1. **Detect:** inject a supported failure or receive a Grafana alert webhook. Webhook ingestion classifies the alert, suppresses duplicates, updates simulation state, and launches investigation.
+2. **Investigate:** query Prometheus and Loki through the official Grafana MCP server, with direct Grafana REST fallbacks. Gemini can select tool calls; the commander also has deterministic scenario fallbacks.
+3. **Remediate:** record an in-memory transaction with the previous state, intended action, idempotency key, and rollback action; apply the change to the simulator.
+4. **Verify:** poll recovery evidence and evaluate health gates. A successful transaction receives a `RecoveryProof` containing snapshots, gate results, and a SHA-256 evidence digest.
+5. **Recover or escalate:** commit a verified recovery, or restore the simulation snapshot and assemble an `EscalationPackage`. Grafana annotations and IRM lifecycle updates depend on integration configuration and successful API responses.
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-    WEBHOOK["Grafana Alertmanager Webhook"] -->|"POST /api/alerts/grafana"| ALERTS["Alert Ingest & Dedup Engine"]
-    UI["Next.js Command Center"] -->|"REST + SSE"| API["FastAPI Control Plane"]
-    ALERTS -->|"Async Task"| COMMANDER["Autonomous SRE Commander"]
-    API --> COMMANDER
-
-    subgraph Autonomous Agent Loop
-        COMMANDER -->|"PromQL / LogQL"| ADK_AGENT["Google ADK Gemini SRE Agent"]
-        ADK_AGENT -->|"Bounded Tools"| MCP_TOOLSET["Google ADK McpToolset"]
-        MCP_TOOLSET -->|"stdio JSON-RPC"| MCP_BIN["Official grafana/mcp-grafana:1.5.1"]
-        MCP_BIN --> GRAFANA_CLOUD["Grafana Cloud (Mimir / Loki / IRM)"]
-        ADK_AGENT -->|"Reasoning Trace + Claims"| DIAGNOSIS["Evidence-Addressed Diagnosis"]
-    end
-
-    subgraph Transactional Remediation Engine
-        DIAGNOSIS --> TX_MGR["Transaction Manager (Ledger & Idempotency)"]
-        TX_MGR -->|"Apply Mutation"| CHAOS["Chaos & Infrastructure State Machine"]
-        CHAOS --> TELEMETRY["Canonical 1Hz Telemetry Engine"]
-        TELEMETRY --> PROM_METRICS["Prometheus Metrics (/api/telemetry/metrics)"]
-    end
-
-    subgraph Closed-Loop Verification Gate
-        TELEMETRY --> GATES["Multi-Dimensional Recovery Gates"]
-        GATES -->|"All Gates Passed"| PROOF["RecoveryProof (SHA-256 Evidence Hash)"]
-        PROOF -->|"Commit"| COMMITTED["Mark Verified Recovered & Resolve IRM"]
-        GATES -->|"Gate Failed / Stalled"| ROLLBACK["Automated Rollback (Restore Snapshot)"]
-        ROLLBACK --> ESCALATION["EscalationPackage (Human SRE Dossier)"]
-    end
-
-    PROM_METRICS --> GRAFANA_CLOUD
-    TELEMETRY --> UI
-    PROOF --> UI
-    ESCALATION --> UI
+    UI["Next.js static command center"] -->|"REST / SSE"| API["FastAPI routes"]
+    ALERT["Grafana alert webhook"] -->|"Classify + deduplicate"| API
+    API --> COMMANDER["Python incident commander"]
+    COMMANDER <-->|"Google Gen AI SDK"| GEMINI["Gemini"]
+    COMMANDER --> BRIDGE["Grafana tool bridge"]
+    BRIDGE -->|"ADK McpToolset / stdio"| MCP["Official mcp-grafana 1.5.1"]
+    MCP --> GRAFANA["Grafana Cloud: Prometheus / Loki / IRM"]
+    BRIDGE -.->|"REST fallback"| GRAFANA
+    COMMANDER --> TX["In-memory transaction manager"]
+    TX --> SIM["Streaming infrastructure simulator"]
+    SIM --> TEL["Canonical 1 Hz telemetry"]
+    TEL -->|"Snapshots / history / SSE"| API
+    TEL --> METRICS["Prometheus exposition endpoint"]
+    METRICS -.->|"External scrape + forwarding required"| GRAFANA
+    COMMANDER --> VERIFY["Recovery verification"]
+    GRAFANA -->|"Remote VPF readback, when available"| VERIFY
+    TEL -->|"Local health gates"| VERIFY
+    VERIFY -->|"Pass"| PROOF["Commit + RecoveryProof"]
+    VERIFY -->|"Failed convergence"| ROLLBACK["Rollback + EscalationPackage"]
 ```
 
-<p align="center">
-  <img src="docs/images/continuity_dashboard_full.png" alt="CONTINUITY Full Operations & Chaos Injection Suite" width="100%" />
-</p>
-<p align="center"><em>Figure 2: Complete operations surface — multi-agent radio intercom, live LogQL & PromQL telemetry ingestion, transactional remediation ledger, and chaos injection suite.</em></p>
-
----
-
-## The Premiere Continuity Crew
-
-CONTINUITY bridges the Agentic Cinema theme with real-world OTT streaming operations by framing multi-agent incident response around authentic Hollywood production set and master control room roles:
-
-| Crew Member | On-Set Responsibility | Architectural Mapping & MCP Tools |
-| :--- | :--- | :--- |
-| **1st AD** *(First Assistant Director)* | Set commander running call sheet, directing emergency positions, and delivering post-incident wrap report. | **API Control Plane & Incident Commander**: Triggers multi-step investigation, acquires incident locks, tracks MTTR, and manages the transaction ledger. |
-| **DIT** *(Digital Imaging Technician)* | On-set technical engineer inspecting raw digital camera feeds, pixel accuracy, bitrates, and card integrity. | **Grafana Observability Ingestion**: Queries Grafana Cloud Prometheus (`query_prometheus`) and Loki (`query_loki_logs`) for objective ground truth. |
-| **Key Grip** *(Infrastructure Rigger)* | Master of physical cabling, power distribution, and backup generator switchovers. | **Transactional Remediation Control Plane**: Executes `continuity_execute_remediation` (shifting egress to secondary Akamai CDN, BGP rerouting, DRM key failover). |
-| **Continuity Supervisor** | Detail guardian ensuring zero continuity breaks between takes. | **Closed-Loop Recovery Gate**: Enforces `Command Succeeded != Service Recovered`. Validates downstream buffer depth and VPF before stamping `VERIFIED_RECOVERED` or triggering rollback. |
-
----
-
-## Technical Architecture Components
-
-### 1. Direct Google ADK to Grafana MCP Integration
-
-CONTINUITY runs the official Grafana Labs binary (`grafana/mcp-grafana:1.5.1`) via stdio transport using Google ADK's native `McpToolset`:
-
-```
-Google ADK Gemini SRE Agent
-  ↓
-Google ADK McpToolset (stdio session manager)
-  ↓
-Official grafana/mcp-grafana:1.5.1 binary
-  ↓
-Grafana Cloud (Prometheus / Mimir + Loki + Annotations + IRM Incidents)
-```
-
-- **Tool Filtering**: The official MCP binary exposes over 60 tools. CONTINUITY bounds the exposed surface using `ALLOWED_GRAFANA_TOOLS`:
-  - `query_prometheus`: Real-time PromQL querying against Grafana Cloud Mimir.
-  - `query_loki_logs`: LogQL log stream querying against Grafana Cloud Loki.
-  - `create_annotation`: Visual timestamp placement on live operational dashboards.
-  - `create_incident`: Structured incident declaration in Grafana Incident Response & Management (IRM).
-  - `update_incident`: Incident resolution in Grafana IRM upon verified recovery.
-- **Native Custom Tools**: Added alongside Grafana tools inside the agent's function calling context:
-  - `continuity_execute_remediation`: Transactional policy application.
-  - `continuity_verify_closed_loop_recovery`: Multi-dimensional health gate evaluation.
-  - `continuity_rollback_remediation`: Reversal to pre-action baseline snapshot.
-  - `continuity_escalate_incident`: Human operator dossier generation.
-
-### 2. Event-Driven Incident Triggering
-
-CONTINUITY supports event-driven webhook ingestion at `POST /api/alerts/grafana`:
-
-```http
-POST /api/alerts/grafana
-X-Webhook-Secret: continuity-demo-secret-2026
-Content-Type: application/json
-
-{
-  "status": "firing",
-  "alerts": [
-    {
-      "status": "firing",
-      "labels": {
-        "alertname": "HighVideoPlaybackFailures",
-        "severity": "CRITICAL",
-        "region": "us-east-2"
-      },
-      "annotations": {
-        "summary": "Fastly POP us-east-2 packet loss exceeds 68%"
-      },
-      "fingerprint": "cdn-outage-us-east-2"
-    }
-  ]
-}
-```
-
-- **Authentication**: Validates incoming requests against `CONTINUITY_DEMO_KEY` via `X-Continuity-Demo-Key`, `X-Webhook-Secret`, `Authorization: Bearer`, or query parameter.
-- **Deduplication Engine**: Uses an in-memory TTL cache (`_DEDUP_CACHE`) to suppress redundant alerts while an incident or remediation pipeline is active.
-- **Classification**: Automatically classifies alert annotations and labels into failure modes (`CDN_OUTAGE`, `DRM_TIMEOUT`, `ISP_PEERING_DROP`) and triggers background investigation.
-
-### 3. Remediation as a Transaction (`RemediationTransaction`)
-
-Every remediation action is treated as a stateful transaction with complete pre-action state preservation:
-
-```python
-class RemediationTransaction(BaseModel):
-    transaction_id: str
-    incident_id: str
-    action: str
-    failure_mode: Optional[str] = None
-    previous_state: Dict[str, Any]
-    intended_state: Optional[Dict[str, Any]] = None
-    applied_at: float
-    idempotency_key: str
-    rollback_action: Optional[str] = None
-    status: Literal["PENDING", "APPLIED", "VERIFYING", "COMMITTED", "ROLLBACK_REQUIRED", "ROLLED_BACK", "FAILED"]
-    proof: Optional[RecoveryProof] = None
-```
-
-- **Idempotency**: Checked against `idempotency_index` before execution. If `{incident_id}:{action}:{version}` is already in the ledger, the existing transaction is returned without re-applying mutations.
-- **Rollback Mapping**:
-  - `SHIFT_TRAFFIC_TO_AKAMAI` -> `RESTORE_PREVIOUS_TRAFFIC_SPLIT`
-  - `FAILOVER_DRM_KEY_CLUSTER` -> `RESTORE_PREVIOUS_DRM_CLUSTER`
-  - `REROUTE_BGP_TRANSIT` -> `RESTORE_PREVIOUS_TRANSIT_ROUTE`
-
-### 4. Closed-Loop Verification & Cryptographic Recovery Proof
-
-Recovery is evaluated against multi-dimensional health gates:
-
-| Health Gate | Operational SLA Target | Evaluated Metric |
+| Component | Implementation | Responsibility |
 |---|---|---|
-| **Video Playback Failures (VPF)** | <= 0.50% | `ott_video_playback_failures_ratio` |
-| **Forward Playback Buffer** | >= 20.0 s | `ott_buffer_health_seconds` |
-| **CDN Egress Latency** | <= 150.0 ms | `ott_cdn_egress_latency_ms` (CDN scenarios) |
-| **DRM License Handshake** | <= 250.0 ms | `ott_drm_handshake_ms` (DRM scenarios) |
-| **Delivered Stream Bitrate** | >= 10.0 Mbps | `ott_stream_bitrate_mbps` (ISP scenarios) |
+| Command center | [Next.js / React / TypeScript](frontend/package.json), [API client](frontend/src/services/api.ts) | Static export, telemetry visualization, SSE subscription, chaos controls, incident history. |
+| HTTP service | [FastAPI application](backend/main.py), [routes](backend/routes) | Telemetry, webhook ingestion, investigations, simulation mutations, health probes. |
+| Incident commander | [agent_commander.py](backend/services/agent_commander.py) | Per-incident locks, Gemini calls, tool dispatch, scenario fallbacks, investigation results. |
+| Observability bridge | [mcp_service.py](backend/services/mcp_service.py), [grafana_client.py](backend/services/grafana_client.py) | Official Grafana MCP tools via ADK `McpToolset`; direct REST fallback. |
+| Recovery control | [transaction_manager.py](backend/services/transaction_manager.py), [models](backend/services/remediation_models.py) | Ledger, idempotency, scenario gates, evidence digest, rollback, escalation records. |
+| Simulation | [chaos.py](backend/services/chaos.py), [telemetry.py](backend/services/telemetry.py), [scenarios.py](backend/services/scenarios.py) | Modeled infrastructure and a shared 1 Hz telemetry source. |
+| Deployment | [Dockerfile](Dockerfile), [deploy.sh](deploy.sh), [Next.js config](frontend/next.config.ts) | Python 3.11 container with MCP binary; Cloud Run backend and separately hosted static frontend. |
 
-When all gates pass, CONTINUITY stamps an immutable `RecoveryProof`:
+The active reasoning path calls the Google Gen AI SDK and dispatches tools in Python. An ADK `Agent` and `Runner` are also constructed, but the investigation method does not execute the ADK runner. ADK's `McpToolset` provides the MCP integration.
 
-```python
-class RecoveryProof(BaseModel):
-    incident_id: str
-    remediation_transaction_id: str
-    pre_action: HealthSnapshot
-    post_action: HealthSnapshot
-    verification_source: str
-    authoritative: bool
-    gates: List[RecoveryGateResult]
-    verified_at: Optional[float]
-    outcome: Literal["PASSED", "PENDING", "ROLLED_BACK", "ESCALATED"]
-    evidence_hash: Optional[str]  # SHA-256 digest of pre, post, and gate evidence
-```
+### Grafana integration boundary
 
-### 5. Automated Rollback & Human Escalation (`EscalationPackage`)
+The container pins `grafana/mcp-grafana:1.5.1`. The agent-facing allowlist contains `query_prometheus`, `query_loki_logs`, `create_annotation`, `create_incident`, and `update_incident`. CONTINUITY's remediation, verification, rollback, and escalation functions are local custom tools.
 
-If recovery gates fail validation, the system refuses to mark the incident resolved. Instead, it executes:
+The backend exposes simulation and agent metrics at `/api/telemetry/metrics`. Scraping and forwarding these metrics to Grafana Cloud requires external configuration; this repository does not include a collector deployment. A Loki push helper exists, but the telemetry ticker does not call it. UI log text alone does not establish successful Loki ingestion.
 
-1. **State Rollback**: Reverts simulated infrastructure to `previous_state` using `chaos_manager.apply_rollback()`.
-2. **Escalation Package Assembly**: Compiles an `EscalationPackage` containing:
-   - Incident ID, failure mode, and severity.
-   - List of attempted remediation actions and transaction IDs.
-   - Explicit list of failed health gates and observed values.
-   - Recommended next steps for human SRE operators.
-   - PromQL and LogQL query strings for manual verification.
-3. **Lifecycle Transition**: Advances state to `IncidentLifecycle.ESCALATED`.
+## Command center
 
-### 6. Autonomous Agent Self-Observability in Prometheus
+The interface groups the workflow into four cinema-inspired roles. These are presentation roles within one commander workflow, not four independently deployed agents.
 
-CONTINUITY instruments the SRE agent directly into the Prometheus registry (`PREMIERE_REGISTRY`):
+| Role | Responsibility |
+|---|---|
+| **1st AD · Commander** | Coordinates investigation and incident results. |
+| **DIT · Signal scout** | Represents Prometheus and Loki evidence collection. |
+| **Key Grip · Infrastructure rigger** | Represents simulated traffic, DRM, and transit remediation. |
+| **Continuity · Quality gate** | Represents recovery verification, rollback, and escalation. |
 
-| Metric Name | Type | Labels | Description |
-|---|---|---|---|
-| `continuity_agent_gemini_latency_seconds` | Histogram | `model`, `trigger_source` | Latency distribution of Gemini reasoning calls. |
-| `continuity_agent_mcp_tool_calls_total` | Counter | `tool_name`, `status` | Total MCP tool invocations and execution status. |
-| `continuity_agent_remediations_total` | Counter | `failure_mode`, `action`, `status` | Total remediations committed vs rolled back. |
-| `continuity_agent_rollbacks_total` | Counter | `failure_mode`, `rollback_action` | Total rollbacks triggered due to unverified convergence. |
-| `continuity_agent_escalations_total` | Counter | `failure_mode`, `reason` | Total human escalations dispatched. |
-| `continuity_agent_verification_gate_total` | Counter | `failure_mode`, `gate_name`, `outcome` | Pass/fail counts for each closed-loop health gate. |
+<details>
+<summary>View the full dashboard capture</summary>
 
-All metrics are scraped via `GET /api/telemetry/metrics` and visualized in Grafana Cloud.
+![Full CONTINUITY dashboard showing the player, telemetry cards, crew dispatch, log panel, and chaos controls](docs/images/continuity_dashboard_full.png)
 
-### 7. Evidence-Addressed Diagnosis
+*Historical application capture of the baseline layout. Financial savings and tool-status labels visible in this capture are illustrative UI content, not verified outcomes. The current source has evolved since this image was captured.*
 
-Root-cause analysis is structured using formal schemas linking claims directly to query outputs:
+</details>
 
-```python
-class EvidenceReference(BaseModel):
-    query_type: str  # "promql" or "logql"
-    query: str
-    target_metric: str
-    observed_value: Any
-    threshold: Optional[str]
-    status: str  # "BREACHED" or "NORMAL"
-    timestamp: float
+The frontend also includes explicit `?stage=baseline`, `?stage=outage`, `?stage=gemini_modal`, `?stage=recovered`, and `?stage=pipeline` presentation fixtures in [page.tsx](frontend/src/app/page.tsx). Their timings, proof text, and telemetry are canned examples, not benchmark evidence.
 
-class DiagnosisClaim(BaseModel):
-    subsystem: str
-    claim: str
-    evidence: List[EvidenceReference]
-    confidence: float
-```
+## Recovery semantics
 
----
+Recovery verification combines a Prometheus VPF readback with local simulation telemetry. Transaction gates are implemented in [transaction_manager.py](backend/services/transaction_manager.py):
 
-## Failure Scenarios & Benchmarks
+| Gate | Required value | Scope |
+|---|---|---|
+| Video playback failures | ≤ 0.50% | All scenarios |
+| Forward playback buffer | ≥ 20.0 seconds | All scenarios |
+| CDN egress latency | ≤ 150.0 ms | CDN and secondary-path scenarios |
+| DRM handshake | ≤ 250.0 ms | DRM scenario |
+| Delivered bitrate | ≥ 10.0 Mbps | ISP scenario |
 
-CONTINUITY models four distinct failure modes, including a double-fault adversarial scenario:
+The outer verification loop also checks local VPF, CDN latency, and buffer health before transaction-specific verification. The chart's 1.00% VPF reference line is a presentation threshold; the recovery gate is 0.50%.
 
-| Scenario | Injected Failure | Autonomous Remediation | Convergence Gate |
-|---|---|---|---|
-| **Edge CDN Failover** | Fastly edge POP packet loss (68%), 502 Bad Gateway | `SHIFT_TRAFFIC_TO_AKAMAI` (80% egress) | VPF <= 0.5%, Latency <= 150ms |
-| **DRM Key Proxy Failover** | Widevine license timeouts (>2400ms), 504 Gateway | `FAILOVER_DRM_KEY_CLUSTER` (drm-failover) | VPF <= 0.5%, DRM Handshake <= 250ms |
-| **ISP BGP Route Reroute** | ASN 3356 transit packet drop, bitrate degraded (3.2 Mbps) | `REROUTE_BGP_TRANSIT` (ASN 2914 backup) | VPF <= 0.5%, Bitrate >= 10.0 Mbps |
-| **Adversarial Double-Fault** | Primary CDN outage active AND secondary path degraded | `SHIFT_TRAFFIC_TO_AKAMAI` | **Fails Convergence Gate** -> Automatic Rollback + Escalation |
+| `VERIFICATION_POLICY` | Behavior when remote VPF is unavailable |
+|---|---|
+| `remote_required` | Verification cannot pass without a remote Prometheus value. |
+| `remote_preferred` (default) | Allows the local Prometheus collector registry as a fallback. |
+| `local_allowed` | Also permits the local collector fallback. The implementation still attempts the remote read first. |
 
-<p align="center">
-  <img src="docs/images/continuity_incident_active.png" alt="CONTINUITY Live Incident Telemetry & Verification" width="100%" />
-</p>
-<p align="center"><em>Figure 3: Live anomaly triage & remediation — real-time edge failure detection, buffer drain tracking, autonomous failover dispatch, and closed-loop verification.</em></p>
+Results expose the verification source and an `authoritative` flag. That flag identifies remote Prometheus readback; other gates still use local telemetry. It does not mean every recovery signal was independently measured in production.
 
-### Repeatable Chaos Benchmarks (`benchmarks/run_scenarios.py`)
+A `RecoveryProof` hashes the incident and transaction IDs, pre/post snapshots, gate results, and outcome. It is an evidence digest, not a digital signature, immutable storage guarantee, or independent attestation. Transactions, proofs, deduplication caches, and incident history are process-local and are lost on restart.
 
-Run the automated chaos benchmark suite across all scenarios:
+## Failure scenarios and recorded results
+
+| Scenario | Simulated action | Expected outcome |
+|---|---|---|
+| Primary CDN outage | `SHIFT_TRAFFIC_TO_AKAMAI` | Recover after traffic rebalance and passing gates. |
+| DRM timeout | `FAILOVER_DRM_KEY_CLUSTER` | Recover after key-cluster failover and passing gates. |
+| ISP peering drop | `REROUTE_BGP_TRANSIT` | Recover after transit reroute and passing gates. |
+| Secondary path degraded | Attempt CDN failover into a degraded path | Fail verification, roll back, and escalate. |
+
+The checked-in [benchmark report](benchmarks/benchmark_report.json) records five runs per scenario:
+
+| Scenario | Successful expected outcomes | Mean recovery time | False resolutions |
+|---|---:|---:|---:|
+| CDN failover | 4/5 (80%) | 6.42 s | 0 |
+| DRM failover | 5/5 (100%) | 5.95 s | 0 |
+| ISP reroute | 5/5 (100%) | 13.28 s | 0 |
+| Adversarial double fault | 5/5 rollbacks with escalation | Not applicable | 0 |
+
+These are saved simulation results, not a fresh run or a production SLA. The report's `all_passed: true` means no false resolutions were counted by the runner; it does **not** mean every recovery attempt succeeded. See [benchmark logic](benchmarks/run_scenarios.py).
+
+## Quick start
+
+### Requirements
+
+- Python 3.11 for parity with the container.
+- Node.js 20.9+ and npm for the frontend.
+- Docker Compose for the simplest backend setup; the image includes the Grafana MCP binary.
+- Gemini and Grafana credentials for external integrations. Use a Gemini model available to your account; the configured default in [config.py](backend/config.py) is not an availability guarantee.
 
 ```bash
-.venv/bin/python benchmarks/run_scenarios.py
-```
-
-Benchmark output from test execution:
-
-```
-==========================================================================================
-SCENARIO                            | PASS RATE  | FALSE RESOLVE | MEAN MTTR  | STATUS  
-------------------------------------------------------------------------------------------
-Edge CDN Failover                   |    100.0%  |             0 |      6.42s | PASS    
-DRM Key Proxy Failover              |    100.0%  |             0 |      5.95s | PASS    
-ISP BGP Route Reroute               |    100.0%  |             0 |     13.28s | PASS    
-Adversarial Double-Fault (Degraded) |    100.0%  |             0 | N/A (Rollback) | PASS    
-==========================================================================================
-Total Invariant False Resolutions: 0
-Benchmark results saved to: benchmarks/benchmark_report.json
-
-SUCCESS: 100% Closed-Loop Verification & Rollback Invariants Proven.
-```
-
----
-
-## API Reference
-
-### Telemetry Endpoints
-- `GET /api/telemetry/current`: Canonical streaming QoS telemetry snapshot.
-- `GET /api/telemetry/stream`: Server-Sent Events (SSE) 1Hz live telemetry feed.
-- `GET /api/telemetry/history`: Rolling 60-second telemetry window.
-- `GET /api/telemetry/metrics`: Prometheus exposition endpoint (QoS + Agent Self-Observability).
-
-### Incident & Remediation Endpoints
-- `POST /api/alerts/grafana`: Event-driven webhook ingest for Grafana Cloud Alertmanager.
-- `POST /api/investigate`: Trigger autonomous multi-step investigation loop.
-- `GET /api/agent/mcp-tools`: Inspect runtime catalog of discovered official Grafana MCP tools.
-- `POST /api/chaos/inject`: Inject failure scenario (`CDN_OUTAGE`, `DRM_TIMEOUT`, `ISP_PEERING_DROP`, `SECONDARY_PATH_DEGRADED`).
-- `POST /api/chaos/reset`: Reset infrastructure to healthy normal operating baseline.
-- `GET /healthz`: System health check and Grafana Cloud connectivity status.
-
----
-
-## Local Development & Testing
-
-### Prerequisites
-- Python 3.11+ (or Python 3.14 venv)
-- Node.js 20+ & npm
-- Docker (optional, for containerized run)
-
-### Setup
-
-```bash
-# 1. Clone repository
 git clone https://github.com/bobybarack/continuity-sre.git
 cd continuity-sre
-
-# 2. Configure environment
-cp .env.example .env
-# Edit .env with GEMINI_API_KEY, GRAFANA_INSTANCE_URL, GRAFANA_TOKEN
-
-# 3. Setup Python virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r backend/requirements.txt
-
-# 4. Setup frontend
-cd frontend
-npm install
-cd ..
 ```
 
-### Running Test Suite
+Create `.env` at the repository root; there is no checked-in `.env.example`:
 
-```bash
-# Run complete test suite (129+ tests passing)
-.venv/bin/pytest -v
-
-# Run targeted subsystems
-.venv/bin/pytest tests/test_event_driven_alerts.py
-.venv/bin/pytest tests/test_remediation_transactions_rollback.py
-.venv/bin/pytest tests/test_agent_observability.py
-.venv/bin/pytest tests/test_incident_concurrency.py
-.venv/bin/pytest tests/test_adversarial_scenario.py
-.venv/bin/pytest tests/test_chaos_benchmarks.py
+```dotenv
+GEMINI_API_KEY=your-gemini-api-key
+GEMINI_MODEL=your-supported-gemini-model
+GRAFANA_INSTANCE_URL=https://your-stack.grafana.net
+GRAFANA_TOKEN=your-grafana-service-account-token
+GRAFANA_PROM_UID=your-prometheus-datasource-uid
+GRAFANA_LOKI_UID=your-loki-datasource-uid
+VERIFICATION_POLICY=remote_preferred
+CONTINUITY_DEMO_KEY=your-local-demo-write-key
 ```
 
-### Running Frontend & Backend Locally
+Start the backend:
 
 ```bash
-# Start backend control plane (port 8000)
-.venv/bin/uvicorn main:app --app-dir backend --reload --port 8000
+docker compose up --build
+```
 
-# Start Next.js Command Center (port 3000)
+In a second terminal, configure and start the frontend:
+
+```bash
 cd frontend
+npm ci
+```
+
+Create `frontend/.env.local`:
+
+```dotenv
+NEXT_PUBLIC_API_URL=http://localhost:8080
+NEXT_PUBLIC_DEMO_KEY=your-local-demo-write-key
+```
+
+```bash
 npm run dev
 ```
 
----
+Open `http://localhost:3000`. Set the frontend URL explicitly: its source default points to the hosted backend. `NEXT_PUBLIC_DEMO_KEY` must match the backend write key and is visible in the browser bundle; it is a demo write guard, not user authentication. Keep Gemini and Grafana credentials on the backend.
 
-## Production Deployment (Google Cloud Run)
-
-The production control plane is containerized via a multi-stage Dockerfile that copies the official `mcp-grafana:1.5.1` binary from Grafana Labs and executes FastAPI with Python 3.11-slim.
-
-Deploy via `deploy.sh`:
+### Native backend alternative
 
 ```bash
-./deploy.sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -r backend/requirements.lock
+.venv/bin/uvicorn main:app --app-dir backend --reload --port 8000
 ```
 
-**Single-Instance Stateful Guarantee**:
-Cloud Run is explicitly configured with:
+For this option, set `NEXT_PUBLIC_API_URL=http://localhost:8000`. Install the official `mcp-grafana` executable on `PATH` or at `backend/bin/mcp-grafana` to use MCP. The native Python dependency install does not install that binary; supported Grafana calls can fall back to REST.
+
+## API
+
+FastAPI serves interactive OpenAPI documentation at `/docs` on the backend.
+
+| Method | Route | Purpose |
+|---|---|---|
+| GET | `/healthz` | Process liveness; does not check Grafana connectivity. |
+| GET | `/readyz` | Basic configuration readiness; does not authenticate external services. |
+| GET | `/api/telemetry/grafana-health` | Attempt authenticated Grafana datasource discovery. |
+| GET | `/api/telemetry/current` | Current canonical simulation snapshot. |
+| GET | `/api/telemetry/history` | Rolling telemetry history. |
+| GET | `/api/telemetry/stream` | SSE telemetry feed. |
+| GET | `/api/telemetry/metrics` | Prometheus simulation and agent metrics. |
+| GET | `/api/agent/status` | Agent configuration and investigation count. |
+| GET | `/api/agent/mcp-tools` | Runtime MCP discovery and allowlist. |
+| GET | `/api/agent/history` | In-memory investigation results. |
+| POST | `/api/agent/investigate-and-remediate` | Run the commander workflow. |
+| POST | `/api/alerts/grafana` | Ingest a Grafana alert and start a background workflow. |
+| GET | `/api/chaos/state` | Read simulator state. |
+| POST | `/api/chaos/inject-cdn-outage` | Inject a CDN outage. |
+| POST | `/api/chaos/inject-drm-timeout` | Inject a DRM timeout. |
+| POST | `/api/chaos/inject-isp-drop` | Inject an ISP drop. |
+| POST | `/api/chaos/remediate` | Apply a direct simulator action; bypasses the commander transaction workflow. |
+| POST | `/api/chaos/reset` | Restore the simulation baseline. |
+
+Agent and chaos mutations use `X-Continuity-Demo-Key`. The webhook additionally accepts `X-Webhook-Secret`, bearer authorization, or its supported query parameters. Secondary-path degradation is available through the Python simulator and benchmark, with no dedicated HTTP injection route.
+
+## Validation
+
+Run focused local checks without relying on the parallel-test plugin assumed by `pytest.ini`:
+
 ```bash
---min-instances 1 \
---max-instances 1 \
---concurrency 80
+.venv/bin/python -m pytest -o addopts='' -q \
+  tests/test_scenarios.py \
+  tests/test_chaos_state_machine.py \
+  tests/test_remediation_transactions_rollback.py
 ```
-This invariant ensures process-local simulation state, transaction ledgers, and deduplication caches remain coherent without requiring distributed database overhead for prototype validation.
 
----
+The full suite and benchmark include integration paths that can call configured services and create Grafana records. Run them against a dedicated test stack:
 
-## License
+```bash
+.venv/bin/python -m pytest -o addopts='' -v tests/
+.venv/bin/python benchmarks/run_scenarios.py
+```
 
-Licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
+The benchmark replaces `benchmarks/benchmark_report.json`. No fixed passing-test count or CI status is asserted here.
+
+## Deployment and operating limits
+
+[deploy.sh](deploy.sh) runs the test suite, builds the container, and deploys it to Google Cloud Run. It contains a project ID, region, and service name specific to this demo; review those values and `.env` before running it.
+
+The script sets `--min-instances 1`, `--max-instances 1`, and `--concurrency 80` for the process-local simulator. These settings do not provide durable storage, high availability, or state continuity across restarts and revision changes. The frontend is a separate Next.js static export (`npm run build` produces `frontend/out`); the script does not deploy it.
+
+Production use would require persistent transaction and incident storage, coordinated concurrency, identity and authorization beyond the public demo key, real infrastructure adapters, and independently ingested recovery telemetry. The current implementation demonstrates the workflow and its recovery checks within the boundaries above.
+
+## Repository guide
+
+| Path | Contents |
+|---|---|
+| [backend/](backend) | API, configuration, integrations, simulation, and recovery control. |
+| [frontend/](frontend) | Command center, API client, and presentation fixtures. |
+| [tests/](tests) | Unit, workflow, concurrency, and integration tests. |
+| [benchmarks/](benchmarks) | Scenario runner and saved results. |
+| [docs/images/](docs/images) | Existing application screenshots used in this README. |
+| [docker-compose.yml](docker-compose.yml) | Local backend container configuration. |
+| [LICENSE](LICENSE) | Apache License 2.0. |

@@ -37,8 +37,8 @@ export function TopBar({
     <header className="bg-white border border-gray-200/80 rounded-2xl px-5 py-3.5 subtle-card-shadow flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
       {/* Brand & Stream Selector */}
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 flex items-center justify-center">
-          <ContinuityLogo className="w-8 h-8" />
+        <div className="w-8 h-8 flex items-center justify-center shrink-0">
+          <ContinuityLogo className="w-8 h-8 text-gray-900" />
         </div>
 
         <div>
