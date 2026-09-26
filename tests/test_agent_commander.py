@@ -14,7 +14,7 @@ from services.mcp_service import official_mcp_bridge
 def test_agent_configuration():
     """Verifies that the Gemini Agent is initialized with the valid Google Cloud API key and model."""
     assert agent_commander.is_configured() is True
-    assert agent_commander.model_name in ["models/gemini-3.6-flash", "models/gemini-3.7-flash", "models/gemini-2.5-flash"]
+    assert agent_commander.model_name == "models/gemini-3.7-flash"
 
 @pytest.mark.asyncio
 async def test_official_grafana_mcp_bridge_discovery():
