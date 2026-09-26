@@ -1,16 +1,6 @@
 "use client";
 
 import React from "react";
-import {
-  Film01Icon,
-  Activity01Icon,
-  FlashIcon,
-  Shield01Icon,
-  DatabaseIcon,
-  Alert01Icon,
-  CloudIcon,
-  SparklesIcon,
-} from "hugeicons-react";
 import { InvestigationResult } from "../types/telemetry";
 
 export interface PremiereCrewDispatchCardProps {
