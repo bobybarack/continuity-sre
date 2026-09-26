@@ -8,7 +8,6 @@ import { LivePlayerCard } from "../components/LivePlayerCard";
 import { PremiereCrewDispatchCard } from "../components/PremiereCrewDispatchCard";
 import { CdnSplitCard } from "../components/CdnSplitCard";
 import { CrewRadioDispatchCard } from "../components/CrewRadioDispatchCard";
-import { ChaosDock } from "../components/ChaosDock";
 import { IncidentDrawer } from "../components/IncidentDrawer";
 import { ApiService } from "../services/api";
 import {
@@ -412,11 +411,18 @@ export default function ContinuityDashboard() {
           </div>
         )}
 
-        {/* Top Header with Brand & Incident Notification Bell */}
+        {/* Top Header with Brand, Chaos Demo Controls, & Incident Logs */}
         <TopBar
           telemetry={telemetry}
           investigationCount={investigations.length}
           onOpenNotifications={() => setIsDrawerOpen(true)}
+          chaosState={chaosState}
+          onInjectCdnOutage={handleInjectCdnOutage}
+          onInjectDrmTimeout={handleInjectDrmTimeout}
+          onInjectIspDrop={handleInjectIspDrop}
+          onAutoRemediate={handleTriggerAutonomousInvestigation}
+          onReset={handleResetChaos}
+          isLoading={isActionLoading || isInvestigating}
         />
 
         {/* 1. Top 5 Real-Time Metric Cards */}
@@ -451,17 +457,6 @@ export default function ContinuityDashboard() {
             latestInvestigation={latestInvestigation}
           />
         </div>
-
-        {/* 4. Chaos Injection & Self-Healing Control Dock */}
-        <ChaosDock
-          chaosState={chaosState}
-          onInjectCdnOutage={handleInjectCdnOutage}
-          onInjectDrmTimeout={handleInjectDrmTimeout}
-          onInjectIspDrop={handleInjectIspDrop}
-          onAutoRemediate={handleTriggerAutonomousInvestigation}
-          onReset={handleResetChaos}
-          isLoading={isActionLoading || isInvestigating}
-        />
       </main>
 
       {/* Slide-over Incident Log Drawer */}
