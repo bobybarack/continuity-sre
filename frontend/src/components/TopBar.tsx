@@ -34,7 +34,7 @@ export function TopBar({
             </h1>
             <span className="text-gray-300">•</span>
             <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-md">
-              Continuity Premiere: Global Broadcast (Live 4K)
+              Spider-Man: Brand New Day (World Premiere 4K)
             </span>
           </div>
           <p className="text-xs text-gray-500 font-medium mt-0.5">
