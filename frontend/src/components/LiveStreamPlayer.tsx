@@ -22,10 +22,10 @@ interface LiveStreamPlayerProps {
 }
 
 export function LiveStreamPlayer({ telemetry }: LiveStreamPlayerProps) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
+  const [isVideoLoading, setIsVideoLoading] = useState<boolean>(true);
   const [hasVideoError, setHasVideoError] = useState<boolean>(false);
   const [showAudioViz, setShowAudioViz] = useState<boolean>(true);
 
@@ -50,131 +50,6 @@ export function LiveStreamPlayer({ telemetry }: LiveStreamPlayerProps) {
     } else {
       video.pause();
     }
-  }, [isPlaying, isOutage]);
-
-  // Cinematic canvas render loop (fallback if video fails to load)
-  useEffect(() => {
-    if (!hasVideoError) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    let animId: number;
-    let t = 0;
-
-    const stars: { x: number; y: number; s: number; o: number }[] = [];
-    for (let i = 0; i < 90; i++) {
-      stars.push({
-        x: Math.random() * 800,
-        y: Math.random() * 450,
-        s: Math.random() * 2 + 0.5,
-        o: Math.random() * 0.8 + 0.2,
-      });
-    }
-
-    const render = () => {
-      t += 0.012;
-      const w = canvas.width;
-      const h = canvas.height;
-
-      // Deep Space Gradient
-      const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
-      bgGrad.addColorStop(0, "#050811");
-      bgGrad.addColorStop(0.45, "#0b1220");
-      bgGrad.addColorStop(0.8, "#26130b");
-      bgGrad.addColorStop(1, "#120803");
-      ctx.fillStyle = bgGrad;
-      ctx.fillRect(0, 0, w, h);
-
-      // Starfield
-      stars.forEach((st) => {
-        ctx.fillStyle = `rgba(255, 255, 255, ${
-          st.o * (0.75 + 0.25 * Math.sin(t * 1.5 + st.x))
-        })`;
-        ctx.fillRect(st.x, st.y, st.s, st.s);
-      });
-
-      // Giant Eclipse Horizon Planet
-      const planetGrad = ctx.createRadialGradient(
-        w * 0.74,
-        h * 0.38,
-        25,
-        w * 0.74,
-        h * 0.38,
-        170
-      );
-      planetGrad.addColorStop(0, "#ffb800");
-      planetGrad.addColorStop(0.28, "#e65c00");
-      planetGrad.addColorStop(0.68, "#6b1402");
-      planetGrad.addColorStop(1, "transparent");
-      ctx.fillStyle = planetGrad;
-      ctx.beginPath();
-      ctx.arc(w * 0.74, h * 0.38, 135, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Atmospheric Ring
-      ctx.strokeStyle = "rgba(255, 184, 0, 0.3)";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.ellipse(w * 0.74, h * 0.38, 185, 42, -0.22, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // Distant Arrakis Mountain Range
-      ctx.fillStyle = "#180d07";
-      ctx.beginPath();
-      ctx.moveTo(0, h);
-      for (let x = 0; x <= w; x += 15) {
-        const y =
-          h * 0.68 + Math.sin(x * 0.007 + t * 0.3) * 14 + Math.cos(x * 0.015) * 7;
-        ctx.lineTo(x, y);
-      }
-      ctx.lineTo(w, h);
-      ctx.closePath();
-      ctx.fill();
-
-      // Rolling Foreground Dunes
-      ctx.fillStyle = "#0d0502";
-      ctx.beginPath();
-      ctx.moveTo(0, h);
-      for (let x = 0; x <= w; x += 12) {
-        const y =
-          h * 0.82 + Math.sin(x * 0.011 - t * 0.6) * 12 + Math.cos(x * 0.02) * 5;
-        ctx.lineTo(x, y);
-      }
-      ctx.lineTo(w, h);
-      ctx.closePath();
-      ctx.fill();
-
-      // Outage Glitch Distortion
-      if (isOutage) {
-        for (let i = 0; i < 5; i++) {
-          const sliceY = Math.random() * h;
-          const sliceH = Math.random() * 20 + 4;
-          const shift = (Math.random() - 0.5) * 44;
-          ctx.drawImage(canvas, 0, sliceY, w, sliceH, shift, sliceY, w, sliceH);
-        }
-
-        ctx.fillStyle = "rgba(255, 51, 102, 0.14)";
-        ctx.fillRect(0, 0, w, h);
-
-        ctx.strokeStyle = "rgba(255, 51, 102, 0.25)";
-        ctx.lineWidth = 1;
-        for (let y = 0; y < h; y += 6) {
-          ctx.beginPath();
-          ctx.moveTo(0, y);
-          ctx.lineTo(w, y);
-          ctx.stroke();
-        }
-      }
-
-      if (isPlaying) {
-        animId = requestAnimationFrame(render);
-      }
-    };
-
-    render();
-    return () => cancelAnimationFrame(animId);
   }, [isPlaying, isOutage]);
 
   // Audio Spectrum Frequency Visualizer
@@ -260,21 +135,110 @@ export function LiveStreamPlayer({ telemetry }: LiveStreamPlayerProps) {
           <video
             ref={videoRef}
             src="/assets/premiere_stream.mp4"
+            poster="/assets/premiere_poster.jpg"
             autoPlay
             loop
             muted
             playsInline
-            onError={() => setHasVideoError(true)}
+            preload="auto"
+            onLoadStart={() => setIsVideoLoading(true)}
+            onLoadedData={() => setIsVideoLoading(false)}
+            onCanPlay={() => setIsVideoLoading(false)}
+            onPlaying={() => setIsVideoLoading(false)}
+            onWaiting={() => setIsVideoLoading(true)}
+            onError={() => {
+              setHasVideoError(true);
+              setIsVideoLoading(false);
+            }}
             className="w-full h-full object-cover"
           />
         ) : (
-          <canvas
-            ref={canvasRef}
-            width={800}
-            height={450}
-            className="w-full h-full object-cover"
-          />
+          <div className="relative w-full h-full flex flex-col items-center justify-center text-center p-6 bg-[#0a0f1d] overflow-hidden">
+            <img
+              src="/assets/premiere_poster.jpg"
+              alt="Broadcast Poster"
+              className="absolute inset-0 w-full h-full object-cover filter blur-lg opacity-30 scale-105"
+            />
+            <div className="relative z-10 flex flex-col items-center">
+              <div className="p-3 rounded-full bg-amber-500/10 border border-amber-500/30 mb-2">
+                <Radio01Icon className="w-6 h-6 text-amber-400" />
+              </div>
+              <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider">
+                Broadcast Signal Standby
+              </h4>
+              <p className="text-[11px] font-mono text-gray-400 mt-1 max-w-xs">
+                Edge stream relay reconnecting. Standby for frame sync.
+              </p>
+              <button
+                onClick={() => {
+                  setHasVideoError(false);
+                  setIsVideoLoading(true);
+                  if (videoRef.current) {
+                    videoRef.current.load();
+                  }
+                }}
+                className="mt-3 px-3 py-1 rounded text-[11px] font-mono font-semibold bg-white/10 hover:bg-white/20 border border-white/20 text-white transition-all cursor-pointer"
+              >
+                Reconnect Feed
+              </button>
+            </div>
+          </div>
         )}
+
+        {/* Blurred Pre-Load Screen Overlay */}
+        <div
+          className={`absolute inset-0 z-10 bg-black/60 backdrop-blur-xl transition-opacity duration-700 flex flex-col items-center justify-center p-6 text-center select-none ${
+            isVideoLoading && !isOutage
+              ? "opacity-100 pointer-events-auto"
+              : "opacity-0 pointer-events-none"
+          }`}
+        >
+          {/* Background blurred poster hint */}
+          <img
+            src="/assets/premiere_poster.jpg"
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover filter blur-xl scale-110 opacity-40 pointer-events-none"
+          />
+
+          {/* Glowing Radar Spinner */}
+          <div className="relative z-10 flex items-center justify-center mb-3">
+            <div className="absolute w-12 h-12 rounded-full bg-cyan-500/20 animate-ping" />
+            <div className="w-10 h-10 rounded-full border-2 border-cyan-400/30 border-t-cyan-400 animate-spin flex items-center justify-center">
+              <div className="w-2 h-2 rounded-full bg-cyan-400" />
+            </div>
+          </div>
+
+          {/* Status Information */}
+          <div className="relative z-10 flex flex-col items-center">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+              <span className="text-xs font-mono font-bold tracking-widest text-cyan-300 uppercase">
+                Synchronizing 4K Broadcast Feed
+              </span>
+            </div>
+            <p className="text-[11px] font-mono text-gray-300 max-w-xs leading-relaxed">
+              Handshaking DRM license and priming edge playback buffers...
+            </p>
+
+            {/* Shimmer Progress Bar */}
+            <div className="w-44 h-1.5 bg-white/10 rounded-full overflow-hidden mt-3 border border-white/10">
+              <div className="h-full bg-gradient-to-r from-cyan-500 via-emerald-400 to-cyan-400 animate-pulse rounded-full w-4/5" />
+            </div>
+
+            {/* Technical Spec Badges */}
+            <div className="flex items-center gap-1.5 mt-3 text-[10px] font-mono text-white/70">
+              <span className="px-2 py-0.5 rounded bg-white/10 border border-white/10">
+                3840x2160 UHD
+              </span>
+              <span className="px-2 py-0.5 rounded bg-white/10 border border-white/10">
+                60 FPS
+              </span>
+              <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                Fastly Edge
+              </span>
+            </div>
+          </div>
+        </div>
 
         {/* DRM Security Overlay Pill */}
         <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-black/60 backdrop-blur-md border border-white/10 text-[11px] font-mono text-white/70">
