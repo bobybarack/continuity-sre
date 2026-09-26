@@ -366,27 +366,27 @@ export function PremiereCrewDispatchCard({
 
         {/* Transaction Ledger & Idempotency Key */}
         {latestInvestigation?.remediation_transaction_id && (
-          <div className="mt-2.5 p-2.5 bg-slate-50 rounded-xl border border-slate-200/80">
-            <div className="flex items-center justify-between mb-1">
+          <div className="mt-2.5 p-2.5 bg-gray-50 rounded-xl border border-gray-200/60">
+            <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-1.5">
-                <DatabaseIcon className="w-3.5 h-3.5 text-indigo-600" />
-                <span className="text-[10px] font-mono font-bold tracking-wider text-indigo-700 uppercase">
+                <DatabaseIcon className="w-3.5 h-3.5 text-gray-500" />
+                <span className="text-[10px] font-mono font-semibold tracking-wider text-gray-500 uppercase">
                   Remediation Transaction
                 </span>
               </div>
-              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-100/70 text-indigo-800 border border-indigo-200">
+              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-white text-gray-800 border border-gray-200/80">
                 {latestInvestigation.remediation_transaction_id}
               </span>
             </div>
-            <div className="flex items-center justify-between text-[10px] font-mono text-gray-600">
+            <div className="flex items-center justify-between text-[10px] font-mono text-gray-500">
               <span className="truncate max-w-[220px]" title={latestInvestigation.idempotency_key || ""}>
-                Idempotency: {latestInvestigation.idempotency_key || "None"}
+                Idempotency: <span className="text-gray-700 font-medium">{latestInvestigation.idempotency_key || "None"}</span>
               </span>
               <span
-                className={`px-1.5 py-0.2 rounded font-bold ${
+                className={`px-1.5 py-0.2 rounded font-bold border ${
                   latestInvestigation.rollback_status === "EXECUTED"
-                    ? "bg-red-100 text-red-800 border border-red-200"
-                    : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                    ? "bg-red-50 text-red-700 border-red-200"
+                    : "bg-emerald-50 text-emerald-700 border-emerald-200"
                 }`}
               >
                 {latestInvestigation.rollback_status === "EXECUTED" ? "ROLLED_BACK" : "COMMITTED"}
@@ -397,17 +397,17 @@ export function PremiereCrewDispatchCard({
 
         {/* Closed-Loop Recovery Proof & Cryptographic Evidence Hash */}
         {latestInvestigation?.recovery_proof && (
-          <div className="mt-2.5 p-2.5 bg-emerald-50/60 rounded-xl border border-emerald-200/70">
+          <div className="mt-2.5 p-2.5 bg-gray-50 rounded-xl border border-gray-200/60">
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-1.5">
-                <Shield01Icon className="w-3.5 h-3.5 text-emerald-700" />
-                <span className="text-[10px] font-mono font-bold tracking-wider text-emerald-800 uppercase">
+                <Shield01Icon className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="text-[10px] font-mono font-semibold tracking-wider text-gray-500 uppercase">
                   Cryptographic Recovery Proof
                 </span>
               </div>
               {Boolean((latestInvestigation.recovery_proof as { evidence_hash?: string })?.evidence_hash) && (
                 <span
-                  className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold"
+                  className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white text-emerald-800 border border-emerald-200/80 font-bold"
                   title={(latestInvestigation.recovery_proof as { evidence_hash?: string }).evidence_hash}
                 >
                   SHA-256: {String((latestInvestigation.recovery_proof as { evidence_hash?: string }).evidence_hash).substring(0, 12)}...
@@ -422,7 +422,7 @@ export function PremiereCrewDispatchCard({
                     key={idx}
                     className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-medium border ${
                       g.passed
-                        ? "bg-white/80 border-emerald-200 text-emerald-800"
+                        ? "bg-white border-gray-200/80 text-gray-700"
                         : "bg-red-50 border-red-200 text-red-700"
                     }`}
                   >
