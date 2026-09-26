@@ -1,14 +1,7 @@
 "use client";
 
 import React from "react";
-import {
-  Notification01Icon,
-  CheckmarkCircle01Icon,
-  Alert01Icon,
-  Clock01Icon,
-  CpuIcon,
-  CloudIcon,
-} from "hugeicons-react";
+import { Notification01Icon, Alert01Icon } from "hugeicons-react";
 import { ContinuityLogo } from "./ContinuityLogo";
 import { TelemetrySnapshot } from "../types/telemetry";
 
@@ -50,58 +43,15 @@ export function TopBar({
         </div>
       </div>
 
-      {/* Right Status Badges & Controls */}
+      {/* Right Controls */}
       <div className="flex items-center gap-3 flex-wrap">
-        {/* Live SLA Status Badge */}
-        <div
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-            isOutage
-              ? "bg-red-50 text-red-700 border-red-200 animate-pulse"
-              : isRecovered
-              ? "bg-emerald-50 text-emerald-800 border-emerald-300 font-bold"
-              : "bg-emerald-50 text-emerald-700 border-emerald-200"
-          }`}
-        >
-          {isOutage ? (
+        {/* Outage Alert Badge - Only displayed when critical outage is active */}
+        {isOutage && (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border bg-red-50 text-red-700 border-red-200 animate-pulse">
             <Alert01Icon className="w-4 h-4 text-red-600" />
-          ) : (
-            <CheckmarkCircle01Icon className="w-4 h-4 text-emerald-600" />
-          )}
-          <span>
-            {isOutage
-              ? "Critical Edge Outage Active"
-              : isRecovered
-              ? "Failover Restored"
-              : "Stream Operational (Nominal)"}
-          </span>
-        </div>
-
-        {/* Official Grafana Cloud MCP Badge */}
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200">
-          <CloudIcon className="w-3.5 h-3.5 text-sky-600" />
-          <span>Grafana MCP (stdio: CONNECTED)</span>
-        </div>
-
-        {/* Gemini Engine Badge */}
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
-          <CpuIcon className="w-3.5 h-3.5 text-purple-600" />
-          <span>Google Gemini 3.8 Flash</span>
-        </div>
-
-        {/* Live Grafana Cloud Public Dashboard Link */}
-        <a
-          href="https://joyfuljasmine1550.grafana.net/public-dashboards/4cf5f0a12aee4d48a3ed18abd2c03db7"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200/80 transition-all active:scale-[0.98]"
-          title="Open live Grafana Cloud dashboard with Prometheus & Loki metrics"
-        >
-          <CloudIcon className="w-3.5 h-3.5 text-gray-500" />
-          <span>Grafana Cloud Live Board</span>
-          <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-          </svg>
-        </a>
+            <span>Critical Edge Outage Active</span>
+          </div>
+        )}
 
         {/* Live Incident Notification Bell Button */}
         <button
