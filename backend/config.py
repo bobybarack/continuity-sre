@@ -9,7 +9,7 @@ load_dotenv(dotenv_path=env_path)
 
 # Google Cloud & Gemini Settings
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "models/gemini-3.6-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "models/gemini-3.7-flash")
 GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT", "premiereshield-cinema")
 GOOGLE_CLOUD_PROJECT_NUMBER = os.getenv("GOOGLE_CLOUD_PROJECT_NUMBER", "121300560395")
 
