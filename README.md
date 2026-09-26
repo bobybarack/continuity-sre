@@ -21,6 +21,7 @@ A remediation action succeeding at the control-plane level does not prove that e
 
 | Resource | Description | Endpoint / URL |
 |---|---|---|
+| Command Center UI | Next.js Real-Time Control Center | [https://continuity-sre.pages.dev](https://continuity-sre.pages.dev) |
 | Repository | Source Code & Test Suites | [https://github.com/bobybarack/continuity-sre](https://github.com/bobybarack/continuity-sre) |
 | Backend API | FastAPI Production Control Plane | [https://continuity-api-121300560395.us-central1.run.app/](https://continuity-api-121300560395.us-central1.run.app/) |
 | Grafana Dashboard | Live Streaming QoS & Chaos Board | [https://joyfuljasmine1550.grafana.net/public-dashboards/4cf5f0a12aee4d48a3ed18abd2c03db7](https://joyfuljasmine1550.grafana.net/public-dashboards/4cf5f0a12aee4d48a3ed18abd2c03db7) |
