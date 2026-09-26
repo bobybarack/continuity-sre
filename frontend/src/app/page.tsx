@@ -9,6 +9,7 @@ import { PremiereCrewDispatchCard } from "../components/PremiereCrewDispatchCard
 import { CdnSplitCard } from "../components/CdnSplitCard";
 import { CrewRadioDispatchCard } from "../components/CrewRadioDispatchCard";
 import { IncidentDrawer } from "../components/IncidentDrawer";
+import { OutageResolutionModal } from "../components/OutageResolutionModal";
 import { ApiService } from "../services/api";
 import {
   TelemetrySnapshot,
@@ -25,6 +26,7 @@ export default function ContinuityDashboard() {
   const [isActionLoading, setIsActionLoading] = useState<boolean>(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [demoFixtureStage, setDemoFixtureStage] = useState<string | null>(null);
+  const [isResolutionModalDismissed, setIsResolutionModalDismissed] = useState<boolean>(false);
 
   // Initial Data Fetch & Demo Stage Handling
   const applyDemoStage = useCallback((stage: string) => {
@@ -279,9 +281,17 @@ export default function ContinuityDashboard() {
     return () => unsub();
   }, []);
 
+  // Automatically reopen resolution popup when an outage is detected
+  useEffect(() => {
+    if (telemetry?.is_outage) {
+      setIsResolutionModalDismissed(false);
+    }
+  }, [telemetry?.is_outage]);
+
   // Chaos Injection Handlers
   const handleInjectCdnOutage = async () => {
     setIsActionLoading(true);
+    setIsResolutionModalDismissed(false);
     try {
       const state = await ApiService.injectCdnOutage();
       setChaosState(state);
@@ -296,6 +306,7 @@ export default function ContinuityDashboard() {
 
   const handleInjectDrmTimeout = async () => {
     setIsActionLoading(true);
+    setIsResolutionModalDismissed(false);
     try {
       const state = await ApiService.injectDrmTimeout();
       setChaosState(state);
@@ -310,6 +321,7 @@ export default function ContinuityDashboard() {
 
   const handleInjectIspDrop = async () => {
     setIsActionLoading(true);
+    setIsResolutionModalDismissed(false);
     try {
       const state = await ApiService.injectIspDrop();
       setChaosState(state);
@@ -466,6 +478,16 @@ export default function ContinuityDashboard() {
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         investigations={investigations}
+      />
+
+      {/* 1-Click Autonomous SRE Outage Resolution Popup */}
+      <OutageResolutionModal
+        isOpen={Boolean(isOutage && !isResolutionModalDismissed)}
+        onClose={() => setIsResolutionModalDismissed(true)}
+        onAutoRemediate={handleTriggerAutonomousInvestigation}
+        isInvestigating={isInvestigating}
+        telemetry={telemetry}
+        latestInvestigation={latestInvestigation}
       />
     </div>
   );
