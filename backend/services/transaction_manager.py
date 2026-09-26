@@ -17,6 +17,7 @@ from services.remediation_models import (
     RecoveryProof,
     EscalationPackage
 )
+from services.checkpoint_service import checkpoint_service
 
 logger = logging.getLogger("continuity.transaction")
 
@@ -30,7 +31,15 @@ class TransactionManager:
         self.escalations: Dict[str, EscalationPackage] = {}
 
     def get_transaction(self, transaction_id: str) -> Optional[RemediationTransaction]:
-        return self.ledger.get(transaction_id)
+        if transaction_id in self.ledger:
+            return self.ledger[transaction_id]
+        # Durable checkpoint persistence lookup
+        tx = checkpoint_service.get_transaction(transaction_id)
+        if tx:
+            self.ledger[transaction_id] = tx
+            if tx.idempotency_key:
+                self.idempotency_index[tx.idempotency_key] = transaction_id
+        return tx
 
     def get_active_transaction(self, incident_id: Optional[str] = None) -> Optional[RemediationTransaction]:
         """Finds an in-flight transaction (APPLIED or VERIFYING) for the active incident."""
@@ -48,6 +57,10 @@ class TransactionManager:
         self.idempotency_index.clear()
         self.proofs.clear()
         self.escalations.clear()
+        try:
+            checkpoint_service.clear()
+        except Exception:
+            pass
 
     def get_proof(self, transaction_id: str) -> Optional[RecoveryProof]:
         return self.proofs.get(transaction_id)
@@ -79,12 +92,20 @@ class TransactionManager:
         """
         idempotency_key = f"{incident_id}:{action}:{version}"
 
-        # Phase 6: Idempotent Remediation check
+        # Phase 6: Idempotent Remediation check (in-memory + durable fallback)
         if idempotency_key in self.idempotency_index:
             existing_tx_id = self.idempotency_index[idempotency_key]
-            existing_tx = self.ledger[existing_tx_id]
-            logger.info(f"[Remediation Transaction] Idempotency hit for {idempotency_key} -> Reusing {existing_tx_id}")
-            return existing_tx, False
+            existing_tx = self.ledger.get(existing_tx_id)
+            if existing_tx:
+                logger.info(f"[Remediation Transaction] Idempotency hit for {idempotency_key} -> Reusing {existing_tx_id}")
+                return existing_tx, False
+
+        persisted_tx = checkpoint_service.get_transaction_by_idempotency(idempotency_key)
+        if persisted_tx:
+            self.ledger[persisted_tx.transaction_id] = persisted_tx
+            self.idempotency_index[idempotency_key] = persisted_tx.transaction_id
+            logger.info(f"[Remediation Transaction] Durable idempotency hit for {idempotency_key} -> Reusing {persisted_tx.transaction_id}")
+            return persisted_tx, False
 
         current_chaos = chaos_manager.get_state()
         previous_state = {
@@ -123,6 +144,10 @@ class TransactionManager:
 
         self.ledger[tx_id] = tx
         self.idempotency_index[idempotency_key] = tx_id
+        try:
+            checkpoint_service.save_transaction(tx)
+        except Exception as e:
+            logger.warning(f"[Checkpoint] Failed to persist transaction {tx_id}: {e}")
 
         # Mutate simulator state
         chaos_manager.apply_autonomous_remediation(
@@ -295,6 +320,10 @@ class TransactionManager:
         proof.evidence_hash = proof.calculate_evidence_hash()
         tx.proof = proof
         self.proofs[transaction_id] = proof
+        try:
+            checkpoint_service.save_transaction(tx)
+        except Exception as e:
+            logger.warning(f"[Checkpoint] Failed to persist committed transaction {transaction_id}: {e}")
         return proof
 
     def rollback_transaction(self, transaction_id: str) -> RemediationTransaction:
@@ -315,6 +344,10 @@ class TransactionManager:
         except Exception:
             pass
         logger.warning(f"[Remediation Transaction] {transaction_id} ROLLED_BACK to safe baseline snapshot.")
+        try:
+            checkpoint_service.save_transaction(tx)
+        except Exception as e:
+            logger.warning(f"[Checkpoint] Failed to persist rolled back transaction {transaction_id}: {e}")
         return tx
 
     def create_escalation_package(
