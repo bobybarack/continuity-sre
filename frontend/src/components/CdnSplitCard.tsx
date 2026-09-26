@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { CloudIcon } from "hugeicons-react";
 import { TelemetrySnapshot } from "../types/telemetry";
 
 interface CdnSplitCardProps {
@@ -18,18 +17,16 @@ export function CdnSplitCard({ telemetry }: CdnSplitCardProps) {
     <div className="bg-white border border-gray-200/80 rounded-2xl p-5 subtle-card-shadow flex flex-col justify-between h-full">
       <div>
         <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
-              <CloudIcon className="w-4 h-4 text-emerald-600" />
-            </div>
-            <div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
               <h3 className="text-sm font-bold text-gray-900 tracking-tight">
                 Multi-CDN Traffic Distribution
               </h3>
-              <p className="text-xs text-gray-500 font-medium">
-                Live Egress Routing & Balance
-              </p>
             </div>
+            <p className="text-xs text-gray-500 font-medium mt-0.5">
+              Live Egress Routing & Balance
+            </p>
           </div>
 
           <span
