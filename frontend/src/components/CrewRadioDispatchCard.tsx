@@ -74,6 +74,34 @@ function parseReasoningToDispatches(
   });
 }
 
+function formatLogText(text: string) {
+  if (text.includes("[PROMPT_INJECTION_DETECTED: neutralized]")) {
+    const parts = text.split("[PROMPT_INJECTION_DETECTED: neutralized]");
+    return (
+      <>
+        {parts[0]}
+        <span className="px-1 py-0.2 rounded font-bold bg-amber-100 text-amber-900 border border-amber-300">
+          [MODEL ARMOR: INJECTION BLOCKED]
+        </span>
+        {parts[1]}
+      </>
+    );
+  }
+  if (text.includes("[REDACTED]")) {
+    const parts = text.split("[REDACTED]");
+    return (
+      <>
+        {parts[0]}
+        <span className="px-1 py-0.2 rounded font-bold bg-slate-200 text-slate-800 border border-slate-300">
+          [REDACTED]
+        </span>
+        {parts[1]}
+      </>
+    );
+  }
+  return text;
+}
+
 export function CrewRadioDispatchCard({
   telemetry,
   latestInvestigation,
@@ -126,6 +154,9 @@ export function CrewRadioDispatchCard({
             <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold bg-gray-100 text-gray-700 border border-gray-200">
               Query: &#123;app="ott-edge-router"&#125;
             </span>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+              MODEL ARMOR: ARMED
+            </span>
           </div>
           <p className="text-xs text-gray-500 font-medium mt-0.5">
             Real-time edge POP telemetry & multi-agent radio dispatches
@@ -171,7 +202,7 @@ export function CrewRadioDispatchCard({
             <span className="text-gray-400 shrink-0 text-[10px]">[{baseTime}]</span>
             <span className="text-blue-600 font-bold shrink-0">LOKI INGEST</span>
             <span className="text-gray-700 leading-snug">
-              {telemetry?.latest_log || "Fastly Edge POP iad-01 502 BAD GATEWAY - Upstream packet drop 60% (ASN 3356)"}
+              {formatLogText(telemetry?.latest_log || "Fastly Edge POP iad-01 502 BAD GATEWAY - Upstream packet drop 60% (ASN 3356)")}
             </span>
           </div>
 
@@ -243,7 +274,7 @@ export function CrewRadioDispatchCard({
               EDGE INGEST
             </span>
             <span className="text-gray-700 truncate">
-              {telemetry?.latest_log || "All edge delivery streams nominal [Fastly Edge POP iad-01: 200 OK]"}
+              {formatLogText(telemetry?.latest_log || "All edge delivery streams nominal [Fastly Edge POP iad-01: 200 OK]")}
             </span>
           </div>
         </div>

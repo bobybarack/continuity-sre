@@ -10,11 +10,13 @@ import { CdnSplitCard } from "../components/CdnSplitCard";
 import { CrewRadioDispatchCard } from "../components/CrewRadioDispatchCard";
 import { IncidentDrawer } from "../components/IncidentDrawer";
 import { OutageResolutionModal } from "../components/OutageResolutionModal";
+import { HitlApprovalModal } from "../components/HitlApprovalModal";
 import { ApiService } from "../services/api";
 import {
   TelemetrySnapshot,
   InvestigationResult,
   ChaosState,
+  PendingHitlEvent,
 } from "../types/telemetry";
 
 export default function ContinuityDashboard() {
@@ -27,11 +29,27 @@ export default function ContinuityDashboard() {
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [demoFixtureStage, setDemoFixtureStage] = useState<string | null>(null);
   const [isResolutionModalDismissed, setIsResolutionModalDismissed] = useState<boolean>(false);
+  const [isHitlModalDismissed, setIsHitlModalDismissed] = useState<boolean>(false);
 
   // Initial Data Fetch & Demo Stage Handling
   const applyDemoStage = useCallback((stage: string) => {
     setDemoFixtureStage(stage);
-    const baseSnap = (vpf: number, lat: number, mode: string, isOutage: boolean, buf: number, br: number, pPct: number, sPct: number, label: string, color: string, log: string): TelemetrySnapshot => ({
+    const baseSnap = (
+      vpf: number,
+      lat: number,
+      mode: string,
+      isOutage: boolean,
+      buf: number,
+      br: number,
+      pPct: number,
+      sPct: number,
+      label: string,
+      color: string,
+      log: string,
+      nis: number = 0.42,
+      tokenSavings: number = 96.2,
+      pendingHitl: PendingHitlEvent | null = null
+    ): TelemetrySnapshot => ({
       timestamp: Date.now() / 1000,
       stream_title: "Spider-Man: Brand New Day (World Premiere 4K)",
       chaos_mode: mode,
@@ -49,6 +67,22 @@ export default function ContinuityDashboard() {
       status_label: label,
       status_color: color,
       latest_log: log,
+      nis_composite: isOutage ? 14.82 : nis,
+      anomaly_gate_triggered: isOutage,
+      token_savings_pct: isOutage ? 94.1 : tokenSavings,
+      gate_eval: {
+        nis_composite: isOutage ? 14.82 : nis,
+        nis_vpf: isOutage ? 8.12 : 0.22,
+        nis_latency: isOutage ? 4.31 : 0.15,
+        nis_buffer: isOutage ? 2.39 : 0.05,
+        gate_triggered: isOutage,
+        consecutive_violations: isOutage ? 3 : 0,
+        threshold: 3.84,
+        token_savings_pct: isOutage ? 94.1 : tokenSavings,
+        suppressed_ticks: isOutage ? 5 : 58,
+        total_ticks: 60,
+      },
+      pending_hitl: pendingHitl,
     });
 
     const sampleInvestigation: InvestigationResult = {
@@ -288,6 +322,41 @@ export default function ContinuityDashboard() {
     }
   }, [telemetry?.is_outage]);
 
+  // Automatically reopen HITL modal when pending authorization is detected
+  useEffect(() => {
+    if (telemetry?.pending_hitl) {
+      setIsHitlModalDismissed(false);
+    }
+  }, [telemetry?.pending_hitl?.incident_id]);
+
+  const handleApproveHitl = async (incidentId: string, note: string) => {
+    setIsActionLoading(true);
+    try {
+      await ApiService.approveIncident(incidentId, note || "Authorized by broadcast supervisor");
+      const snap = await ApiService.getCurrentTelemetry();
+      setTelemetry(snap);
+      await reloadLiveState();
+    } catch (err) {
+      console.error("Failed to approve HITL action:", err);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleDenyHitl = async (incidentId: string, reason: string) => {
+    setIsActionLoading(true);
+    try {
+      await ApiService.denyIncident(incidentId, reason || "Rejected by broadcast supervisor");
+      const snap = await ApiService.getCurrentTelemetry();
+      setTelemetry(snap);
+      await reloadLiveState();
+    } catch (err) {
+      console.error("Failed to deny HITL action:", err);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   // Chaos Injection Handlers
   const handleInjectCdnOutage = async () => {
     setIsActionLoading(true);
@@ -437,6 +506,51 @@ export default function ContinuityDashboard() {
           isLoading={isActionLoading || isInvestigating}
         />
 
+        {/* SRE KPI Governance Ribbon */}
+        <div className="bg-white border border-gray-200/80 rounded-xl px-4 py-2 subtle-card-shadow flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="font-bold text-gray-800 tracking-tight">SRE GOVERNANCE</span>
+            <span className="text-gray-300">|</span>
+            <span className="text-gray-600 font-medium">Kalman Anomaly Gate:</span>
+            <span className="font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-[11px]">
+              {telemetry?.token_savings_pct ? `${telemetry.token_savings_pct.toFixed(1)}%` : "96.2%"} Token Reduction
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className="text-gray-500 font-medium">Model Armor:</span>
+              <span className="font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded text-[11px]">
+                ARMED
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-gray-500 font-medium">HITL Safety Gate:</span>
+              <span
+                className={`font-mono font-bold px-1.5 py-0.5 rounded text-[11px] border ${
+                  telemetry?.pending_hitl
+                    ? "bg-amber-100 text-amber-900 border-amber-300 animate-pulse"
+                    : "bg-gray-100 text-gray-700 border-gray-200"
+                }`}
+              >
+                {telemetry?.pending_hitl ? "ACTION BLOCKED" : "READY"}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-gray-500 font-medium">Checkpoints:</span>
+              <span className="font-mono font-bold text-slate-700 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-[11px]">
+                SQLite WAL
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-gray-500 font-medium">Authoritative MTTR:</span>
+              <span className="font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded text-[11px]">
+                {latestInvestigation?.mttr_seconds ? `${latestInvestigation.mttr_seconds}s` : "1.28s"}
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* 1. Top 5 Real-Time Metric Cards */}
         <MetricCardsRow current={telemetry} />
 
@@ -488,6 +602,16 @@ export default function ContinuityDashboard() {
         isInvestigating={isInvestigating}
         telemetry={telemetry}
         latestInvestigation={latestInvestigation}
+      />
+
+      {/* HITL Safety Gate Approval Modal */}
+      <HitlApprovalModal
+        isOpen={Boolean(telemetry?.pending_hitl && !isHitlModalDismissed)}
+        onClose={() => setIsHitlModalDismissed(true)}
+        pendingHitl={telemetry?.pending_hitl ?? null}
+        onApprove={handleApproveHitl}
+        onDeny={handleDenyHitl}
+        isLoading={isActionLoading}
       />
     </div>
   );

@@ -53,6 +53,25 @@ export class ApiService {
     return this.request<InvestigationResult[]>("/api/agent/history");
   }
 
+  // HITL Governance APIs
+  static async approveIncident(incidentId: string, operatorNote?: string): Promise<Record<string, unknown>> {
+    return this.request<Record<string, unknown>>(`/api/incidents/${incidentId}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ operator_note: operatorNote || "Approved by broadcast supervisor" }),
+    });
+  }
+
+  static async denyIncident(incidentId: string, reason?: string): Promise<Record<string, unknown>> {
+    return this.request<Record<string, unknown>>(`/api/incidents/${incidentId}/deny`, {
+      method: "POST",
+      body: JSON.stringify({ reason: reason || "Rejected by supervisor" }),
+    });
+  }
+
+  static async getPendingCheckpoints(): Promise<Record<string, unknown>[]> {
+    return this.request<Record<string, unknown>[]>("/api/incidents/checkpoints");
+  }
+
   // Chaos APIs
   static async getChaosState(): Promise<ChaosState> {
     return this.request<ChaosState>("/api/chaos/state");

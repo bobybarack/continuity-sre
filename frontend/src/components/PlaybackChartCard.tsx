@@ -13,10 +13,12 @@ export function PlaybackChartCard({
   history,
 }: PlaybackChartCardProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [activeMetric, setActiveMetric] = useState<"vpf" | "latency">("vpf");
+  const [activeMetric, setActiveMetric] = useState<"vpf" | "latency" | "kalman">("vpf");
 
   const vpf = telemetry?.video_playback_failures_pct ?? 0.18;
   const isOutage = telemetry?.is_outage ?? false;
+  const nisVal = telemetry?.nis_composite ?? 0.14;
+  const tokenSavings = telemetry?.token_savings_pct ?? 96.2;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -40,17 +42,29 @@ export function PlaybackChartCard({
 
     if (history.length < 2) return;
 
-    const values =
-      activeMetric === "vpf"
-        ? history.map((s) => s.video_playback_failures_pct)
-        : history.map((s) => s.cdn_egress_latency_ms);
+    let values: number[];
+    let threshold: number;
+    let unit: string;
 
-    const threshold = activeMetric === "vpf" ? 1.0 : 150.0;
+    if (activeMetric === "vpf") {
+      values = history.map((s) => s.video_playback_failures_pct);
+      threshold = 1.0;
+      unit = "%";
+    } else if (activeMetric === "latency") {
+      values = history.map((s) => s.cdn_egress_latency_ms);
+      threshold = 150.0;
+      unit = "ms";
+    } else {
+      values = history.map((s) => s.nis_composite ?? 0.14);
+      threshold = 3.84;
+      unit = " NIS";
+    }
+
     const maxVal = Math.max(...values, threshold * 1.3, 1);
     const minVal = 0;
     const range = maxVal - minVal;
 
-    // Draw SLA Threshold Line
+    // Draw SLA / Chi-Square Threshold Line
     const threshY = h - 25 - ((threshold - minVal) / range) * (h - 55);
     ctx.beginPath();
     ctx.setLineDash([4, 4]);
@@ -61,11 +75,12 @@ export function PlaybackChartCard({
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Draw SLA Label
+    // Draw Threshold Label
     ctx.fillStyle = "#ef4444";
     ctx.font = "10px sans-serif";
+    const labelText = activeMetric === "kalman" ? `CHI-SQUARE LIMIT: ${threshold}${unit}` : `SLA LIMIT: ${threshold}${unit}`;
     ctx.fillText(
-      `SLA LIMIT: ${threshold}${activeMetric === "vpf" ? "%" : "ms"}`,
+      labelText,
       40,
       threshY - 5
     );
@@ -124,11 +139,22 @@ export function PlaybackChartCard({
         {/* Chart Header */}
         <div className="flex flex-wrap items-center justify-between gap-2.5 pb-3 border-b border-gray-100">
           <div>
-            <h3 className="text-sm font-bold text-gray-900 tracking-tight">
-              Playback Quality & Failure Rate
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-gray-900 tracking-tight">
+                {activeMetric === "kalman" ? "50Hz Mathematical Anomaly Gate" : "Playback Quality & Telemetry"}
+              </h3>
+              {activeMetric === "kalman" && (
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                  KALMAN INNOVATION
+                </span>
+              )}
+            </div>
             <p className="text-xs text-gray-500 mt-0.5">
-              Real-time video playback failures vs 1.00% SLA limit (60s rolling)
+              {activeMetric === "kalman"
+                ? `KALMAN Innovation Gate: ${tokenSavings.toFixed(1)}% LLM tokens saved via mathematical noise screening`
+                : activeMetric === "vpf"
+                ? "Real-time video playback failures vs 1.00% SLA limit (60s rolling)"
+                : "Downstream edge CDN egress latency vs 150ms SLA limit"}
             </p>
           </div>
 
@@ -154,6 +180,16 @@ export function PlaybackChartCard({
               >
                 Latency (ms)
               </button>
+              <button
+                onClick={() => setActiveMetric("kalman")}
+                className={`px-2.5 py-1 rounded-lg transition-all text-[11px] font-mono ${
+                  activeMetric === "kalman"
+                    ? "bg-white text-purple-900 font-bold shadow-sm"
+                    : "text-gray-500 hover:text-gray-900"
+                }`}
+              >
+                NIS Gate
+              </button>
             </div>
 
             <div className="text-right pl-1">
@@ -161,13 +197,15 @@ export function PlaybackChartCard({
                 Current
               </span>
               <span
-                className={`text-sm font-bold leading-tight ${
+                className={`text-sm font-bold leading-tight font-mono ${
                   isOutage ? "text-red-600" : "text-emerald-700"
                 }`}
               >
                 {activeMetric === "vpf"
                   ? `${vpf.toFixed(2)}%`
-                  : `${(telemetry?.cdn_egress_latency_ms ?? 48).toFixed(0)}ms`}
+                  : activeMetric === "latency"
+                  ? `${(telemetry?.cdn_egress_latency_ms ?? 48).toFixed(0)}ms`
+                  : `${nisVal.toFixed(2)}`}
               </span>
             </div>
           </div>

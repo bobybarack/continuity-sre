@@ -16,6 +16,35 @@ export interface TelemetrySnapshot {
   status_label: "HEALTHY" | "DEGRADED" | "CRITICAL_OUTAGE" | "RECOVERED" | string;
   status_color: "green" | "yellow" | "red" | "blue" | string;
   latest_log: string;
+  pending_hitl?: PendingHitlEvent | null;
+  nis_composite?: number;
+  anomaly_gate_triggered?: boolean;
+  token_savings_pct?: number;
+  gate_eval?: {
+    nis_composite: number;
+    nis_vpf: number;
+    nis_latency: number;
+    nis_buffer: number;
+    gate_triggered: boolean;
+    consecutive_violations: number;
+    threshold: number;
+    token_savings_pct: number;
+    suppressed_ticks: number;
+    total_ticks: number;
+  } | null;
+}
+
+export interface PendingHitlEvent {
+  type: string;
+  checkpoint_id: string;
+  incident_id: string;
+  action: string;
+  params: Record<string, unknown>;
+  rationale: string;
+  blast_radius: number;
+  requested_at: number;
+  timeout_seconds: number;
+  rollback_plan: string;
 }
 
 export interface InvestigationResult {

@@ -171,6 +171,14 @@ export function PremiereCrewDispatchCard({
             <p className="text-[10px] text-gray-500 font-medium mt-1 leading-snug">
               Incident lifecycle, orchestration, and executive wrap report
             </p>
+            <div className="flex flex-wrap gap-1 mt-1.5 pt-1.5 border-t border-slate-200/60">
+              <span className="text-[8px] font-mono px-1 py-0.5 rounded bg-white text-slate-700 border border-slate-200">
+                create_incident
+              </span>
+              <span className="text-[8px] font-mono px-1 py-0.5 rounded bg-white text-slate-700 border border-slate-200">
+                request_approval
+              </span>
+            </div>
           </div>
 
           {/* Station 2: DIT */}
@@ -207,6 +215,14 @@ export function PremiereCrewDispatchCard({
             <p className="text-[10px] text-gray-500 font-medium mt-1 leading-snug">
               Grafana Cloud MCP: Prometheus vectors and Loki error streams
             </p>
+            <div className="flex flex-wrap gap-1 mt-1.5 pt-1.5 border-t border-amber-200/60">
+              <span className="text-[8px] font-mono px-1 py-0.5 rounded bg-white text-amber-800 border border-amber-200">
+                query_prometheus
+              </span>
+              <span className="text-[8px] font-mono px-1 py-0.5 rounded bg-white text-amber-800 border border-amber-200">
+                query_loki (Model Armor)
+              </span>
+            </div>
           </div>
 
           {/* Station 3: Key Grip */}
@@ -243,6 +259,14 @@ export function PremiereCrewDispatchCard({
             <p className="text-[10px] text-gray-500 font-medium mt-1 leading-snug">
               CDN egress traffic shifting, BGP reroute, and DRM failover
             </p>
+            <div className="flex flex-wrap gap-1 mt-1.5 pt-1.5 border-t border-sky-200/60">
+              <span className="text-[8px] font-mono px-1 py-0.5 rounded bg-white text-sky-800 border border-sky-200">
+                shift_cdn
+              </span>
+              <span className="text-[8px] font-mono px-1 py-0.5 rounded bg-white text-sky-800 border border-sky-200">
+                failover_drm
+              </span>
+            </div>
           </div>
 
           {/* Station 4: Continuity Supervisor */}
@@ -283,6 +307,14 @@ export function PremiereCrewDispatchCard({
             <p className="text-[10px] text-gray-500 font-medium mt-1 leading-snug">
               Enforces Closed-Loop invariant: Command executed != Service recovered
             </p>
+            <div className="flex flex-wrap gap-1 mt-1.5 pt-1.5 border-t border-emerald-200/60">
+              <span className="text-[8px] font-mono px-1 py-0.5 rounded bg-white text-emerald-800 border border-emerald-200">
+                create_annotation
+              </span>
+              <span className="text-[8px] font-mono px-1 py-0.5 rounded bg-white text-emerald-800 border border-emerald-200">
+                verify_recovery (VPF Proof)
+              </span>
+            </div>
           </div>
         </div>
 
