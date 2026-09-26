@@ -428,34 +428,36 @@ export default function ContinuityDashboard() {
         {/* 1. Top 5 Real-Time Metric Cards */}
         <MetricCardsRow current={telemetry} />
 
-        {/* 2. Central Row: Option 2 Command Center - Video Hero (8 cols / 66.7%) + Stacked Telemetry (4 cols / 33.3%) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
-          <div className="lg:col-span-8 flex flex-col">
+        {/* 2. Layout 15 - Upper Tier: Media & Telemetry Observability (50% / 50%) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
+          <div className="lg:col-span-6 flex flex-col">
             <LivePlayerCard telemetry={telemetry} />
           </div>
-          <div className="lg:col-span-4 flex flex-col gap-4 justify-between">
-            <div className="flex-1">
-              <PlaybackChartCard telemetry={telemetry} history={history} />
-            </div>
-            <div className="flex-1">
-              <CdnSplitCard telemetry={telemetry} />
-            </div>
+          <div className="lg:col-span-6 flex flex-col">
+            <PlaybackChartCard telemetry={telemetry} history={history} />
           </div>
         </div>
 
-        {/* 3. Bottom Row: Premiere Crew Dispatch (50%) + Crew Radio Comms & Ingest Stream (50%) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <PremiereCrewDispatchCard
-            latestInvestigation={latestInvestigation}
-            isInvestigating={isInvestigating}
-            onTriggerInvestigation={handleTriggerAutonomousInvestigation}
-            isOutage={isOutage}
-          />
-          <CrewRadioDispatchCard
-            telemetry={telemetry}
-            history={history}
-            latestInvestigation={latestInvestigation}
-          />
+        {/* 3. Layout 15 - Lower Tier: CDN Egress (25%), SRE Crew (41.7%), Radio Stream (33.3%) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
+          <div className="lg:col-span-3 flex flex-col">
+            <CdnSplitCard telemetry={telemetry} />
+          </div>
+          <div className="lg:col-span-5 flex flex-col">
+            <PremiereCrewDispatchCard
+              latestInvestigation={latestInvestigation}
+              isInvestigating={isInvestigating}
+              onTriggerInvestigation={handleTriggerAutonomousInvestigation}
+              isOutage={isOutage}
+            />
+          </div>
+          <div className="lg:col-span-4 flex flex-col">
+            <CrewRadioDispatchCard
+              telemetry={telemetry}
+              history={history}
+              latestInvestigation={latestInvestigation}
+            />
+          </div>
         </div>
       </main>
 
