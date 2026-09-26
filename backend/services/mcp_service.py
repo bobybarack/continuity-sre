@@ -34,6 +34,7 @@ from services.integration_models import (
     normalize_incident_result,
     normalize_annotation_result,
 )
+from services.security_guard import security_guard
 
 logger = logging.getLogger("continuity.mcp")
 
@@ -303,11 +304,13 @@ async def grafana_query_loki(logql: str, limit: int = 20) -> LokiQueryResult:
             "limit": limit
         })
         if res is not None and isinstance(res, (dict, list)):
-            return normalize_loki_result(res, query=logql, source="official_mcp")
+            normalized = normalize_loki_result(res, query=logql, source="official_mcp")
+            return security_guard.sanitize_loki_result(normalized)
     except Exception as e:
         logger.warning(f"[MCP Tool] Official MCP query_loki_logs failed: {e}. Executing direct REST fallback...")
     direct_res = await grafana_client.query_loki_logs(logql, limit=limit)
-    return normalize_loki_result(direct_res, query=logql, source="direct_rest")
+    normalized = normalize_loki_result(direct_res, query=logql, source="direct_rest")
+    return security_guard.sanitize_loki_result(normalized)
 
 async def grafana_create_annotation(text: str, tags: Optional[List[str]] = None) -> GrafanaAnnotationRef:
     """Drops a visible timestamped vertical annotation pin on live Grafana dashboard via official MCP Server."""
