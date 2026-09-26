@@ -33,7 +33,9 @@ AGENTS.md
 videos/
 video-production/
 devpost-gallery/
-docs/
+docs/*
+!docs/images/
+!docs/images/**
 frontend/public/assets/
 frontend/public/*.png
 frontend/public/*.svg

@@ -32,7 +32,7 @@ export default function ContinuityDashboard() {
     setDemoFixtureStage(stage);
     const baseSnap = (vpf: number, lat: number, mode: string, isOutage: boolean, buf: number, br: number, pPct: number, sPct: number, label: string, color: string, log: string): TelemetrySnapshot => ({
       timestamp: Date.now() / 1000,
-      stream_title: "Continuity Premiere: Global Broadcast (Live 4K UHD)",
+      stream_title: "Spider-Man: Brand New Day (World Premiere 4K)",
       chaos_mode: mode,
       is_outage: isOutage,
       video_playback_failures_pct: vpf,
@@ -53,7 +53,7 @@ export default function ContinuityDashboard() {
     const sampleInvestigation: InvestigationResult = {
       timestamp: Date.now() / 1000 - 120,
       incident_id: "INC-89211",
-      stream_title: "Continuity Premiere: Global Broadcast (Live 4K UHD)",
+      stream_title: "Spider-Man: Brand New Day (World Premiere 4K)",
       initial_anomaly_detected: true,
       vpf_rate: 5.08,
       cdn_latency_ms: 840.0,
