@@ -8,6 +8,8 @@ import {
   Shield01Icon,
   CloudIcon,
   SparklesIcon,
+  DatabaseIcon,
+  Alert01Icon,
 } from "hugeicons-react";
 import { InvestigationResult } from "../types/telemetry";
 
@@ -361,6 +363,96 @@ export function PremiereCrewDispatchCard({
             </span>
           </div>
         </div>
+
+        {/* Transaction Ledger & Idempotency Key */}
+        {latestInvestigation?.remediation_transaction_id && (
+          <div className="mt-2.5 p-2.5 bg-slate-50 rounded-xl border border-slate-200/80">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-1.5">
+                <DatabaseIcon className="w-3.5 h-3.5 text-indigo-600" />
+                <span className="text-[10px] font-mono font-bold tracking-wider text-indigo-700 uppercase">
+                  Remediation Transaction
+                </span>
+              </div>
+              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-100/70 text-indigo-800 border border-indigo-200">
+                {latestInvestigation.remediation_transaction_id}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-[10px] font-mono text-gray-600">
+              <span className="truncate max-w-[220px]" title={latestInvestigation.idempotency_key || ""}>
+                Idempotency: {latestInvestigation.idempotency_key || "None"}
+              </span>
+              <span
+                className={`px-1.5 py-0.2 rounded font-bold ${
+                  latestInvestigation.rollback_status === "EXECUTED"
+                    ? "bg-red-100 text-red-800 border border-red-200"
+                    : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                }`}
+              >
+                {latestInvestigation.rollback_status === "EXECUTED" ? "ROLLED_BACK" : "COMMITTED"}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Closed-Loop Recovery Proof & Cryptographic Evidence Hash */}
+        {latestInvestigation?.recovery_proof && (
+          <div className="mt-2.5 p-2.5 bg-emerald-50/60 rounded-xl border border-emerald-200/70">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-1.5">
+                <Shield01Icon className="w-3.5 h-3.5 text-emerald-700" />
+                <span className="text-[10px] font-mono font-bold tracking-wider text-emerald-800 uppercase">
+                  Cryptographic Recovery Proof
+                </span>
+              </div>
+              {Boolean((latestInvestigation.recovery_proof as { evidence_hash?: string })?.evidence_hash) && (
+                <span
+                  className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold"
+                  title={(latestInvestigation.recovery_proof as { evidence_hash?: string }).evidence_hash}
+                >
+                  SHA-256: {String((latestInvestigation.recovery_proof as { evidence_hash?: string }).evidence_hash).substring(0, 12)}...
+                </span>
+              )}
+            </div>
+            {/* Gate checklist */}
+            {Array.isArray((latestInvestigation.recovery_proof as { gates?: Array<{ name: string; observed_value: string; required_value: string; passed: boolean }> })?.gates) && (
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {((latestInvestigation.recovery_proof as { gates: Array<{ name: string; observed_value: string; required_value: string; passed: boolean }> }).gates).map((g, idx) => (
+                  <span
+                    key={idx}
+                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-medium border ${
+                      g.passed
+                        ? "bg-white/80 border-emerald-200 text-emerald-800"
+                        : "bg-red-50 border-red-200 text-red-700"
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        g.passed ? "bg-emerald-500" : "bg-red-500"
+                      }`}
+                    />
+                    <span>
+                      {g.name}: {g.observed_value} ({g.passed ? "PASSED" : "FAILED"})
+                    </span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Adversarial Rollback Alert Banner */}
+        {latestInvestigation?.rollback_status === "EXECUTED" && (
+          <div className="mt-2.5 p-2.5 bg-red-50 rounded-xl border border-red-200 text-xs">
+            <div className="flex items-center gap-1.5 font-bold text-red-800 text-[11px] mb-1">
+              <Alert01Icon className="w-3.5 h-3.5 text-red-600" />
+              <span>AUTOMATED ROLLBACK EXECUTED</span>
+            </div>
+            <p className="text-[10px] text-red-700 leading-snug font-medium">
+              Recovery verification gates failed to converge. Infrastructure state restored to pre-action baseline snapshot. Human SRE escalation package compiled.
+            </p>
+          </div>
+        )}
 
         {/* Official MCP Toolchain Strip */}
         <div className="mt-2.5 p-2.5 bg-gray-900 rounded-xl border border-gray-800 text-white">
