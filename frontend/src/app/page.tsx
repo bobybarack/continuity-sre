@@ -99,6 +99,20 @@ export default function ContinuityDashboard() {
         "Verifying downstream forward buffer and VPF recovery via Prometheus",
         "Closed-loop verification passed: VPF 0.21% (threshold < 1.00%)",
       ],
+      remediation_transaction_id: "TX-2026-89211",
+      idempotency_key: "INC-89211:SHIFT_TRAFFIC_TO_AKAMAI:v1",
+      rollback_action: "RESTORE_FASTLY_PRIMARY_EGRESS",
+      rollback_status: "STANDBY",
+      recovery_proof: {
+        evidence_hash: "e4b27c9f8a12d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8",
+        verified_at: Date.now() / 1000 - 110,
+        authoritative_source: "grafana_cloud_prometheus",
+        gates: [
+          { name: "VPF Rate", observed_value: "0.21%", required_value: "<= 0.50%", passed: true },
+          { name: "Forward Buffer", observed_value: "27.9s", required_value: ">= 20.0s", passed: true },
+          { name: "Edge Latency", observed_value: "46ms", required_value: "<= 150ms", passed: true },
+        ],
+      },
     };
 
     if (stage === "baseline") {
@@ -374,6 +388,26 @@ export default function ContinuityDashboard() {
               className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded text-[11px] transition-colors"
             >
               Switch to Live Telemetry
+            </button>
+          </div>
+        )}
+
+        {/* Conditional Adversarial Rollback & SRE Escalation Banner */}
+        {latestInvestigation?.rollback_status === "EXECUTED" && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-2.5 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-mono uppercase font-bold text-red-700 bg-red-500/20 px-1.5 py-0.5 rounded text-[10px]">
+                AUTOMATED ROLLBACK EXECUTED
+              </span>
+              <span className="text-red-900 font-medium">
+                Closed-loop recovery gates failed to converge &bull; Infrastructure snapshot restored &bull; Human SRE Dossier compiled
+              </span>
+            </div>
+            <button
+              onClick={() => setIsDrawerOpen(true)}
+              className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-semibold rounded text-[11px] transition-colors"
+            >
+              View Escalation Dossier
             </button>
           </div>
         )}
