@@ -57,14 +57,14 @@ export function PlaybackChartCard({
     } else {
       values = history.map((s) => s.nis_composite ?? 0.14);
       threshold = 3.84;
-      unit = " NIS";
+      unit = "";
     }
 
     const maxVal = Math.max(...values, threshold * 1.3, 1);
     const minVal = 0;
     const range = maxVal - minVal;
 
-    // Draw SLA / Chi-Square Threshold Line
+    // Draw SLA / Anomaly Threshold Line
     const threshY = h - 25 - ((threshold - minVal) / range) * (h - 55);
     ctx.beginPath();
     ctx.setLineDash([4, 4]);
@@ -78,7 +78,7 @@ export function PlaybackChartCard({
     // Draw Threshold Label
     ctx.fillStyle = "#ef4444";
     ctx.font = "10px sans-serif";
-    const labelText = activeMetric === "kalman" ? `CHI-SQUARE LIMIT: ${threshold}${unit}` : `SLA LIMIT: ${threshold}${unit}`;
+    const labelText = activeMetric === "kalman" ? `ANOMALY THRESHOLD: ${threshold}${unit}` : `SLA LIMIT: ${threshold}${unit}`;
     ctx.fillText(
       labelText,
       40,
@@ -141,17 +141,17 @@ export function PlaybackChartCard({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-gray-900 tracking-tight">
-                {activeMetric === "kalman" ? "50Hz Mathematical Anomaly Gate" : "Playback Quality & Telemetry"}
+                {activeMetric === "kalman" ? "Telemetry Anomaly Gate" : "Playback Quality & Telemetry"}
               </h3>
               {activeMetric === "kalman" && (
                 <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                  KALMAN INNOVATION
+                  ANOMALY FILTER
                 </span>
               )}
             </div>
             <p className="text-xs text-gray-500 mt-0.5">
               {activeMetric === "kalman"
-                ? `KALMAN Innovation Gate: ${tokenSavings.toFixed(1)}% LLM tokens saved via mathematical noise screening`
+                ? `Anomaly Gate: ${tokenSavings.toFixed(1)}% LLM tokens saved via statistical noise screening`
                 : activeMetric === "vpf"
                 ? "Real-time video playback failures vs 1.00% SLA limit (60s rolling)"
                 : "Downstream edge CDN egress latency vs 150ms SLA limit"}
@@ -188,7 +188,7 @@ export function PlaybackChartCard({
                     : "text-gray-500 hover:text-gray-900"
                 }`}
               >
-                NIS Gate
+                Anomaly Gate
               </button>
             </div>
 

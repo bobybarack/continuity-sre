@@ -151,7 +151,7 @@ class TelemetrySnapshot(BaseModel):
     # HITL Governance
     pending_hitl: Optional[Dict[str, Any]] = None
 
-    # Mathematical Anomaly Gating (KALMAN Innovation Filter)
+    # Mathematical Anomaly Gating (Statistical Innovation Filter)
     nis_composite: float = 0.0
     anomaly_gate_triggered: bool = False
     token_savings_pct: float = 100.0
@@ -287,7 +287,7 @@ class TelemetryEngine:
             PROM_CDN_SPLIT.labels(cdn_provider="Akamai").set(state.secondary_cdn_traffic_pct)
             PROM_OUTAGE_STATUS.labels(chaos_mode=mode, region=state.affected_region).set(1.0 if state.is_outage_active else 0.0)
 
-            # Evaluate 50Hz Kalman Anomaly Innovation Gate
+            # Evaluate Telemetry Anomaly Gate
             gate_eval = anomaly_gate.process_sample(
                 vpf_pct=vpf,
                 latency_ms=latency,

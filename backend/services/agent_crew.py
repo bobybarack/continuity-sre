@@ -1,4 +1,4 @@
-"""Continuity 2.0 Multi-Agent ADK Crew & Scoped Orchestration Architecture.
+"""CONTINUITY Multi-Agent ADK Crew & Scoped Orchestration Architecture.
 
 Implements four distinct, isolated Google ADK Agent instances reflecting real Hollywood
 cinema SRE separation of duties with strictly scoped MCP toolsets and structured handovers:
@@ -115,7 +115,7 @@ def request_human_approval_tool(
 
 
 # ------------------------------------------------------------------------------
-# Continuity 2.0 Multi-Agent ADK Crew
+# CONTINUITY Multi-Agent ADK Crew
 # ------------------------------------------------------------------------------
 
 class ContinuityAgentCrew:

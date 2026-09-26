@@ -1,4 +1,4 @@
-"""Continuity 2.0 Enterprise Log Security Guard.
+"""CONTINUITY Enterprise Log Security Guard.
 
 Screening layer inspired by Google Cloud Model Armor to neutralize indirect prompt injection
 and credential leaks embedded in raw Loki/PromQL telemetry logs before ingestion by Gemini.

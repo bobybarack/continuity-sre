@@ -51,7 +51,7 @@ export default function ContinuityDashboard() {
       pendingHitl: PendingHitlEvent | null = null
     ): TelemetrySnapshot => ({
       timestamp: Date.now() / 1000,
-      stream_title: "Spider-Man: Brand New Day (World Premiere 4K)",
+      stream_title: "Spider-Man: Brand New Day (4K UHD 60fps)",
       chaos_mode: mode,
       is_outage: isOutage,
       video_playback_failures_pct: vpf,
@@ -88,7 +88,7 @@ export default function ContinuityDashboard() {
     const sampleInvestigation: InvestigationResult = {
       timestamp: Date.now() / 1000 - 120,
       incident_id: "INC-89211",
-      stream_title: "Spider-Man: Brand New Day (World Premiere 4K)",
+      stream_title: "Spider-Man: Brand New Day (4K UHD 60fps)",
       initial_anomaly_detected: true,
       vpf_rate: 5.08,
       cdn_latency_ms: 840.0,
@@ -512,7 +512,7 @@ export default function ContinuityDashboard() {
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span className="font-bold text-gray-800 tracking-tight">SRE GOVERNANCE</span>
             <span className="text-gray-300">|</span>
-            <span className="text-gray-600 font-medium">Kalman Anomaly Gate:</span>
+            <span className="text-gray-600 font-medium">Telemetry Anomaly Gate:</span>
             <span className="font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-[11px]">
               {telemetry?.token_savings_pct ? `${telemetry.token_savings_pct.toFixed(1)}%` : "96.2%"} Token Reduction
             </span>

@@ -1,4 +1,4 @@
-"""Continuity 2.0 Durable Checkpointing & State Persistence Service.
+"""CONTINUITY Durable Checkpointing & State Persistence Service.
 
 Provides SQLite / Cloud SQL durable storage for incidents, remediation transactions,
 state snapshots, and human-in-the-loop (HITL) checkpoints so execution survives

@@ -23,7 +23,7 @@ CONTINUITY investigates streaming failures, applies a remediation, and checks re
 
 ## How it works
 
-1. **Detect & Mathematical Gating:** Continuous 1 Hz telemetry is monitored through a scalar 1D innovation Kalman filter. High-frequency variations are evaluated against a chi-squared ($\chi^2 = 3.84$) threshold, achieving >94% LLM token reduction during nominal operation while instantly triggering when anomalies breach bounds.
+1. **Detect & Mathematical Gating:** Continuous 1 Hz telemetry is monitored through a statistical innovation filter. High-frequency variations are evaluated against a chi-squared ($\chi^2 = 3.84$) threshold, achieving >94% LLM token reduction during nominal operation while instantly triggering when anomalies breach bounds.
 2. **Screen & Sanitize:** The Model Armor screening layer inspects incoming Loki logs and telemetry labels, neutralizing indirect prompt injection vectors and redacting sensitive credentials before agent ingestion.
 3. **Multi-Agent ADK Triage:** The 4-agent Google ADK crew executes a sequential workflow with scoped tool allowlists:
    - **1st AD (Commander):** Orchestrates lifecycle, evaluates blast radius, and requests HITL approval when needed.
@@ -37,8 +37,8 @@ CONTINUITY investigates streaming failures, applies a remediation, and checks re
 
 ```mermaid
 flowchart TD
-    UI["Next.js Command Center\n(HITL Modal + Kalman Chart)"] -->|"REST / SSE"| API["FastAPI Control Plane"]
-    API --> GATE["Kalman Anomaly Gate\n(94%+ Token Savings)"]
+    UI["Next.js Command Center\n(HITL Modal + Anomaly Chart)"] -->|"REST / SSE"| API["FastAPI Control Plane"]
+    API --> GATE["Telemetry Anomaly Gate\n(94%+ Token Savings)"]
     GATE --> CREW["Google ADK 4-Agent Crew"]
     
     subgraph ADK_CREW ["Google ADK Multi-Agent Team (Scoped Toolsets)"]
@@ -65,11 +65,11 @@ flowchart TD
 
 | Component | Implementation | Responsibility |
 |---|---|---|
-| Command center | [Next.js / React / TypeScript](frontend/package.json), [API client](frontend/src/services/api.ts) | Real-time SSE dashboard, live HLS player, Kalman NIS anomaly chart, HITL approval modal. |
+| Command center | [Next.js / React / TypeScript](frontend/package.json), [API client](frontend/src/services/api.ts) | Real-time SSE dashboard, live HLS player, anomaly gate chart, HITL approval modal. |
 | HTTP service | [FastAPI application](backend/main.py), [routes](backend/routes) | Telemetry streaming, webhook ingestion, HITL approval/denial endpoints, health probes. |
 | Multi-agent crew | [agent_crew.py](backend/services/agent_crew.py), [agent_commander.py](backend/services/agent_commander.py) | 4-agent Google ADK team (1st AD, DIT, Key Grip, Continuity) with strict scoped tool allowlists. |
 | Security screening | [security_guard.py](backend/services/security_guard.py) | Google Model Armor-inspired log screening, indirect prompt injection defense, credential redaction. |
-| Mathematical gating | [anomaly_filter.py](backend/services/anomaly_filter.py) | 1D Kalman innovation filter calculating Normalized Innovation Squared ($\epsilon_k$) vs $\chi^2 = 3.84$. |
+| Mathematical gating | [anomaly_filter.py](backend/services/anomaly_filter.py) | 1D statistical innovation filter calculating anomaly score ($\epsilon_k$) vs $\chi^2 = 3.84$. |
 | Durable checkpointing | [checkpoint_service.py](backend/services/checkpoint_service.py) | SQLite WAL persistent ledger for incidents, checkpoints, transactions, and audit trails. |
 | HITL governance | [hitl_service.py](backend/services/hitl_service.py) | Evaluates action blast radius, forces function-calling supervisor approval, manages timeouts. |
 | Recovery control | [transaction_manager.py](backend/services/transaction_manager.py), [models](backend/services/remediation_models.py) | ACID transaction ledger, pre/post snapshots, closed-loop gates, automated rollback. |
@@ -77,7 +77,7 @@ flowchart TD
 
 ## Multi-Agent ADK Crew & Scoped Toolsets
 
-Continuity 2.0 enforces strict agent privilege separation across four dedicated Google ADK agents:
+CONTINUITY enforces strict agent privilege separation across four dedicated Google ADK agents:
 
 | Agent Role | Concrete Responsibility | Scoped MCP & Local Toolset |
 |---|---|---|

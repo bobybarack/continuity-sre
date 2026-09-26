@@ -211,7 +211,7 @@ class AgentCommander:
         if not is_anomaly and state.current_mode in ["NORMAL", "REMEDIATED"]:
             elapsed = round(time.time() - start_time, 2)
             trace.append(
-                f"[{time.strftime('%H:%M:%S')}] Mathematical Anomaly Gate [KALMAN]: NIS={snapshot.nis_composite:.2f} <= 3.84. "
+                f"[{time.strftime('%H:%M:%S')}] Telemetry Anomaly Gate: Score={snapshot.nis_composite:.2f} <= 3.84. "
                 f"LLM inference suppressed (Token Savings: {snapshot.token_savings_pct}%). Status: HEALTHY."
             )
             result = InvestigationResult(

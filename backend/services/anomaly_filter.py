@@ -1,4 +1,4 @@
-"""Continuity 2.0 Mathematical Anomaly Gate (KALMAN Innovation Filter).
+"""CONTINUITY Mathematical Anomaly Gate (Statistical Innovation Filter).
 
 Implements a 1D scalar Kalman innovation filter that tracks the probability distribution
 of nominal OTT telemetry noise (VPF, CDN latency, Buffer health) and calculates
