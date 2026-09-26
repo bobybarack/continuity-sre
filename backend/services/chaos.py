@@ -352,6 +352,12 @@ class ChaosStateManager:
             self.state.force_recovery_failure = False
             self.state.convergence_duration_sec = 1.5
             
+            try:
+                from services.anomaly_filter import anomaly_gate
+                anomaly_gate.reset()
+            except Exception:
+                pass
+
             self._record_event(
                 "CHAOS_RESET",
                 "Telemetry reset to baseline normal state. All systems operational.",

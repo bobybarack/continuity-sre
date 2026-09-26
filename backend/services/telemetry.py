@@ -11,6 +11,7 @@ from prometheus_client import (
     CONTENT_TYPE_LATEST
 )
 from services.chaos import chaos_manager, ChaosStateManager
+from services.anomaly_filter import anomaly_gate
 from config import (
     STREAM_TITLE,
     TOTAL_ACTIVE_VIEWERS_BASE,
@@ -150,6 +151,12 @@ class TelemetrySnapshot(BaseModel):
     # HITL Governance
     pending_hitl: Optional[Dict[str, Any]] = None
 
+    # Mathematical Anomaly Gating (KALMAN Innovation Filter)
+    nis_composite: float = 0.0
+    anomaly_gate_triggered: bool = False
+    token_savings_pct: float = 100.0
+    gate_eval: Optional[Dict[str, Any]] = None
+
 import asyncio
 import threading
 
@@ -280,6 +287,13 @@ class TelemetryEngine:
             PROM_CDN_SPLIT.labels(cdn_provider="Akamai").set(state.secondary_cdn_traffic_pct)
             PROM_OUTAGE_STATUS.labels(chaos_mode=mode, region=state.affected_region).set(1.0 if state.is_outage_active else 0.0)
 
+            # Evaluate 50Hz Kalman Anomaly Innovation Gate
+            gate_eval = anomaly_gate.process_sample(
+                vpf_pct=vpf,
+                latency_ms=latency,
+                buffer_sec=buffer_sec
+            )
+
             snapshot = TelemetrySnapshot(
                 timestamp=now,
                 stream_title=STREAM_TITLE,
@@ -297,7 +311,11 @@ class TelemetryEngine:
                 secondary_traffic_pct=state.secondary_cdn_traffic_pct,
                 status_label=status_label,
                 status_color=status_color,
-                latest_log=latest_log
+                latest_log=latest_log,
+                nis_composite=gate_eval["nis_composite"],
+                anomaly_gate_triggered=gate_eval["gate_triggered"],
+                token_savings_pct=gate_eval["token_savings_pct"],
+                gate_eval=gate_eval
             )
             
             self.current_snapshot = snapshot
