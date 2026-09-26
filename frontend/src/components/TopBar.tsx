@@ -48,7 +48,7 @@ export function TopBar({
             </h1>
             <span className="text-gray-300">•</span>
             <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-md">
-              Spider-Man: Brand New Day (4K UHD 60fps)
+              Global Premiere: Live Broadcast (4K UHD 60fps)
             </span>
           </div>
           <p className="text-xs text-gray-500 font-medium mt-0.5">

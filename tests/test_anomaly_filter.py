@@ -5,22 +5,22 @@ import pytest
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
 
-from services.anomaly_filter import ScalarKalmanFilter, StreamingAnomalyGate, anomaly_gate
+from services.anomaly_filter import ScalarInnovationFilter, StreamingAnomalyGate, anomaly_gate
 from services.telemetry import telemetry_engine
 from services.chaos import chaos_manager
 
-def test_scalar_kalman_filter_nominal_vs_outage():
+def test_scalar_innovation_filter_nominal_vs_outage():
     """Verifies that nominal jitter produces low NIS and an outage jump produces a dramatic NIS spike."""
-    kf = ScalarKalmanFilter(initial_state=0.10, q=0.005, r=0.02)
+    filter_inst = ScalarInnovationFilter(initial_state=0.10, q=0.005, r=0.02)
 
     # 1. Feed nominal samples near 0.10
     for _ in range(10):
-        y, nis = kf.step(0.12)
+        y, nis = filter_inst.step(0.12)
         assert abs(y) < 0.05
         assert nis < 3.84  # Below Chi-squared 95% threshold
 
     # 2. Sudden outage spike: VPF jumps to 8.5%
-    y_spike, nis_spike = kf.step(8.5)
+    y_spike, nis_spike = filter_inst.step(8.5)
     assert y_spike > 7.0
     assert nis_spike > 10.0  # Massive statistical anomaly
 

@@ -51,7 +51,7 @@ export default function ContinuityDashboard() {
       pendingHitl: PendingHitlEvent | null = null
     ): TelemetrySnapshot => ({
       timestamp: Date.now() / 1000,
-      stream_title: "Spider-Man: Brand New Day (4K UHD 60fps)",
+      stream_title: "Global Premiere: Live Broadcast (4K UHD 60fps)",
       chaos_mode: mode,
       is_outage: isOutage,
       video_playback_failures_pct: vpf,
@@ -88,7 +88,7 @@ export default function ContinuityDashboard() {
     const sampleInvestigation: InvestigationResult = {
       timestamp: Date.now() / 1000 - 120,
       incident_id: "INC-89211",
-      stream_title: "Spider-Man: Brand New Day (4K UHD 60fps)",
+      stream_title: "Global Premiere: Live Broadcast (4K UHD 60fps)",
       initial_anomaly_detected: true,
       vpf_rate: 5.08,
       cdn_latency_ms: 840.0,

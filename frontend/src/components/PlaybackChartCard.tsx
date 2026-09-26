@@ -13,7 +13,7 @@ export function PlaybackChartCard({
   history,
 }: PlaybackChartCardProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [activeMetric, setActiveMetric] = useState<"vpf" | "latency" | "kalman">("vpf");
+  const [activeMetric, setActiveMetric] = useState<"vpf" | "latency" | "anomaly">("vpf");
 
   const vpf = telemetry?.video_playback_failures_pct ?? 0.18;
   const isOutage = telemetry?.is_outage ?? false;
@@ -78,7 +78,7 @@ export function PlaybackChartCard({
     // Draw Threshold Label
     ctx.fillStyle = "#ef4444";
     ctx.font = "10px sans-serif";
-    const labelText = activeMetric === "kalman" ? `ANOMALY THRESHOLD: ${threshold}${unit}` : `SLA LIMIT: ${threshold}${unit}`;
+    const labelText = activeMetric === "anomaly" ? `ANOMALY THRESHOLD: ${threshold}${unit}` : `SLA LIMIT: ${threshold}${unit}`;
     ctx.fillText(
       labelText,
       40,
@@ -141,16 +141,16 @@ export function PlaybackChartCard({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-gray-900 tracking-tight">
-                {activeMetric === "kalman" ? "Telemetry Anomaly Gate" : "Playback Quality & Telemetry"}
+                {activeMetric === "anomaly" ? "Telemetry Anomaly Gate" : "Playback Quality & Telemetry"}
               </h3>
-              {activeMetric === "kalman" && (
+              {activeMetric === "anomaly" && (
                 <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold bg-purple-50 text-purple-700 border border-purple-200">
                   ANOMALY FILTER
                 </span>
               )}
             </div>
             <p className="text-xs text-gray-500 mt-0.5">
-              {activeMetric === "kalman"
+              {activeMetric === "anomaly"
                 ? `Anomaly Gate: ${tokenSavings.toFixed(1)}% LLM tokens saved via statistical noise screening`
                 : activeMetric === "vpf"
                 ? "Real-time video playback failures vs 1.00% SLA limit (60s rolling)"
@@ -181,9 +181,9 @@ export function PlaybackChartCard({
                 Latency (ms)
               </button>
               <button
-                onClick={() => setActiveMetric("kalman")}
+                onClick={() => setActiveMetric("anomaly")}
                 className={`px-2.5 py-1 rounded-lg transition-all text-[11px] font-mono ${
-                  activeMetric === "kalman"
+                  activeMetric === "anomaly"
                     ? "bg-white text-purple-900 font-bold shadow-sm"
                     : "text-gray-500 hover:text-gray-900"
                 }`}
