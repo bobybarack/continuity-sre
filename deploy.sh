@@ -44,7 +44,7 @@ gcloud run deploy "${SERVICE_NAME}" \
     --concurrency 80 \
     --memory 1Gi \
     --cpu 1 \
-    --set-env-vars GEMINI_API_KEY="${GEMINI_API_KEY}",GEMINI_MODEL="${GEMINI_MODEL:-models/gemini-3.6-flash}",GRAFANA_INSTANCE_URL="${GRAFANA_INSTANCE_URL}",GRAFANA_TOKEN="${GRAFANA_TOKEN}",GRAFANA_PROM_UID="${GRAFANA_PROM_UID:-grafanacloud-prom}",GRAFANA_LOKI_UID="${GRAFANA_LOKI_UID:-grafanacloud-logs}",GOOGLE_CLOUD_PROJECT="${PROJECT_ID}",VERIFICATION_POLICY="${VERIFICATION_POLICY:-remote_preferred}",CONTINUITY_DEMO_KEY="${CONTINUITY_DEMO_KEY:-continuity-demo-secret-2026}"
+    --set-env-vars GEMINI_API_KEY="${GEMINI_API_KEY}",GEMINI_MODEL="${GEMINI_MODEL:-models/gemini-3.7-flash}",GRAFANA_INSTANCE_URL="${GRAFANA_INSTANCE_URL}",GRAFANA_TOKEN="${GRAFANA_TOKEN}",GRAFANA_PROM_UID="${GRAFANA_PROM_UID:-grafanacloud-prom}",GRAFANA_LOKI_UID="${GRAFANA_LOKI_UID:-grafanacloud-logs}",GOOGLE_CLOUD_PROJECT="${PROJECT_ID}",VERIFICATION_POLICY="${VERIFICATION_POLICY:-remote_preferred}",CONTINUITY_DEMO_KEY="${CONTINUITY_DEMO_KEY:-continuity-demo-secret-2026}"
 
 echo "=== Deployment Complete: Public Live URL Generated ==="
 gcloud run services describe "${SERVICE_NAME}" --platform managed --region "${REGION}" --format 'value(status.url)'
