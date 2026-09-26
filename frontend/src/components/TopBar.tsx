@@ -93,12 +93,12 @@ export function TopBar({
           href="https://joyfuljasmine1550.grafana.net/public-dashboards/4cf5f0a12aee4d48a3ed18abd2c03db7"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200/80 transition-all active:scale-[0.98]"
           title="Open live Grafana Cloud dashboard with Prometheus & Loki metrics"
         >
-          <CloudIcon className="w-3.5 h-3.5 text-orange-600" />
+          <CloudIcon className="w-3.5 h-3.5 text-gray-500" />
           <span>Grafana Cloud Live Board</span>
-          <svg className="w-3 h-3 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
           </svg>
         </a>
