@@ -11,6 +11,7 @@ import json
 import sqlite3
 import time
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -30,7 +31,14 @@ class CheckpointService:
     """Manages persistent SQLite ledger for incident transactions and HITL graph checkpoints."""
 
     def __init__(self, db_path: Optional[Path | str] = None):
-        self.db_path = Path(db_path) if db_path else DEFAULT_DB_PATH
+        if db_path:
+            self.db_path = Path(db_path)
+        else:
+            worker = os.environ.get("PYTEST_XDIST_WORKER")
+            if worker:
+                self.db_path = Path(__file__).resolve().parent.parent / f"continuity_checkpoint_{worker}.db"
+            else:
+                self.db_path = DEFAULT_DB_PATH
         self._init_db()
 
     def _get_connection(self) -> sqlite3.Connection:
@@ -254,6 +262,27 @@ class CheckpointService:
                 }
                 for r in rows
             ]
+
+    def get_suspended_checkpoint_by_incident(self, incident_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves an active suspended checkpoint for a specific incident."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM checkpoints WHERE incident_id = ? AND status = 'SUSPENDED' ORDER BY suspended_at DESC LIMIT 1",
+                (incident_id,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return {
+                "checkpoint_id": row["checkpoint_id"],
+                "incident_id": row["incident_id"],
+                "step_name": row["step_name"],
+                "suspended_at": row["suspended_at"],
+                "status": row["status"],
+                "state_data": json.loads(row["state_data"]) if row["state_data"] else {},
+                "resolution_data": json.loads(row["resolution_data"]) if row["resolution_data"] else None
+            }
 
     # --------------------------------------------------------------------------
     # Audit Logging

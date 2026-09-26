@@ -1,6 +1,6 @@
 import time
 import random
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
 from prometheus_client import (
     CollectorRegistry,
@@ -146,6 +146,9 @@ class TelemetrySnapshot(BaseModel):
     status_label: str # "HEALTHY", "DEGRADED", "CRITICAL_OUTAGE", "RECOVERED"
     status_color: str # "green", "yellow", "red", "blue"
     latest_log: str
+
+    # HITL Governance
+    pending_hitl: Optional[Dict[str, Any]] = None
 
 import asyncio
 import threading

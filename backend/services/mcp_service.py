@@ -817,6 +817,15 @@ async def dispatch_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
                 incident_id=args.get("incident_id", ""),
                 reason=args.get("reason", "Autonomous escalation triggered")
             )
+        elif name in ("request_human_approval", "continuity_request_human_approval"):
+            from services.hitl_service import hitl_service
+            res = hitl_service.request_approval(
+                incident_id=args.get("incident_id", "INC-UNKNOWN"),
+                action=args.get("action", "REROUTE_BGP_TRANSIT"),
+                params=args.get("params", {}),
+                rationale=args.get("rationale", ""),
+                blast_radius=float(args.get("blast_radius", 0.85))
+            )
         else:
             raise ValueError(f"Unknown MCP tool: {name}")
 

@@ -91,10 +91,27 @@ class VerificationVerdict(BaseModel):
 # Scoped Tool Allowlist Definitions
 # ------------------------------------------------------------------------------
 
-FIRST_AD_TOOLS = ["create_incident", "update_incident"]
+FIRST_AD_TOOLS = ["create_incident", "update_incident", "request_human_approval"]
 DIT_TOOLS = ["query_prometheus", "query_loki_logs"]
 KEY_GRIP_TOOLS = ["shift_cdn_traffic", "failover_drm_cluster", "reroute_bgp_transit"]
 CONTINUITY_TOOLS = ["create_annotation"]
+
+
+def request_human_approval_tool(
+    incident_id: str,
+    action: str,
+    blast_radius: float = 0.85,
+    rationale: str = ""
+) -> Dict[str, Any]:
+    """Suspends the autonomous remediation loop and requests mandatory approval from the human broadcast supervisor."""
+    from services.hitl_service import hitl_service
+    return hitl_service.request_approval(
+        incident_id=incident_id,
+        action=action,
+        rationale=rationale,
+        blast_radius=blast_radius
+    )
+
 
 
 # ------------------------------------------------------------------------------

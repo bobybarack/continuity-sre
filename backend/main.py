@@ -6,6 +6,7 @@ from routes.chaos import router as chaos_router
 from routes.telemetry import router as telemetry_router
 from routes.agent import router as agent_router
 from routes.alerts import router as alerts_router
+from routes.incidents import router as incidents_router
 from services.telemetry import telemetry_engine
 from services.mcp_service import official_mcp_bridge
 from services.grafana_client import grafana_client
@@ -46,6 +47,7 @@ app.include_router(chaos_router)
 app.include_router(telemetry_router)
 app.include_router(agent_router)
 app.include_router(alerts_router)
+app.include_router(incidents_router)
 
 @app.get("/healthz")
 async def health_check():

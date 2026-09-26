@@ -5,6 +5,7 @@ from fastapi.responses import StreamingResponse
 from prometheus_client import CONTENT_TYPE_LATEST
 from services.telemetry import telemetry_engine, TelemetrySnapshot
 from services.grafana_client import grafana_client
+from services.hitl_service import hitl_service
 from typing import List, Dict, Any
 
 router = APIRouter(prefix="/api/telemetry", tags=["Telemetry Stream"])
@@ -37,9 +38,14 @@ async def stream_telemetry_sse():
         last_timestamp = None
         while True:
             snapshot = telemetry_engine.get_current_snapshot()
-            if snapshot.timestamp != last_timestamp:
+            pending_events = hitl_service.get_pending_events()
+            latest_hitl = pending_events[-1] if pending_events else None
+
+            if snapshot.timestamp != last_timestamp or latest_hitl is not None:
                 last_timestamp = snapshot.timestamp
-                data_json = json.dumps(snapshot.model_dump())
+                dumped = snapshot.model_dump()
+                dumped["pending_hitl"] = latest_hitl
+                data_json = json.dumps(dumped)
                 yield f"data: {data_json}\n\n"
             await asyncio.sleep(0.25)
 
