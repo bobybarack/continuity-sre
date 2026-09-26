@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useEffect } from "react";
+import { DatabaseIcon } from "hugeicons-react";
 import { TelemetrySnapshot, InvestigationResult } from "../types/telemetry";
 
 export interface CrewRadioDispatchCardProps {
