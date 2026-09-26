@@ -116,41 +116,41 @@ export function CrewRadioDispatchCard({
   };
 
   return (
-    <div className="bg-white border border-gray-200/80 rounded-2xl p-5 subtle-card-shadow flex flex-col justify-between h-full">
-      <div>
-        {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center">
-              <Radio01Icon className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-gray-900 tracking-tight">
-                  Crew Radio Intercom
-                </h3>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold bg-purple-50 text-purple-800 border border-purple-200">
-                  CH-1 PREMIERE
-                </span>
-              </div>
-              <p className="text-xs text-gray-500 font-medium">
-                Live Multi-Agent Radio Comms & Edge Telemetry LogQL Stream
-              </p>
-            </div>
+    <div className="bg-white border border-gray-200/80 rounded-2xl p-5 subtle-card-shadow flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between pb-3 border-b border-gray-100 shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center">
+            <Radio01Icon className="w-4 h-4" />
           </div>
-
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-              1Hz Intercom Active
-            </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-gray-900 tracking-tight">
+                Crew Radio Intercom
+              </h3>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold bg-purple-50 text-purple-800 border border-purple-200">
+                CH-1 PREMIERE
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 font-medium">
+              Live Multi-Agent Radio Comms & Edge Telemetry LogQL Stream
+            </p>
           </div>
         </div>
 
-        {/* Structured Radio Dispatches Feed */}
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+            1Hz Intercom Active
+          </span>
+        </div>
+      </div>
+
+      {/* Structured Radio Dispatches Feed - Full Card Height / Zero Negative Space */}
+      <div className="flex-1 mt-3.5 flex flex-col min-h-[380px] lg:min-h-0">
         <div
           ref={scrollContainerRef}
-          className="mt-3.5 p-3 bg-slate-950 rounded-xl border border-slate-800 font-mono text-[11px] space-y-2.5 max-h-56 overflow-y-auto shadow-inner"
+          className="flex-1 w-full p-3.5 bg-slate-950 rounded-xl border border-slate-800 font-mono text-[11px] space-y-2.5 overflow-y-auto shadow-inner flex flex-col justify-start"
         >
           {/* Baseline Comms Line */}
           <div className="flex items-start gap-2 text-slate-400">
@@ -206,19 +206,39 @@ export function CrewRadioDispatchCard({
               </div>
             ))
           ) : (
-            <div className="flex items-start gap-2 text-slate-400">
-              <span className="text-slate-500 shrink-0 text-[10px]">[{baseTime}]</span>
-              <span className="px-1 py-0.2 rounded text-[9px] font-bold border shrink-0 bg-amber-900/60 text-amber-200 border-amber-700">
-                DIT
-              </span>
-              <span className="text-slate-300 leading-snug">
-                Continuous Grafana Cloud Mimir polling: VPF ratio nominal (&le; 0.20%), 4K buffer depth 28.5s.
-              </span>
-            </div>
+            <>
+              <div className="flex items-start gap-2 text-slate-400">
+                <span className="text-slate-500 shrink-0 text-[10px]">[{baseTime}]</span>
+                <span className="px-1 py-0.2 rounded text-[9px] font-bold border shrink-0 bg-amber-900/60 text-amber-200 border-amber-700">
+                  DIT
+                </span>
+                <span className="text-slate-300 leading-snug">
+                  Continuous Grafana Cloud Mimir polling: VPF ratio nominal (&le; 0.20%), 4K buffer depth 28.5s.
+                </span>
+              </div>
+              <div className="flex items-start gap-2 text-slate-400">
+                <span className="text-slate-500 shrink-0 text-[10px]">[{baseTime}]</span>
+                <span className="px-1 py-0.2 rounded text-[9px] font-bold border shrink-0 bg-sky-900/60 text-sky-200 border-sky-700">
+                  KEY GRIP
+                </span>
+                <span className="text-slate-300 leading-snug">
+                  Primary trunk Fastly Edge iad-01 nominal at 100% (63.4 Gbps). Secondary Akamai failover armed.
+                </span>
+              </div>
+              <div className="flex items-start gap-2 text-slate-400">
+                <span className="text-slate-500 shrink-0 text-[10px]">[{baseTime}]</span>
+                <span className="px-1 py-0.2 rounded text-[9px] font-bold border shrink-0 bg-emerald-900/60 text-emerald-200 border-emerald-700">
+                  CONTINUITY
+                </span>
+                <span className="text-slate-300 leading-snug">
+                  Closed-loop recovery gates armed. Monitoring forward buffer depth threshold &ge; 20.0s.
+                </span>
+              </div>
+            </>
           )}
 
           {/* Recent Edge Ingest Log */}
-          <div className="flex items-start gap-2 pt-1 border-t border-slate-800/80 text-slate-400">
+          <div className="flex items-start gap-2 pt-1.5 border-t border-slate-800/80 text-slate-400 mt-auto">
             <span className="text-slate-500 shrink-0 text-[10px]">[{baseTime}]</span>
             <span className="px-1 py-0.2 rounded text-[9px] font-bold border shrink-0 bg-slate-800 text-purple-300 border-purple-800/50">
               EDGE INGEST
@@ -230,7 +250,8 @@ export function CrewRadioDispatchCard({
         </div>
       </div>
 
-      <div className="mt-4 pt-3 border-t border-gray-100 text-xs text-gray-500 font-medium flex items-center justify-between">
+      {/* Footer */}
+      <div className="mt-3 pt-2.5 border-t border-gray-100 text-xs text-gray-500 font-medium flex items-center justify-between shrink-0">
         <div className="flex items-center gap-1.5">
           <DatabaseIcon className="w-3.5 h-3.5 text-purple-600" />
           <span>Grafana Cloud Loki & Prometheus Proxy</span>
