@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { File01Icon, CheckmarkCircle01Icon, Alert01Icon, Clock01Icon } from "hugeicons-react";
 import { InvestigationResult } from "../types/telemetry";
 
 interface IncidentDrawerProps {
@@ -23,9 +22,7 @@ export function IncidentDrawer({
         {/* Drawer Header */}
         <div className="p-5 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
-              <File01Icon className="w-4 h-4 text-emerald-600" />
-            </div>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
             <div>
               <h3 className="text-sm font-bold text-gray-900 tracking-tight">
                 Incident Audit Logs
@@ -113,10 +110,10 @@ export function IncidentDrawer({
                 </div>
 
                 {/* Executed Official MCP Tools */}
-                <div className="p-2.5 bg-gray-900 rounded-lg border border-gray-800 text-white font-mono text-[10px]">
-                  <div className="flex items-center justify-between mb-1.5 text-sky-400 font-bold">
+                <div className="p-2.5 bg-gray-50 rounded-lg border border-gray-200 text-gray-800 font-mono text-[10px]">
+                  <div className="flex items-center justify-between mb-1.5 text-sky-700 font-bold">
                     <span>OFFICIAL MCP TOOLS EXECUTED</span>
-                    <span className="text-[9px] text-white/50">stdio JSON-RPC</span>
+                    <span className="text-[9px] text-gray-500">stdio JSON-RPC</span>
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {(inv.mcp_tools_executed && inv.mcp_tools_executed.length > 0 ? inv.mcp_tools_executed : [
@@ -127,7 +124,7 @@ export function IncidentDrawer({
                       "grafana_create_incident",
                       "continuity_verify_closed_loop_recovery",
                     ]).map((t, tIdx) => (
-                      <span key={tIdx} className="px-1.5 py-0.5 bg-white/10 rounded border border-white/15 text-gray-300">
+                      <span key={tIdx} className="px-1.5 py-0.5 bg-white rounded border border-gray-200 text-gray-700">
                         {t}
                       </span>
                     ))}
@@ -144,7 +141,7 @@ export function IncidentDrawer({
                   <span className="text-[10px] text-gray-400 font-semibold uppercase block mb-1.5">
                     Gemini Reasoning Log
                   </span>
-                  <div className="p-2 bg-gray-900 rounded-lg text-gray-300 font-mono text-[10px] space-y-1 max-h-28 overflow-y-auto">
+                  <div className="p-2 bg-gray-50 rounded-lg border border-gray-200 text-gray-700 font-mono text-[10px] space-y-1 max-h-28 overflow-y-auto">
                     {inv.reasoning_trace.map((step, sIdx) => (
                       <div key={sIdx}>&gt; {step}</div>
                     ))}
