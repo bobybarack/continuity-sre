@@ -1,14 +1,6 @@
 "use client";
 
 import React, { useRef, useEffect, useState } from "react";
-import {
-  PlayIcon,
-  PauseIcon,
-  Alert01Icon,
-  CheckmarkCircle01Icon,
-  Radio01Icon,
-  Shield01Icon,
-} from "hugeicons-react";
 import { TelemetrySnapshot } from "../types/telemetry";
 
 interface LivePlayerCardProps {
@@ -55,7 +47,7 @@ export function LivePlayerCard({ telemetry }: LivePlayerCardProps) {
               Live Stream Monitor
             </h3>
             <p className="text-xs text-gray-500 mt-0.5 font-medium">
-              Continuity Premiere: Global Broadcast (4K UHD 60fps)
+              Spider-Man: Brand New Day (4K UHD 60fps)
             </p>
           </div>
 
@@ -95,8 +87,8 @@ export function LivePlayerCard({ telemetry }: LivePlayerCardProps) {
                 className="absolute inset-0 w-full h-full object-cover filter blur-lg opacity-30 scale-105"
               />
               <div className="relative z-10 flex flex-col items-center">
-                <div className="p-3 rounded-full bg-amber-500/10 border border-amber-500/30 mb-2">
-                  <Radio01Icon className="w-6 h-6 text-amber-400" />
+                <div className="w-10 h-10 rounded-full bg-amber-500/10 border border-amber-500/30 mb-2 flex items-center justify-center">
+                  <span className="w-3 h-3 rounded-full bg-amber-400 animate-pulse" />
                 </div>
                 <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider">
                   Broadcast Signal Standby
@@ -178,7 +170,9 @@ export function LivePlayerCard({ telemetry }: LivePlayerCardProps) {
           {/* Outage Banner */}
           {isOutage && (
             <div className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center p-4 text-center">
-              <Alert01Icon className="w-8 h-8 text-red-500 animate-bounce mb-1" />
+              <div className="w-8 h-8 rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-500 font-bold text-sm mb-1 animate-pulse">
+                !
+              </div>
               <p className="text-xs font-bold text-white uppercase">
                 {telemetry?.chaos_mode === "DRM_TIMEOUT"
                   ? "DRM License Acquisition Stall"
@@ -200,13 +194,9 @@ export function LivePlayerCard({ telemetry }: LivePlayerCardProps) {
           <div className="absolute bottom-0 left-0 right-0 p-2.5 bg-gradient-to-t from-black/80 to-transparent flex items-center justify-between text-white text-xs">
             <button
               onClick={() => setIsPlaying(!isPlaying)}
-              className="p-1 rounded bg-white/20 hover:bg-white/30 transition-all"
+              className="px-2 py-0.5 rounded bg-white/20 hover:bg-white/30 transition-all font-mono text-[11px]"
             >
-              {isPlaying ? (
-                <PauseIcon className="w-3.5 h-3.5" />
-              ) : (
-                <PlayIcon className="w-3.5 h-3.5" />
-              )}
+              {isPlaying ? "❚❚" : "▶"}
             </button>
 
             <span className="text-[11px] text-gray-300">
