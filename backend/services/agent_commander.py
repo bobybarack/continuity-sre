@@ -89,6 +89,9 @@ class InvestigationResult(BaseModel):
     recovery_proof: Optional[Dict[str, Any]] = None
     escalation_package: Optional[Dict[str, Any]] = None
     diagnosis_claims: List[Dict[str, Any]] = Field(default_factory=list)
+    crew_dispatch: List[Dict[str, Any]] = Field(default_factory=list)
+
+from services.agent_crew import continuity_crew
 
 class AgentCommander:
     def __init__(self):
@@ -116,6 +119,7 @@ class AgentCommander:
             session_service=self.session_service,
             auto_create_session=True
         )
+        self.crew = continuity_crew
 
     def is_configured(self) -> bool:
         return self.client is not None
@@ -237,7 +241,8 @@ class AgentCommander:
                 verified_latency_ms=snapshot.cdn_egress_latency_ms,
                 verification_status="NOT_REQUIRED",
                 verification_source=None,
-                verification_authoritative=False
+                verification_authoritative=False,
+                crew_dispatch=self.crew.get_agent_specs()
             )
             self._record_result(result)
             return result
@@ -581,7 +586,8 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             rollback_status=rollback_status,
             recovery_proof=proof_data,
             escalation_package=escalation_data,
-            diagnosis_claims=diagnosis_claims_data
+            diagnosis_claims=diagnosis_claims_data,
+            crew_dispatch=self.crew.get_agent_specs()
         )
 
         self._record_result(result)

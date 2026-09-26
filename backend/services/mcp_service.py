@@ -141,8 +141,10 @@ class OfficialGrafanaMCPBridge:
             tool_filter=tool_filter,
         )
 
-    def get_toolset(self, restricted: bool = True) -> McpToolset:
-        """Returns the Google ADK McpToolset instance. Restricted exposes only CONTINUITY required tools."""
+    def get_toolset(self, restricted: bool = True, tool_filter: Optional[List[str]] = None) -> McpToolset:
+        """Returns the Google ADK McpToolset instance with optional granular tool filtering."""
+        if tool_filter is not None:
+            return self._create_toolset(tool_filter=tool_filter)
         if restricted:
             if self._toolset is None:
                 self._toolset = self._create_toolset(tool_filter=ALLOWED_GRAFANA_TOOLS)
