@@ -50,6 +50,8 @@ app.include_router(alerts_router)
 app.include_router(incidents_router)
 
 @app.get("/healthz")
+@app.get("/health")
+@app.get("/api/health")
 async def health_check():
     """Liveness probe: verifies process health."""
     return {"status": "HEALTHY", "service": "continuity-api"}
