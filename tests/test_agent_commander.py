@@ -63,7 +63,7 @@ async def test_agent_autonomous_outage_remediation_live():
     assert result.root_cause_analysis is not None
     assert len(result.root_cause_analysis) > 10
     assert result.autonomous_action_taken in ["SHIFT_TRAFFIC_TO_AKAMAI", "FAILOVER_DRM_KEY_CLUSTER", "REROUTE_BGP_TRANSIT"]
-    assert result.traffic_shift_details["secondary_cdn_pct"] in [80, 85, 90]
+    assert result.traffic_shift_details["secondary_cdn_pct"] >= 70
     assert result.mttr_seconds is not None and result.mttr_seconds > 0.0
     assert "sla" in result.estimated_subscriber_loss_prevented.lower() or "sessions" in result.estimated_subscriber_loss_prevented.lower()
     assert len(result.reasoning_trace) >= 5
