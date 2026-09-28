@@ -12,6 +12,7 @@ from services.hitl_service import hitl_service
 from services.checkpoint_service import checkpoint_service
 from services.transaction_manager import transaction_manager
 from services.chaos import chaos_manager
+from config import CONTINUITY_DEMO_KEY
 
 client = TestClient(app)
 
@@ -146,9 +147,17 @@ def test_hitl_fastapi_rest_endpoints():
     assert resp_chk.status_code == 200
     assert resp_chk.json()["incident_id"] == inc_id
 
-    # 3. POST /api/incidents/{incident_id}/approve
+    # 3. POST /api/incidents/{incident_id}/approve without auth header fails with 401
+    resp_unauth = client.post(
+        f"/api/incidents/{inc_id}/approve",
+        json={"operator_note": "Unauthorized attempt"}
+    )
+    assert resp_unauth.status_code == 401
+
+    # 4. POST /api/incidents/{incident_id}/approve with valid auth header succeeds
     resp_app = client.post(
         f"/api/incidents/{inc_id}/approve",
+        headers={"X-Continuity-Demo-Key": CONTINUITY_DEMO_KEY},
         json={"operator_note": "Operator authorized 80% secondary shift"}
     )
     assert resp_app.status_code == 200
@@ -156,6 +165,6 @@ def test_hitl_fastapi_rest_endpoints():
     assert data["status"] == "APPROVED"
     assert data["incident_id"] == inc_id
 
-    # 4. Checkpoints list should now be empty
+    # 5. Checkpoints list should now be empty
     resp_after = client.get("/api/incidents/checkpoints")
     assert len(resp_after.json()) == 0
