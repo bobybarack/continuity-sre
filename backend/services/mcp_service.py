@@ -25,6 +25,7 @@ from services.chaos import chaos_manager
 from services.telemetry import telemetry_engine, PROM_AGENT_MCP_TOOL_CALLS
 from services.transaction_manager import transaction_manager
 from services.checkpoint_service import checkpoint_service
+from services.remediation_models import RecoveryProof, RecoveryGateResult
 from services.integration_models import (
     PrometheusQueryResult,
     LokiQueryResult,
@@ -600,16 +601,45 @@ async def continuity_verify_closed_loop_recovery(
 
     active_tx = transaction_manager.get_transaction(transaction_id) if transaction_id else transaction_manager.get_active_transaction()
     if active_tx:
-        proof = transaction_manager.verify_and_commit(
-            transaction_id=active_tx.transaction_id,
-            pre_action_snapshot=pre_snapshot,
-            verification_source=last_evidence.get("prometheus_source", "none"),
-            authoritative=last_evidence.get("prometheus_authoritative", False)
+        # 1. Execute actual rollback on the transaction manager
+        tx = transaction_manager.rollback_transaction(active_tx.transaction_id)
+
+        # 2. Build post-rollback health snapshot
+        post_snapshot = transaction_manager.build_health_snapshot(source=last_evidence.get("prometheus_source", "none"))
+
+        # 3. Create Escalation Package
+        transaction_manager.create_escalation_package(
+            incident_id=tx.incident_id,
+            diagnosis="Closed-loop verification timed out or recovery gates failed to converge within deadline.",
+            failed_gates=["Verification Convergence Deadline Exceeded"]
         )
+
+        proof = RecoveryProof(
+            incident_id=tx.incident_id,
+            remediation_transaction_id=tx.transaction_id,
+            pre_action=pre_snapshot,
+            post_action=post_snapshot,
+            verification_source=last_evidence.get("prometheus_source", "none"),
+            authoritative=last_evidence.get("prometheus_authoritative", False),
+            gates=[RecoveryGateResult(
+                name="Verification Convergence",
+                observed_value=f"Status: {last_evidence.get('status', 'PENDING')}, Prometheus VPF: {last_evidence.get('prometheus_metric_value')}",
+                operator="==",
+                required_value="Verified Convergence <= 0.5% VPF",
+                passed=False
+            )],
+            verified_at=time.time(),
+            outcome="ROLLED_BACK"
+        )
+        proof.evidence_hash = proof.calculate_evidence_hash()
+        tx.proof = proof
+        transaction_manager.proofs[tx.transaction_id] = proof
+        checkpoint_service.save_transaction(tx)
+
         last_evidence["recovery_proof"] = proof.model_dump()
-        last_evidence["transaction_status"] = "ROLLED_BACK"
-        last_evidence["remediation_transaction_id"] = active_tx.transaction_id
-        last_evidence["status"] = "PENDING"
+        last_evidence["transaction_status"] = tx.status
+        last_evidence["remediation_transaction_id"] = tx.transaction_id
+        last_evidence["status"] = "FAILED"
         last_evidence["verified"] = False
         last_evidence["rollback_executed"] = True
 
