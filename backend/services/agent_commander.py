@@ -561,6 +561,101 @@ Call the necessary MCP tools to remediate this critical stream degradation.
         except Exception:
             pass
 
+        # Phase 10: Multi-Agent Crew Structured Dispatch Handover
+        crew_records: List[Dict[str, Any]] = []
+        try:
+            is_hitl_pending = (remediation_res.get("status") == "PENDING_APPROVAL") if isinstance(remediation_res, dict) else False
+            crew_records = [
+                {
+                    "role": "1st AD",
+                    "name": self.crew.first_ad.name,
+                    "domain": "Incident Coordination & Executive Governance",
+                    "phase": "TRIAGE",
+                    "handover_schema": "TriagePackage",
+                    "handover_data": {
+                        "incident_id": effective_inc_id,
+                        "stream_title": STREAM_TITLE,
+                        "initial_alert": f"{failure_key} degradation across SLA gates",
+                        "severity": decision.get("severity", "CRITICAL"),
+                        "affected_subsystems": scenario_subsystems,
+                        "hitl_required": is_hitl_pending,
+                        "executive_brief": f"1st AD Triage: {decision.get('root_cause_analysis', 'Incident triaged.')}"
+                    },
+                    "timestamp": start_time + 0.1,
+                    "status": "COMPLETED"
+                },
+                {
+                    "role": "DIT",
+                    "name": self.crew.dit.name,
+                    "domain": "Observability & Metric/Log Correlation",
+                    "phase": "EVIDENCE_CORRELATION",
+                    "handover_schema": "EvidencePackage",
+                    "handover_data": {
+                        "incident_id": effective_inc_id,
+                        "promql_metrics": {
+                            "video_playback_failures_pct": snapshot.video_playback_failures_pct,
+                            "cdn_egress_latency_ms": snapshot.cdn_egress_latency_ms,
+                            "drm_handshake_ms": snapshot.drm_handshake_ms,
+                            "buffer_health_sec": snapshot.buffer_health_sec
+                        },
+                        "sanitized_logs": [sanitized_edge_log],
+                        "flagged_security_injections": security_guard.get_security_metrics().get("flagged_injections", 0),
+                        "failure_hypothesis": decision.get("root_cause_analysis", "QoS degradation"),
+                        "confidence": 0.96,
+                        "evidence_citations": [promql_query, logql_query]
+                    },
+                    "timestamp": start_time + 0.3,
+                    "status": "COMPLETED"
+                },
+                {
+                    "role": "Key Grip",
+                    "name": self.crew.key_grip.name,
+                    "domain": "Transactional Infrastructure Remediation",
+                    "phase": "TRANSACTION_EXECUTION",
+                    "handover_schema": "RemediationIntent",
+                    "handover_data": {
+                        "incident_id": effective_inc_id,
+                        "action_name": remediation_action or "NONE",
+                        "target_subsystem": scenario_subsystems[0] if scenario_subsystems else "Edge CDN",
+                        "transaction_id": tx_id or "NONE",
+                        "idempotency_key": idempotency_key or "",
+                        "rollback_action": rollback_action or "NONE",
+                        "execution_status": "SUSPENDED_FOR_APPROVAL" if is_hitl_pending else ("ROLLED_BACK" if rollback_happened else "APPLIED"),
+                        "blast_radius": "HIGH" if is_hitl_pending else "LOW",
+                        "traffic_shift_details": remediation_res or {}
+                    },
+                    "timestamp": start_time + 0.5,
+                    "status": "SUSPENDED" if is_hitl_pending else "COMPLETED"
+                },
+                {
+                    "role": "Continuity",
+                    "name": self.crew.continuity.name,
+                    "domain": "Recovery Verification & Rollback Authority",
+                    "phase": "VERIFICATION_GATE",
+                    "handover_schema": "VerificationVerdict",
+                    "handover_data": {
+                        "incident_id": effective_inc_id,
+                        "transaction_id": tx_id or "NONE",
+                        "outcome": "SUSPENDED_FOR_APPROVAL" if is_hitl_pending else ("COMMITTED" if (is_verified and gate_status == "PASSED") else "ROLLED_BACK"),
+                        "health_gates": {
+                            "vpf_sla": verified_vpf <= 0.5,
+                            "buffer_health": verified_buffer >= 20.0
+                        },
+                        "authoritative": is_authoritative,
+                        "verification_source": verify_source or "Grafana Cloud Prometheus",
+                        "verified_vpf_rate": verified_vpf,
+                        "verified_buffer_health_sec": verified_buffer,
+                        "recovery_proof_digest": proof_data.get("evidence_hash") if isinstance(proof_data, dict) else None,
+                        "escalation_package": escalation_data
+                    },
+                    "timestamp": time.time(),
+                    "status": "COMPLETED" if (is_verified and gate_status == "PASSED") or rollback_happened else ("SUSPENDED" if is_hitl_pending else "PENDING")
+                }
+            ]
+        except Exception as e:
+            logger.warning(f"Failed to generate structured crew dispatch: {e}")
+            crew_records = self.crew.get_agent_specs()
+
         result = InvestigationResult(
             timestamp=time.time(),
             incident_id=effective_inc_id,
@@ -605,7 +700,7 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             recovery_proof=proof_data,
             escalation_package=escalation_data,
             diagnosis_claims=diagnosis_claims_data,
-            crew_dispatch=self.crew.get_agent_specs()
+            crew_dispatch=crew_records
         )
 
         self._record_result(result)
