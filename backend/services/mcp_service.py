@@ -496,7 +496,8 @@ async def _evaluate_single_recovery_sample() -> Dict[str, Any]:
 
     # Policy enforcement:
     # If remote value was not obtained, allow local fallback ONLY under 'remote_preferred' or 'local_allowed'
-    if prom_vpf_value is None and VERIFICATION_POLICY in ("remote_preferred", "local_allowed"):
+    eff_policy = os.getenv("VERIFICATION_POLICY", VERIFICATION_POLICY)
+    if prom_vpf_value is None and eff_policy in ("remote_preferred", "local_allowed"):
         try:
             from services.telemetry import PREMIERE_REGISTRY
             for metric in PREMIERE_REGISTRY.collect():
@@ -551,7 +552,7 @@ async def _evaluate_single_recovery_sample() -> Dict[str, Any]:
         "prometheus_value_available": is_value_available,
         "prometheus_authoritative": is_remote_authoritative,
         "verification_source_trusted": is_source_trusted,
-        "verification_policy": VERIFICATION_POLICY,
+        "verification_policy": eff_policy,
         "prometheus_raw_readback": prom_readback.model_dump() if hasattr(prom_readback, "model_dump") else prom_readback,
         "current_vpf_pct": snapshot.video_playback_failures_pct,
         "vpf_sla_target": 0.5,
