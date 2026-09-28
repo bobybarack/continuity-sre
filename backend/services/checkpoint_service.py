@@ -184,6 +184,14 @@ class CheckpointService:
                 return None
             return self._row_to_transaction(row)
 
+    def list_transactions(self, limit: int = 50) -> List[RemediationTransaction]:
+        """Loads recent transactions from SQLite storage."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM transactions ORDER BY created_at DESC LIMIT ?", (limit,))
+            rows = cursor.fetchall()
+            return [self._row_to_transaction(r) for r in rows]
+
     # --------------------------------------------------------------------------
     # Checkpoints & Graph Suspension (HITL)
     # --------------------------------------------------------------------------
