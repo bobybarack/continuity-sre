@@ -30,6 +30,21 @@ class TransactionManager:
         self.idempotency_index: Dict[str, str] = {}
         self.proofs: Dict[str, RecoveryProof] = {}
         self.escalations: Dict[str, EscalationPackage] = {}
+        self.reload_from_db()
+
+    def reload_from_db(self):
+        """Reloads recent transactions, proofs, and idempotency indices from SQLite into memory for container reboot recovery."""
+        try:
+            recent = checkpoint_service.list_transactions(limit=100)
+            for tx in reversed(recent):
+                self.ledger[tx.transaction_id] = tx
+                if tx.idempotency_key:
+                    self.idempotency_index[tx.idempotency_key] = tx.transaction_id
+                if tx.proof:
+                    self.proofs[tx.transaction_id] = tx.proof
+            logger.info(f"[Transaction Manager] Reloaded {len(recent)} transactions from durable SQLite ledger.")
+        except Exception as e:
+            logger.warning(f"[Transaction Manager] Failed to reload from db: {e}")
 
     def get_transaction(self, transaction_id: str) -> Optional[RemediationTransaction]:
         if transaction_id in self.ledger:
@@ -50,6 +65,17 @@ class TransactionManager:
         for tx in reversed(list(self.ledger.values())):
             if tx.incident_id == target_inc and tx.status in ("APPLIED", "VERIFYING"):
                 return tx
+        # Check SQLite persistence if not found in memory (e.g. post-reboot)
+        try:
+            recent = checkpoint_service.list_transactions(limit=20)
+            for tx in recent:
+                if tx.incident_id == target_inc and tx.status in ("APPLIED", "VERIFYING"):
+                    self.ledger[tx.transaction_id] = tx
+                    if tx.idempotency_key:
+                        self.idempotency_index[tx.idempotency_key] = tx.transaction_id
+                    return tx
+        except Exception as e:
+            logger.warning(f"[Transaction Manager] Error looking up active transaction from SQLite: {e}")
         return None
 
     def clear(self):
