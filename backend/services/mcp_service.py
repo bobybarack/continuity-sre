@@ -24,6 +24,7 @@ from services.grafana_client import grafana_client
 from services.chaos import chaos_manager
 from services.telemetry import telemetry_engine, PROM_AGENT_MCP_TOOL_CALLS
 from services.transaction_manager import transaction_manager
+from services.checkpoint_service import checkpoint_service
 from services.integration_models import (
     PrometheusQueryResult,
     LokiQueryResult,
@@ -384,8 +385,56 @@ async def continuity_execute_remediation(
     incident_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """Executes autonomous multi-CDN egress traffic failover, DRM cluster switch, or BGP transit rerouting as an idempotent transaction."""
-    logger.info(f"[MCP Tool] Executing autonomous remediation: {action} (Primary={primary_cdn_pct}%, Secondary={secondary_cdn_pct}%)")
+    logger.info(f"[MCP Tool] Executing remediation request: {action} (Primary={primary_cdn_pct}%, Secondary={secondary_cdn_pct}%)")
     inc_id = incident_id or chaos_manager.get_state().active_incident_id or f"INC-{int(time.time())}"
+
+    # 1. Enforce HITL approval policy at the mutation boundary
+    from services.hitl_service import hitl_service
+    is_outage = chaos_manager.get_state().is_outage_active
+    requires_approval, blast_radius, policy_reason = hitl_service.evaluate_blast_radius(
+        action=action,
+        primary_cdn_pct=primary_cdn_pct,
+        severity="CRITICAL" if is_outage else None
+    )
+
+    # Check if a supervisor already approved this incident
+    suspended_chk = checkpoint_service.get_suspended_checkpoint_by_incident(inc_id)
+    is_already_approved = False
+    if suspended_chk and suspended_chk.get("status") == "RESUMED":
+        res_data = suspended_chk.get("resolution_data") or {}
+        if res_data.get("decision") == "APPROVED":
+            is_already_approved = True
+
+    if requires_approval and not is_already_approved:
+        logger.warning(f"[MCP Tool] Remediation action '{action}' requires HITL approval (blast_radius={blast_radius}). Suspending.")
+        chk_payload = hitl_service.request_approval(
+            incident_id=inc_id,
+            action=action,
+            params={"primary_cdn_pct": primary_cdn_pct, "secondary_cdn_pct": secondary_cdn_pct},
+            rationale=reason or policy_reason,
+            blast_radius=blast_radius
+        )
+        return {
+            "status": "PENDING_APPROVAL",
+            "transaction_id": None,
+            "idempotency_key": None,
+            "rollback_action": transaction_manager.get_rollback_action(action),
+            "action": action,
+            "primary_cdn": chaos_manager.get_state().primary_cdn,
+            "primary_cdn_traffic_pct": chaos_manager.get_state().primary_cdn_traffic_pct,
+            "secondary_cdn": chaos_manager.get_state().secondary_cdn,
+            "secondary_cdn_traffic_pct": chaos_manager.get_state().secondary_cdn_traffic_pct,
+            "active_drm_cluster": chaos_manager.get_state().active_drm_cluster,
+            "active_transit_route": chaos_manager.get_state().active_transit_route,
+            "reason": reason or policy_reason,
+            "was_newly_applied": False,
+            "requires_hitl": True,
+            "checkpoint_id": chk_payload.get("checkpoint_id"),
+            "blast_radius": blast_radius,
+            "policy_reason": policy_reason,
+            "timestamp": time.time()
+        }
+
     tx, was_newly_applied = transaction_manager.execute_transaction(
         incident_id=inc_id,
         action=action,
