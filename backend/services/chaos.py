@@ -1,5 +1,6 @@
 from enum import Enum
 import time
+import uuid
 import threading
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field
@@ -99,7 +100,7 @@ class ChaosStateManager:
             self.state.remediation_action = None
             self.state.remediation_action_applied = None
             self.state.verified_recovered_at = None
-            self.state.active_incident_id = f"INC-CDN-{int(time.time())}"
+            self.state.active_incident_id = f"INC-CDN-{uuid.uuid4().hex[:8]}"
             self.state.primary_cdn_traffic_pct = 100
             self.state.secondary_cdn_traffic_pct = 0
             self.state.edge_route_status = "FAILING"
@@ -125,7 +126,7 @@ class ChaosStateManager:
             self.state.remediation_action = None
             self.state.remediation_action_applied = None
             self.state.verified_recovered_at = None
-            self.state.active_incident_id = f"INC-DRM-{int(time.time())}"
+            self.state.active_incident_id = f"INC-DRM-{uuid.uuid4().hex[:8]}"
             self.state.primary_drm_cluster_status = "FAILED"
             self.state.secondary_drm_cluster_status = "STANDBY"
             self.state.active_drm_cluster = self.state.primary_drm_cluster
@@ -151,7 +152,7 @@ class ChaosStateManager:
             self.state.remediation_action = None
             self.state.remediation_action_applied = None
             self.state.verified_recovered_at = None
-            self.state.active_incident_id = f"INC-ISP-{int(time.time())}"
+            self.state.active_incident_id = f"INC-ISP-{uuid.uuid4().hex[:8]}"
             self.state.primary_transit_status = "CONGESTED"
             self.state.secondary_transit_status = "STANDBY"
             self.state.active_transit_route = self.state.primary_transit_route
@@ -182,7 +183,7 @@ class ChaosStateManager:
             self.state.remediation_action = None
             self.state.remediation_action_applied = None
             self.state.verified_recovered_at = None
-            self.state.active_incident_id = f"INC-ADV-{int(time.time())}"
+            self.state.active_incident_id = f"INC-ADV-{uuid.uuid4().hex[:8]}"
             self.state.edge_route_status = "FAILING"
             self.state.primary_cdn_traffic_pct = 100
             self.state.secondary_cdn_traffic_pct = 0
