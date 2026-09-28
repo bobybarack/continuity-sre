@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, Body, Depends
 from pydantic import BaseModel
 from services.hitl_service import hitl_service
 from services.checkpoint_service import checkpoint_service
+from services.auth import verify_demo_key
 
 logger = logging.getLogger("continuity.routes.incidents")
 
@@ -36,7 +37,7 @@ async def get_incident_checkpoint(incident_id: str) -> Dict[str, Any]:
     return chk
 
 
-@router.post("/{incident_id}/approve")
+@router.post("/{incident_id}/approve", dependencies=[Depends(verify_demo_key)])
 async def approve_incident(
     incident_id: str,
     payload: Optional[ApprovalPayload] = Body(default=None)
@@ -49,7 +50,7 @@ async def approve_incident(
     return result
 
 
-@router.post("/{incident_id}/deny")
+@router.post("/{incident_id}/deny", dependencies=[Depends(verify_demo_key)])
 async def deny_incident(
     incident_id: str,
     payload: Optional[DenialPayload] = Body(default=None)
