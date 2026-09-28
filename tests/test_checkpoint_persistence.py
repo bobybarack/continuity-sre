@@ -114,3 +114,39 @@ def test_transaction_manager_durable_rehydration():
     assert rehydrated.transaction_id == tx_id
     assert rehydrated.action == "FAILOVER_DRM_KEY_CLUSTER"
     assert tx_id in transaction_manager.ledger
+
+
+def test_transaction_manager_container_reboot_recovery():
+    """Verifies that reload_from_db and get_active_transaction restore state across simulated container restarts."""
+    test_inc_id = f"INC-REBOOT-{uuid.uuid4().hex[:6]}"
+    tx, was_new = transaction_manager.execute_transaction(
+        incident_id=test_inc_id,
+        action="REROUTE_BGP_TRANSIT"
+    )
+    tx_id = tx.transaction_id
+    idemp_key = f"{test_inc_id}:REROUTE_BGP_TRANSIT:v1"
+
+    # Simulate container death / hard process restart
+    transaction_manager.ledger.clear()
+    transaction_manager.idempotency_index.clear()
+    transaction_manager.proofs.clear()
+    assert tx_id not in transaction_manager.ledger
+
+    # Simulate container startup sequence
+    transaction_manager.reload_from_db()
+    assert tx_id in transaction_manager.ledger
+    assert idemp_key in transaction_manager.idempotency_index
+
+    # Active transaction retrieval should succeed seamlessly
+    active_tx = transaction_manager.get_active_transaction(incident_id=test_inc_id)
+    assert active_tx is not None
+    assert active_tx.transaction_id == tx_id
+    assert active_tx.status == "APPLIED"
+
+    # Idempotency check should reuse the recovered transaction rather than creating a new one
+    tx2, was_new2 = transaction_manager.execute_transaction(
+        incident_id=test_inc_id,
+        action="REROUTE_BGP_TRANSIT"
+    )
+    assert was_new2 is False
+    assert tx2.transaction_id == tx_id
