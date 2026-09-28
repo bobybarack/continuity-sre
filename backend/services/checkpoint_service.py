@@ -286,6 +286,27 @@ class CheckpointService:
                 "resolution_data": json.loads(row["resolution_data"]) if row["resolution_data"] else None
             }
 
+    def get_latest_checkpoint_by_incident(self, incident_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves the latest checkpoint for a specific incident regardless of status."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM checkpoints WHERE incident_id = ? ORDER BY suspended_at DESC LIMIT 1",
+                (incident_id,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return {
+                "checkpoint_id": row["checkpoint_id"],
+                "incident_id": row["incident_id"],
+                "step_name": row["step_name"],
+                "suspended_at": row["suspended_at"],
+                "status": row["status"],
+                "state_data": json.loads(row["state_data"]) if row["state_data"] else {},
+                "resolution_data": json.loads(row["resolution_data"]) if row["resolution_data"] else None
+            }
+
     # --------------------------------------------------------------------------
     # Audit Logging
     # --------------------------------------------------------------------------

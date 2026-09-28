@@ -75,30 +75,46 @@ function parseReasoningToDispatches(
 }
 
 function formatLogText(text: string) {
-  if (text.includes("[PROMPT_INJECTION_DETECTED: neutralized]")) {
-    const parts = text.split("[PROMPT_INJECTION_DETECTED: neutralized]");
+  // Regex to match prompt injection markers and credential redaction tags
+  const injectionRegex = /(\[SECURITY_SHIELD_FLAGGED_CONTENT:[^\]]+\]|\[PROMPT_INJECTION_DETECTED:[^\]]+\])/;
+  const redactionRegex = /(\[REDACTED[^\]]*\])/;
+
+  if (injectionRegex.test(text)) {
+    const parts = text.split(injectionRegex);
     return (
       <>
-        {parts[0]}
-        <span className="px-1 py-0.2 rounded font-bold bg-amber-100 text-amber-900 border border-amber-300">
-          [MODEL ARMOR: INJECTION BLOCKED]
-        </span>
-        {parts[1]}
+        {parts.map((part, i) => {
+          if (injectionRegex.test(part)) {
+            return (
+              <span key={i} className="px-1.5 py-0.5 mx-0.5 rounded font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs">
+                [MODEL ARMOR: INJECTION BLOCKED]
+              </span>
+            );
+          }
+          return part;
+        })}
       </>
     );
   }
-  if (text.includes("[REDACTED]")) {
-    const parts = text.split("[REDACTED]");
+
+  if (redactionRegex.test(text)) {
+    const parts = text.split(redactionRegex);
     return (
       <>
-        {parts[0]}
-        <span className="px-1 py-0.2 rounded font-bold bg-slate-200 text-slate-800 border border-slate-300">
-          [REDACTED]
-        </span>
-        {parts[1]}
+        {parts.map((part, i) => {
+          if (redactionRegex.test(part)) {
+            return (
+              <span key={i} className="px-1.5 py-0.5 mx-0.5 rounded font-bold bg-slate-700/50 text-slate-300 border border-slate-600/50 text-xs font-mono">
+                [REDACTED]
+              </span>
+            );
+          }
+          return part;
+        })}
       </>
     );
   }
+
   return text;
 }
 

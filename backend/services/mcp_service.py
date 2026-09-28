@@ -399,10 +399,10 @@ async def continuity_execute_remediation(
     )
 
     # Check if a supervisor already approved this incident
-    suspended_chk = checkpoint_service.get_suspended_checkpoint_by_incident(inc_id)
+    latest_chk = checkpoint_service.get_latest_checkpoint_by_incident(inc_id)
     is_already_approved = False
-    if suspended_chk and suspended_chk.get("status") == "RESUMED":
-        res_data = suspended_chk.get("resolution_data") or {}
+    if latest_chk and latest_chk.get("status") == "RESUMED":
+        res_data = latest_chk.get("resolution_data") or {}
         if res_data.get("decision") == "APPROVED":
             is_already_approved = True
 
@@ -528,13 +528,22 @@ async def _evaluate_single_recovery_sample() -> Dict[str, Any]:
 
     # Fail closed: if an authoritative/trusted Prometheus value is not available, verification fails
     prom_healthy = (prom_vpf_value <= 0.5) if (prom_vpf_value is not None and is_source_trusted) else False
+
+    chaos_state = chaos_manager.get_state()
+    from services.chaos import IncidentLifecycle, FailureMode
+
+    mode_gates_passed = True
+    if chaos_state.failure_mode == FailureMode.DRM_TIMEOUT:
+        mode_gates_passed = (snapshot.drm_handshake_ms <= 250.0)
+    elif chaos_state.failure_mode == FailureMode.ISP_PEERING_DROP:
+        mode_gates_passed = (snapshot.avg_bitrate_mbps >= 10.0)
+
     telemetry_healthy = (
         snapshot.video_playback_failures_pct <= 0.5 and
         snapshot.cdn_egress_latency_ms <= 150.0 and
-        snapshot.buffer_health_sec >= 20.0
+        snapshot.buffer_health_sec >= 20.0 and
+        mode_gates_passed
     )
-    chaos_state = chaos_manager.get_state()
-    from services.chaos import IncidentLifecycle
     if chaos_state.force_recovery_failure:
         is_recovered = False
     elif chaos_state.is_outage_active and (chaos_state.lifecycle == IncidentLifecycle.INCIDENT_ACTIVE or chaos_state.remediation_applied_at is None):
@@ -590,9 +599,22 @@ async def continuity_verify_closed_loop_recovery(
                     verification_source=evidence.get("prometheus_source", "Grafana Cloud Prometheus"),
                     authoritative=evidence.get("prometheus_authoritative", True)
                 )
+                updated_tx = transaction_manager.get_transaction(active_tx.transaction_id)
                 evidence["recovery_proof"] = proof.model_dump()
-                evidence["transaction_status"] = "COMMITTED"
+                evidence["transaction_status"] = updated_tx.status if updated_tx else proof.outcome
                 evidence["remediation_transaction_id"] = active_tx.transaction_id
+
+                if proof.outcome == "PASSED" and (updated_tx and updated_tx.status == "COMMITTED"):
+                    evidence["verified"] = True
+                    evidence["status"] = "PASSED"
+                    return evidence
+                else:
+                    # Transaction failed verification gates inside transaction manager
+                    logger.warning(f"[MCP Tool] verify_and_commit rolled back transaction: {proof.outcome}")
+                    evidence["verified"] = False
+                    evidence["status"] = "FAILED"
+                    evidence["rollback_executed"] = True
+                    return evidence
             return evidence
             
         if loop.time() + eff_poll > deadline:

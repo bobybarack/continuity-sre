@@ -1,6 +1,6 @@
 import logging
 from typing import Dict, Any, Optional, List
-from fastapi import APIRouter, HTTPException, Query, Body, Depends
+from fastapi import APIRouter, HTTPException, Query, Body, Depends, BackgroundTasks
 from pydantic import BaseModel
 from services.hitl_service import hitl_service
 from services.checkpoint_service import checkpoint_service
@@ -40,13 +40,21 @@ async def get_incident_checkpoint(incident_id: str) -> Dict[str, Any]:
 @router.post("/{incident_id}/approve", dependencies=[Depends(verify_demo_key)])
 async def approve_incident(
     incident_id: str,
+    background_tasks: BackgroundTasks,
     payload: Optional[ApprovalPayload] = Body(default=None)
 ) -> Dict[str, Any]:
-    """Approves the proposed high-blast-radius remediation and resumes execution."""
+    """Approves the proposed high-blast-radius remediation, resumes execution, and initiates closed-loop recovery verification."""
     note = payload.operator_note if payload and payload.operator_note else "Approved by broadcast supervisor"
     result = hitl_service.approve_incident(incident_id, operator_note=note)
     if not result.get("success"):
         raise HTTPException(status_code=400, detail=result.get("error", "Approval failed"))
+
+    tx_id = result.get("transaction_id")
+    if tx_id:
+        from services.mcp_service import continuity_verify_closed_loop_recovery
+        background_tasks.add_task(continuity_verify_closed_loop_recovery, transaction_id=tx_id)
+        result["verification_scheduled"] = True
+
     return result
 
 
