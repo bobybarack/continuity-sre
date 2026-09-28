@@ -64,6 +64,7 @@ class RemediationTransaction(BaseModel):
         "FAILED"
     ] = "PENDING"
     error: Optional[str] = None
+    pre_health_snapshot: Optional[HealthSnapshot] = None
     proof: Optional[RecoveryProof] = None
 
 class EscalationPackage(BaseModel):

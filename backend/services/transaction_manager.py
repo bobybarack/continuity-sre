@@ -125,6 +125,7 @@ class TransactionManager:
         rollback_action = self.get_rollback_action(action)
         tx_id = f"tx-{uuid.uuid4().hex[:12]}"
         failure_mode_str = current_chaos.failure_mode.value if current_chaos.failure_mode else "UNKNOWN"
+        pre_health = self.build_health_snapshot(source="pre_remediation_telemetry")
 
         tx = RemediationTransaction(
             transaction_id=tx_id,
@@ -140,6 +141,7 @@ class TransactionManager:
             applied_at=time.time(),
             idempotency_key=idempotency_key,
             rollback_action=rollback_action,
+            pre_health_snapshot=pre_health,
             status="APPLIED"
         )
 
@@ -239,7 +241,7 @@ class TransactionManager:
     def verify_and_commit(
         self,
         transaction_id: str,
-        pre_action_snapshot: HealthSnapshot,
+        pre_action_snapshot: Optional[HealthSnapshot] = None,
         verification_source: str = "Grafana Cloud Prometheus",
         authoritative: bool = True
     ) -> RecoveryProof:
@@ -247,6 +249,8 @@ class TransactionManager:
         tx = self.ledger.get(transaction_id)
         if not tx:
             raise ValueError(f"Unknown transaction {transaction_id}")
+
+        effective_pre_snapshot = pre_action_snapshot or tx.pre_health_snapshot or self.build_health_snapshot()
 
         tx.status = "VERIFYING"
         state = chaos_manager.get_state()
@@ -322,7 +326,7 @@ class TransactionManager:
         proof = RecoveryProof(
             incident_id=tx.incident_id,
             remediation_transaction_id=transaction_id,
-            pre_action=pre_action_snapshot,
+            pre_action=effective_pre_snapshot,
             post_action=post_snapshot,
             verification_source=verification_source,
             authoritative=authoritative,
