@@ -90,3 +90,38 @@ def test_inter_agent_handover_models():
     )
     assert verdict.outcome == "COMMITTED"
     assert verdict.authoritative is True
+
+
+@pytest.mark.asyncio
+async def test_execute_crew_workflow_orchestration():
+    """Verifies that execute_crew_workflow orchestrates all 4 cinema roles sequentially with valid handovers."""
+    crew = continuity_crew
+    assert len(crew.key_grip.tools) > 0, "Key Grip must have tools attached"
+
+    workflow_res = await crew.execute_crew_workflow(
+        incident_id="INC-ORCH-TEST",
+        stream_title="Continuity Orchestration Suite",
+        initial_alert="Edge CDN VPF breach",
+        affected_subsystems=["Edge CDN", "Origin Shield"],
+        promql_query="ott_video_playback_failures_ratio",
+        logql_query="{app='edge-gateway'} |= 'error'",
+        failure_mode_name="CDN_OUTAGE",
+        candidate_action="SHIFT_TRAFFIC_TO_AKAMAI",
+        action_params={"primary_cdn_pct": 20, "secondary_cdn_pct": 80}
+    )
+
+    assert isinstance(workflow_res["triage"], TriagePackage)
+    assert isinstance(workflow_res["evidence"], EvidencePackage)
+    assert isinstance(workflow_res["remediation"], RemediationIntent)
+    assert isinstance(workflow_res["verdict"], VerificationVerdict)
+
+    records = workflow_res["dispatch_records"]
+    assert len(records) == 4
+    roles = [r["role"] for r in records]
+    assert roles == ["1st AD", "DIT", "Key Grip", "Continuity"]
+
+    # Verify handover data structure on each stage
+    assert records[0]["handover_schema"] == "TriagePackage"
+    assert records[1]["handover_schema"] == "EvidencePackage"
+    assert records[2]["handover_schema"] == "RemediationIntent"
+    assert records[3]["handover_schema"] == "VerificationVerdict"
