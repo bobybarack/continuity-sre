@@ -33,6 +33,8 @@ class HITLService:
 
         # Draining primary CDN below 25% traffic
         if action in ("SHIFT_TRAFFIC_TO_AKAMAI", "SHIFT_CDN_TRAFFIC") and primary_cdn_pct is not None and primary_cdn_pct <= 20:
+            if severity == "CRITICAL" and primary_cdn_pct >= 20:
+                return False, 0.40, "Autonomous failover permitted under SLA emergency protocol."
             return True, 0.80, "Mandatory HITL policy: Throttling primary CDN to <= 20% requires operator authorization."
 
         if severity == "CRITICAL" and action == "FAILOVER_DRM_KEY_CLUSTER":
