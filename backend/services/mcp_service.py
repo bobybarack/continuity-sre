@@ -733,6 +733,34 @@ CONTINUITY_FUNCTION_DECLARATIONS = [
             },
             required=["incident_id", "reason"]
         )
+    ),
+    types.FunctionDeclaration(
+        name="continuity_request_human_approval",
+        description="Suspend autonomous execution and request mandatory supervisor approval for high-blast-radius remediation.",
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={
+                "incident_id": types.Schema(type="STRING", description="The active incident identifier."),
+                "action": types.Schema(type="STRING", description="The remediation action requiring approval (e.g. REROUTE_BGP_TRANSIT)."),
+                "rationale": types.Schema(type="STRING", description="Operational and technical justification for the proposed action."),
+                "blast_radius": types.Schema(type="NUMBER", description="Estimated blast radius score (0.0 to 1.0).")
+            },
+            required=["incident_id", "action"]
+        )
+    ),
+    types.FunctionDeclaration(
+        name="request_human_approval",
+        description="Alias for continuity_request_human_approval to request supervisor sign-off on high-blast-radius interventions.",
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={
+                "incident_id": types.Schema(type="STRING", description="The active incident identifier."),
+                "action": types.Schema(type="STRING", description="The remediation action requiring approval."),
+                "rationale": types.Schema(type="STRING", description="Operational and technical justification."),
+                "blast_radius": types.Schema(type="NUMBER", description="Estimated blast radius score.")
+            },
+            required=["incident_id", "action"]
+        )
     )
 ]
 
