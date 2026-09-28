@@ -319,6 +319,11 @@ Call the necessary MCP tools to remediate this critical stream degradation.
                                 contents=prompt,
                                 config=types.GenerateContentConfig(
                                     tools=dynamic_gemini_tools,
+                                    tool_config=types.ToolConfig(
+                                        function_calling_config=types.FunctionCallingConfig(
+                                            mode=types.FunctionCallingConfigMode.AUTO
+                                        )
+                                    ),
                                     temperature=0.2
                                 )
                             ),
@@ -331,6 +336,11 @@ Call the necessary MCP tools to remediate this critical stream degradation.
                                 contents=prompt,
                                 config=types.GenerateContentConfig(
                                     tools=dynamic_gemini_tools,
+                                    tool_config=types.ToolConfig(
+                                        function_calling_config=types.FunctionCallingConfig(
+                                            mode=types.FunctionCallingConfigMode.AUTO
+                                        )
+                                    ),
                                     temperature=0.2
                                 )
                             )
