@@ -254,6 +254,18 @@ class TransactionManager:
         gates = self.evaluate_recovery_gates(state.failure_mode, post_snapshot)
         all_passed = all(g.passed for g in gates) and not state.force_recovery_failure
 
+        # Enforce remote_required policy: if remote authoritative verification is required but not authoritative, fail commit
+        verification_policy = os.getenv("VERIFICATION_POLICY", "remote_preferred")
+        if verification_policy == "remote_required" and not authoritative:
+            all_passed = False
+            gates.append(RecoveryGateResult(
+                name="Remote Prometheus Authoritative Gate",
+                observed_value=f"Source: {verification_source}, Authoritative: {authoritative}",
+                operator="==",
+                required_value="Authoritative Remote Prometheus",
+                passed=False
+            ))
+
         f_mode = tx.failure_mode or (state.failure_mode.value if state.failure_mode else "UNKNOWN")
         for g in gates:
             outcome_str = "PASSED" if g.passed else "FAILED"
