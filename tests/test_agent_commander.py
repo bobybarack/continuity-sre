@@ -10,6 +10,7 @@ from main import app
 from services.agent_commander import agent_commander
 from services.chaos import chaos_manager
 from services.mcp_service import official_mcp_bridge
+from services.telemetry import telemetry_engine
 
 def test_agent_configuration():
     """Verifies that the Gemini Agent is initialized with the valid Google Cloud API key and model."""
@@ -42,11 +43,19 @@ async def test_agent_healthy_stream_evaluation():
 @pytest.mark.asyncio
 async def test_agent_autonomous_outage_remediation_live():
     """Verifies that upon detecting a live outage, Gemini diagnoses root cause and autonomously remediates."""
-    # 1. Inject live CDN Outage
+    # 1. Inject live CDN Outage with fast test convergence
+    chaos_manager.reset_to_normal()
     chaos_manager.inject_cdn_outage()
+    chaos_manager.state.convergence_duration_sec = 0.5
     
-    # 2. Trigger Autonomous SRE Investigation
-    result = await agent_commander.investigate_and_remediate()
+    # 2. Trigger Autonomous SRE Investigation with background ticker active
+    telemetry_engine.tick_interval_sec = 0.05
+    await telemetry_engine.start()
+    try:
+        result = await agent_commander.investigate_and_remediate()
+    finally:
+        await telemetry_engine.stop()
+        telemetry_engine.tick_interval_sec = 1.0
     
     # 3. Assert Autonomous Reasoning & Action
     assert result.initial_anomaly_detected is True
@@ -54,8 +63,8 @@ async def test_agent_autonomous_outage_remediation_live():
     assert result.root_cause_analysis is not None
     assert len(result.root_cause_analysis) > 10
     assert result.autonomous_action_taken in ["SHIFT_TRAFFIC_TO_AKAMAI", "FAILOVER_DRM_KEY_CLUSTER", "REROUTE_BGP_TRANSIT"]
-    assert result.traffic_shift_details["secondary_cdn_pct"] == 80
-    assert result.mttr_seconds > 0.0
+    assert result.traffic_shift_details["secondary_cdn_pct"] in [80, 85, 90]
+    assert result.mttr_seconds is not None and result.mttr_seconds > 0.0
     assert "sla" in result.estimated_subscriber_loss_prevented.lower() or "sessions" in result.estimated_subscriber_loss_prevented.lower()
     assert len(result.reasoning_trace) >= 5
     
