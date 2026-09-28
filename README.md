@@ -23,14 +23,14 @@ CONTINUITY investigates streaming failures, applies a remediation, and checks re
 
 ## How it works
 
-1. **Detect & Mathematical Gating:** Continuous 1 Hz telemetry is monitored through a statistical innovation filter. High-frequency variations are evaluated against a chi-squared ($\chi^2 = 3.84$) threshold, achieving >94% LLM token reduction during nominal operation while instantly triggering when anomalies breach bounds.
-2. **Screen & Sanitize:** The Model Armor screening layer inspects incoming Loki logs and telemetry labels, neutralizing indirect prompt injection vectors and redacting sensitive credentials before agent ingestion.
-3. **Multi-Agent ADK Triage:** The 4-agent Google ADK crew executes a sequential workflow with scoped tool allowlists:
-   - **1st AD (Commander):** Orchestrates lifecycle, evaluates blast radius, and requests HITL approval when needed.
-   - **DIT (Signal Scout):** Queries Grafana Cloud Prometheus vectors and Loki error logs.
-   - **Key Grip (Infra Rigger):** Executes transactional traffic shifts, DRM failovers, or BGP reroutes.
-   - **Continuity (Quality Gate):** Validates post-remediation telemetry against strict health invariants.
-4. **Remediate with Durable Checkpoints:** Every state transition, health snapshot, and transaction is durably recorded to an ACID SQLite WAL checkpoint store, guaranteeing resilience across container restarts.
+1. **Detect & Mathematical Gating:** Continuous 1 Hz telemetry is monitored through a statistical innovation filter. High-frequency variations are evaluated against a chi-squared ($\chi^2 = 3.84$) threshold, achieving 94.2% Telemetry Tick Inference Suppression Rate during nominal operation while instantly triggering when anomalies breach bounds.
+2. **Screen & Sanitize:** An in-memory Model Armor defense-in-depth sanitization gateway inspects incoming Loki logs, edge telemetry logs, and query inputs, neutralizing prompt injection patterns and redacting credentials before agent ingestion.
+3. **Multi-Agent ADK Triage:** The 4-agent Google ADK crew executes a sequential workflow with scoped tool allowlists and structured Pydantic handovers:
+   - **1st AD (Commander):** Orchestrates lifecycle, evaluates blast radius, and requests HITL approval when needed (`TriagePackage`).
+   - **DIT (Signal Scout):** Queries Grafana Cloud Prometheus vectors and Loki error logs with security guard sanitization (`EvidencePackage`).
+   - **Key Grip (Infra Rigger):** Executes transactional traffic shifts, DRM failovers, or BGP reroutes with rollback guarantees (`RemediationIntent`).
+   - **Continuity (Quality Gate):** Validates post-remediation telemetry against strict health invariants, issuing SHA-256 recovery proof or triggering rollback (`VerificationVerdict`).
+4. **Remediate with Durable Checkpoints:** Every state transition, health snapshot, and transaction is durably recorded to an ACID SQLite WAL checkpoint store with container reboot rehydration and named volume persistence in Docker Compose.
 5. **Verify or Roll Back:** The closed-loop gate verifies service recovery via remote Prometheus VPF readback. If recovery fails to converge, an automatic rollback is executed, baseline infrastructure is restored, and an immutable `EscalationPackage` is compiled with SHA-256 evidence.
 
 ## Architecture
@@ -38,7 +38,7 @@ CONTINUITY investigates streaming failures, applies a remediation, and checks re
 ```mermaid
 flowchart TD
     UI["Next.js Command Center\n(HITL Modal + Anomaly Chart)"] -->|"REST / SSE"| API["FastAPI Control Plane"]
-    API --> GATE["Telemetry Anomaly Gate\n(94%+ Token Savings)"]
+    API --> GATE["Telemetry Anomaly Gate\n(94.2% Tick Suppression)"]
     GATE --> CREW["Google ADK 4-Agent Crew"]
     
     subgraph ADK_CREW ["Google ADK Multi-Agent Team (Scoped Toolsets)"]
@@ -193,8 +193,12 @@ FastAPI serves interactive OpenAPI documentation at `/docs` on the backend.
 | POST | `/api/chaos/inject-cdn-outage` | Inject a CDN outage. |
 | POST | `/api/chaos/inject-drm-timeout` | Inject a DRM timeout. |
 | POST | `/api/chaos/inject-isp-drop` | Inject an ISP drop. |
-| POST | `/api/chaos/remediate` | Apply a direct simulator action; bypasses the commander transaction workflow. |
+| POST | `/api/chaos/remediate` | Apply a direct simulator action; enforces blast-radius HITL approval checks. |
 | POST | `/api/chaos/reset` | Restore the simulation baseline. |
+| GET | `/api/incidents/checkpoints` | List pending HITL approval checkpoints. |
+| GET | `/api/incidents/{incident_id}/checkpoint` | Retrieve active suspended checkpoint for incident. |
+| POST | `/api/incidents/{incident_id}/approve` | Authenticated supervisor approval to resume remediation. |
+| POST | `/api/incidents/{incident_id}/deny` | Authenticated supervisor denial and escalation. |
 
 Agent and chaos mutations use `X-Continuity-Demo-Key`. The webhook additionally accepts `X-Webhook-Secret`, bearer authorization, or its supported query parameters. Secondary-path degradation is available through the Python simulator and benchmark, with no dedicated HTTP injection route.
 
