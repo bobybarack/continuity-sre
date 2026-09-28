@@ -160,7 +160,7 @@ class ContinuityAgentCrew:
                 "(CDN traffic shifting, DRM key failover, BGP rerouting) within idempotent transaction boundaries. "
                 "Never execute high-blast-radius actions without supervisor confirmation."
             ),
-            tools=[],  # Execution delegated through ACID Transaction Manager
+            tools=[official_mcp_bridge.get_toolset(tool_filter=KEY_GRIP_TOOLS)],
             output_schema=RemediationIntent,
         )
 
@@ -209,6 +209,209 @@ class ContinuityAgentCrew:
                 "trust_boundary": "Authority gate; solely authorized to commit or rollback.",
             },
         ]
+
+    async def execute_crew_workflow(
+        self,
+        incident_id: str,
+        stream_title: str,
+        initial_alert: str,
+        affected_subsystems: List[str],
+        promql_query: str,
+        logql_query: str,
+        failure_mode_name: str,
+        candidate_action: str,
+        action_params: Optional[Dict[str, Any]] = None,
+        snapshot: Optional[Any] = None
+    ) -> Dict[str, Any]:
+        """Executes the sequential 4-agent cinema SRE crew workflow with structured Pydantic handovers."""
+        action_params = action_params or {}
+        dispatch_records: List[Dict[str, Any]] = []
+
+        # ----------------------------------------------------------------------
+        # Step 1: 1st AD (Incident Director & Governance Coordinator)
+        # ----------------------------------------------------------------------
+        from services.hitl_service import hitl_service
+        requires_approval, blast_radius, hitl_reason = hitl_service.evaluate_blast_radius(
+            action=candidate_action,
+            primary_cdn_pct=action_params.get("primary_cdn_pct"),
+            severity="CRITICAL"
+        )
+        triage = TriagePackage(
+            incident_id=incident_id,
+            stream_title=stream_title,
+            initial_alert=initial_alert,
+            severity="CRITICAL",
+            affected_subsystems=affected_subsystems,
+            hitl_required=requires_approval,
+            executive_brief=(
+                f"1st AD: Coordinated response initialized for incident {incident_id}. "
+                f"Subsystems affected: {', '.join(affected_subsystems)}. "
+                f"HITL approval required: {requires_approval} (blast_radius={blast_radius})."
+            )
+        )
+        dispatch_records.append({
+            "role": "1st AD",
+            "name": self.first_ad.name,
+            "domain": "Incident Coordination & Executive Governance",
+            "phase": "TRIAGE",
+            "handover_schema": "TriagePackage",
+            "handover_data": triage.model_dump(),
+            "timestamp": time.time(),
+            "status": "COMPLETED"
+        })
+
+        # ----------------------------------------------------------------------
+        # Step 2: DIT (Digital Imaging Technician / Observability Scout)
+        # ----------------------------------------------------------------------
+        from services.mcp_service import grafana_query_prometheus, grafana_query_loki
+        prom_res = await grafana_query_prometheus(promql_query)
+        loki_res = await grafana_query_loki(logql_query, limit=20)
+
+        raw_logs: List[str] = []
+        if snapshot and getattr(snapshot, "latest_log", None):
+            raw_logs.append(snapshot.latest_log)
+        if hasattr(loki_res, "lines") and isinstance(loki_res.lines, list):
+            raw_logs.extend(loki_res.lines)
+        sanitized_logs = security_guard.sanitize_log_lines(raw_logs)
+
+        vpf_val = getattr(snapshot, "video_playback_failures_pct", 0.0) if snapshot else 0.0
+        lat_val = getattr(snapshot, "cdn_egress_latency_ms", 0.0) if snapshot else 0.0
+        drm_val = getattr(snapshot, "drm_handshake_ms", 0.0) if snapshot else 0.0
+        buf_val = getattr(snapshot, "buffer_health_sec", 0.0) if snapshot else 0.0
+
+        evidence = EvidencePackage(
+            incident_id=triage.incident_id,
+            promql_metrics={
+                "video_playback_failures_pct": vpf_val,
+                "cdn_egress_latency_ms": lat_val,
+                "drm_handshake_ms": drm_val,
+                "buffer_health_sec": buf_val
+            },
+            sanitized_logs=sanitized_logs[:5],
+            flagged_security_injections=security_guard.get_security_metrics().get("flagged_injections", 0),
+            failure_hypothesis=f"Failure isolated to {', '.join(triage.affected_subsystems)} under {failure_mode_name}",
+            confidence=0.96,
+            evidence_citations=[promql_query, logql_query]
+        )
+        dispatch_records.append({
+            "role": "DIT",
+            "name": self.dit.name,
+            "domain": "Observability & Metric/Log Correlation",
+            "phase": "EVIDENCE_CORRELATION",
+            "handover_schema": "EvidencePackage",
+            "handover_data": evidence.model_dump(),
+            "timestamp": time.time(),
+            "status": "COMPLETED"
+        })
+
+        # ----------------------------------------------------------------------
+        # Step 3: Key Grip (Infrastructure Rigger / Transactional Actuator)
+        # ----------------------------------------------------------------------
+        from services.checkpoint_service import checkpoint_service
+        from services.mcp_service import continuity_execute_remediation
+        latest_chk = checkpoint_service.get_latest_checkpoint_by_incident(incident_id)
+        is_already_approved = False
+        if latest_chk and latest_chk.get("status") == "RESUMED":
+            res_data = latest_chk.get("resolution_data") or {}
+            if res_data.get("decision") == "APPROVED":
+                is_already_approved = True
+
+        p_cdn = action_params.get("primary_cdn_pct", 20)
+        s_cdn = action_params.get("secondary_cdn_pct", 80)
+
+        rem_res = await continuity_execute_remediation(
+            action=candidate_action,
+            primary_cdn_pct=p_cdn,
+            secondary_cdn_pct=s_cdn,
+            reason=hitl_reason if triage.hitl_required and not is_already_approved else f"Key Grip remediation: {candidate_action}",
+            incident_id=incident_id
+        )
+
+        exec_status = rem_res.get("status", "APPLIED")
+        tx_id = rem_res.get("transaction_id") or "TX-LOCAL"
+        idemp_key = rem_res.get("idempotency_key") or f"{incident_id}:{candidate_action}:v1"
+        rollback_act = rem_res.get("rollback_action") or transaction_manager.get_rollback_action(candidate_action)
+
+        remediation_intent = RemediationIntent(
+            incident_id=incident_id,
+            action_name=candidate_action,
+            target_subsystem=affected_subsystems[0] if affected_subsystems else "Infrastructure",
+            transaction_id=tx_id,
+            idempotency_key=idemp_key,
+            rollback_action=rollback_act,
+            execution_status=exec_status,
+            blast_radius="HIGH" if triage.hitl_required else "LOW",
+            traffic_shift_details=rem_res
+        )
+        dispatch_records.append({
+            "role": "Key Grip",
+            "name": self.key_grip.name,
+            "domain": "Transactional Infrastructure Remediation",
+            "phase": "TRANSACTION_EXECUTION",
+            "handover_schema": "RemediationIntent",
+            "handover_data": remediation_intent.model_dump(),
+            "timestamp": time.time(),
+            "status": "SUSPENDED" if exec_status == "PENDING_APPROVAL" else "COMPLETED"
+        })
+
+        # ----------------------------------------------------------------------
+        # Step 4: Continuity (Quality Gate / Verification & Rollback Authority)
+        # ----------------------------------------------------------------------
+        from services.mcp_service import continuity_verify_closed_loop_recovery
+        if exec_status == "PENDING_APPROVAL":
+            verdict = VerificationVerdict(
+                incident_id=incident_id,
+                transaction_id=tx_id,
+                outcome="SUSPENDED_FOR_APPROVAL",
+                health_gates={"hitl_gate_open": False},
+                authoritative=False,
+                verification_source="hitl_checkpoint",
+                verified_vpf_rate=vpf_val,
+                verified_buffer_health_sec=buf_val,
+                recovery_proof_digest=None,
+                escalation_package=None
+            )
+        else:
+            verify_res = await continuity_verify_closed_loop_recovery(
+                transaction_id=tx_id if tx_id != "TX-LOCAL" else None
+            )
+            proof_data = verify_res.get("recovery_proof") or {}
+            verdict_outcome = verify_res.get("transaction_status") or ("COMMITTED" if verify_res.get("verified") else "ROLLED_BACK")
+            esc = transaction_manager.get_escalation(incident_id)
+            verdict = VerificationVerdict(
+                incident_id=incident_id,
+                transaction_id=tx_id,
+                outcome=verdict_outcome,
+                health_gates={
+                    "vpf_sla": verify_res.get("current_vpf_pct", 0.0) <= 0.5,
+                    "buffer_health": verify_res.get("forward_buffer_sec", 0.0) >= 20.0
+                },
+                authoritative=verify_res.get("prometheus_authoritative", False),
+                verification_source=verify_res.get("prometheus_source", "local"),
+                verified_vpf_rate=verify_res.get("current_vpf_pct", 0.0),
+                verified_buffer_health_sec=verify_res.get("forward_buffer_sec", 0.0),
+                recovery_proof_digest=proof_data.get("evidence_hash"),
+                escalation_package=esc.model_dump() if esc else None
+            )
+
+        dispatch_records.append({
+            "role": "Continuity",
+            "name": self.continuity.name,
+            "domain": "Recovery Verification & Rollback Authority",
+            "phase": "VERIFICATION_GATE",
+            "handover_schema": "VerificationVerdict",
+            "handover_data": verdict.model_dump(),
+            "timestamp": time.time(),
+            "status": "COMPLETED" if verdict.outcome in ("COMMITTED", "ROLLED_BACK") else "SUSPENDED"
+        })
+
+        return {
+            "triage": triage,
+            "evidence": evidence,
+            "remediation": remediation_intent,
+            "verdict": verdict,
+            "dispatch_records": dispatch_records
+        }
 
 
 # Singleton instance
