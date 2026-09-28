@@ -13,4 +13,11 @@ services:
     environment:
       - PORT=8080
       - PYTHONUNBUFFERED=1
+      - CONTINUITY_DB_PATH=/data/continuity_checkpoint.db
+    volumes:
+      - continuity-data:/data
     restart: unless-stopped
+
+volumes:
+  continuity-data:
+    driver: local

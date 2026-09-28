@@ -34,11 +34,15 @@ class CheckpointService:
         if db_path:
             self.db_path = Path(db_path)
         else:
-            worker = os.environ.get("PYTEST_XDIST_WORKER")
-            if worker:
-                self.db_path = Path(__file__).resolve().parent.parent / f"continuity_checkpoint_{worker}.db"
+            env_db = os.environ.get("CONTINUITY_DB_PATH")
+            if env_db:
+                self.db_path = Path(env_db)
             else:
-                self.db_path = DEFAULT_DB_PATH
+                worker = os.environ.get("PYTEST_XDIST_WORKER")
+                if worker:
+                    self.db_path = Path(__file__).resolve().parent.parent / f"continuity_checkpoint_{worker}.db"
+                else:
+                    self.db_path = DEFAULT_DB_PATH
         self._init_db()
 
     def _get_connection(self) -> sqlite3.Connection:
