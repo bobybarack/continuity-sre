@@ -23,6 +23,7 @@ from services.integration_models import (
 from services.transaction_manager import transaction_manager
 from services.telemetry import PROM_AGENT_GEMINI_LATENCY
 from services.remediation_models import DiagnosisClaim, EvidenceReference
+from services.security_guard import security_guard
 from services.mcp_service import (
     GEMINI_MCP_TOOLS,
     get_gemini_tools,
@@ -256,7 +257,10 @@ class AgentCommander:
         trace.append(f"[{time.strftime('%H:%M:%S')}] CRITICAL ANOMALY DETECTED: {state.failure_mode.value if state.failure_mode else 'QoS'} threshold breached.")
         trace.append(f"[{time.strftime('%H:%M:%S')}] ADK McpToolset [query_loki_logs]: Querying error logs via Loki proxy ({logql_query})...")
         loki_res = await grafana_query_loki(logql_query, limit=20)
-        trace.append(f"[{time.strftime('%H:%M:%S')}] Loki Log Isolated: \"{snapshot.latest_log}\"")
+        sanitized_edge_log, was_flagged, injection_cat = security_guard.sanitize_log_line(snapshot.latest_log)
+        if was_flagged:
+            trace.append(f"[{time.strftime('%H:%M:%S')}] [Security Guard] Adversarial log injection intercepted: category={injection_cat}")
+        trace.append(f"[{time.strftime('%H:%M:%S')}] Loki Log Isolated: \"{sanitized_edge_log}\"")
 
         prompt = f"""
 You are Continuity, the Lead Autonomous SRE AI Incident Commander for a tier-1 Hollywood OTT streaming platform.
@@ -274,7 +278,7 @@ OBSERVABILITY TELEMETRY (Prometheus & Loki via Grafana MCP):
 - DRM Handshake Duration: {snapshot.drm_handshake_ms}ms (Baseline: 120ms)
 - Buffer Health: {snapshot.buffer_health_sec}s
 - Delivered Bitrate: {snapshot.avg_bitrate_mbps} Mbps
-- Recent Edge Log: "{snapshot.latest_log}"
+- Recent Edge Log: "{sanitized_edge_log}"
 
 RAW GRAFANA CLOUD MCP RESPONSES:
 - Prometheus PromQL Query Response ({promql_query}):
@@ -372,11 +376,11 @@ Call the necessary MCP tools to remediate this critical stream degradation.
         if not decision:
             if not remediation_action:
                 remediation_action = scenario["default_action"]
-                decision_rca = f"Degradation in {', '.join(scenario_subsystems)} identified via {snapshot.latest_log}"
+                decision_rca = f"Degradation in {', '.join(scenario_subsystems)} identified via {sanitized_edge_log}"
 
             decision = {
                 "severity": "CRITICAL" if state.failure_mode != FailureMode.ISP_PEERING_DROP else "WARNING",
-                "root_cause_analysis": decision_rca or f"Degradation detected via {snapshot.latest_log}",
+                "root_cause_analysis": decision_rca or f"Degradation detected via {sanitized_edge_log}",
                 "affected_subsystems": scenario_subsystems,
                 "remediation_action": remediation_action,
                 "estimated_subscriber_loss_prevented": grounded_impact_str,
@@ -523,9 +527,9 @@ Call the necessary MCP tools to remediate this critical stream degradation.
                     query_type="logql",
                     query=logql_query,
                     target_metric="edge_log_stream",
-                    observed_value=snapshot.latest_log,
+                    observed_value=sanitized_edge_log,
                     threshold="Upstream/transit failure pattern",
-                    status="BREACHED" if any(w in snapshot.latest_log for w in ["502", "Timeout", "loss", "refused"]) else "NORMAL"
+                    status="BREACHED" if any(w in sanitized_edge_log for w in ["502", "Timeout", "loss", "refused"]) else "NORMAL"
                 )
             ]
             claim_obj = DiagnosisClaim(
