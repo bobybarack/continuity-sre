@@ -10,6 +10,7 @@ from routes.incidents import router as incidents_router
 from services.telemetry import telemetry_engine
 from services.mcp_service import official_mcp_bridge
 from services.grafana_client import grafana_client
+from services.transaction_manager import transaction_manager
 from config import (
     STREAM_TITLE,
     GOOGLE_CLOUD_PROJECT,
@@ -20,6 +21,7 @@ from config import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    transaction_manager.reload_from_db()
     await telemetry_engine.start()
     yield
     await telemetry_engine.stop()
