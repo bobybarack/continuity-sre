@@ -45,10 +45,11 @@ if GEMINI_API_KEY:
     os.environ["GOOGLE_API_KEY"] = GEMINI_API_KEY
 
 FALLBACK_MODELS = list(dict.fromkeys([
+    "models/gemini-flash-lite-latest",
     GEMINI_MODEL,
+    "models/gemini-flash-latest",
     "models/gemini-3.7-flash",
-    "models/gemini-3.6-flash",
-    "models/gemini-3.5-flash",
+    "models/gemini-2.5-flash-lite",
 ]))
 
 class InvestigationResult(BaseModel):
