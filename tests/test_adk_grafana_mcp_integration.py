@@ -215,7 +215,7 @@ async def test_full_lifecycle_scenarios_verified(scenario_injector, expected_act
             from services.hitl_service import hitl_service
             approve_res = hitl_service.approve_incident(result.incident_id, "Supervisor authorization")
             assert approve_res["success"] is True
-            result = await agent_commander.investigate_and_remediate()
+            result = await agent_commander.investigate_and_remediate(incident_id=result.incident_id)
 
         assert result.workflow_status == "RESOLVED"
         assert result.remediation_status == "SUCCESS"

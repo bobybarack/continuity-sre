@@ -179,7 +179,7 @@ async def test_e2e_deliberate_failure_pending_escalated():
             from services.hitl_service import hitl_service
             approve_res = hitl_service.approve_incident(result.incident_id, "Supervisor authorization")
             assert approve_res["success"] is True
-            result = await agent_commander.investigate_and_remediate()
+            result = await agent_commander.investigate_and_remediate(incident_id=result.incident_id)
 
         # 4. Verify deliberate failure assertions
         assert result.workflow_status == "PENDING_VERIFICATION"
