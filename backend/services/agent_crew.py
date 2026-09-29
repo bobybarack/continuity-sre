@@ -221,18 +221,28 @@ class ContinuityAgentCrew:
         failure_mode_name: str,
         candidate_action: str,
         action_params: Optional[Dict[str, Any]] = None,
-        snapshot: Optional[Any] = None
+        snapshot: Optional[Any] = None,
+        tools: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Executes the sequential 4-agent cinema SRE crew workflow with structured Pydantic handovers and MCP tool execution."""
         action_params = action_params or {}
         dispatch_records: List[Dict[str, Any]] = []
         mcp_tools_called: List[str] = []
 
+        tools = tools or {}
+        import services.mcp_service as mcp_svc
+        _query_prom = tools.get("grafana_query_prometheus", mcp_svc.grafana_query_prometheus)
+        _query_loki = tools.get("grafana_query_loki", mcp_svc.grafana_query_loki)
+        _create_inc = tools.get("grafana_create_incident", mcp_svc.grafana_create_incident)
+        _resolve_inc = tools.get("grafana_resolve_incident", mcp_svc.grafana_resolve_incident)
+        _create_annot = tools.get("grafana_create_annotation", mcp_svc.grafana_create_annotation)
+        _exec_rem = tools.get("continuity_execute_remediation", mcp_svc.continuity_execute_remediation)
+        _verify_rec = tools.get("continuity_verify_closed_loop_recovery", mcp_svc.continuity_verify_closed_loop_recovery)
+
         # ----------------------------------------------------------------------
         # Step 1: 1st AD (Incident Director & Governance Coordinator)
         # ----------------------------------------------------------------------
         from services.hitl_service import hitl_service
-        import services.mcp_service as mcp_svc
 
         requires_approval, blast_radius, hitl_reason = hitl_service.evaluate_blast_radius(
             action=candidate_action,
@@ -255,7 +265,7 @@ class ContinuityAgentCrew:
 
         grafana_inc_id = None
         try:
-            inc_res = await mcp_svc.grafana_create_incident(
+            inc_res = await _create_inc(
                 title=f"CONTINUITY: {stream_title} - {initial_alert}",
                 severity=triage.severity,
                 summary=triage.executive_brief
@@ -280,10 +290,10 @@ class ContinuityAgentCrew:
         # Step 2: DIT (Digital Imaging Technician / Observability Scout)
         # ----------------------------------------------------------------------
         mcp_tools_called.extend(["query_prometheus", "grafana_query_prometheus"])
-        prom_res = await mcp_svc.grafana_query_prometheus(promql_query)
+        prom_res = await _query_prom(promql_query)
 
         mcp_tools_called.extend(["query_loki_logs", "grafana_query_loki"])
-        loki_res = await mcp_svc.grafana_query_loki(logql_query, limit=20)
+        loki_res = await _query_loki(logql_query, limit=20)
 
         raw_logs: List[str] = []
         if snapshot and getattr(snapshot, "latest_log", None):
@@ -337,7 +347,7 @@ class ContinuityAgentCrew:
         s_cdn = action_params.get("secondary_cdn_pct", 80)
 
         mcp_tools_called.append("continuity_execute_remediation")
-        rem_res = await mcp_svc.continuity_execute_remediation(
+        rem_res = await _exec_rem(
             action=candidate_action,
             primary_cdn_pct=p_cdn,
             secondary_cdn_pct=s_cdn,
@@ -393,9 +403,12 @@ class ContinuityAgentCrew:
             )
         else:
             mcp_tools_called.append("continuity_verify_closed_loop_recovery")
-            verify_res = await mcp_svc.continuity_verify_closed_loop_recovery(
-                transaction_id=tx_id if tx_id != "TX-LOCAL" else None
-            )
+            try:
+                verify_res = await _verify_rec(
+                    transaction_id=tx_id if tx_id != "TX-LOCAL" else None
+                )
+            except TypeError:
+                verify_res = await _verify_rec()
             proof_data = verify_res.get("recovery_proof") or {}
             if verify_res.get("status") == "PASSED" and verify_res.get("verified", False):
                 verdict_outcome = "COMMITTED"
@@ -428,7 +441,7 @@ class ContinuityAgentCrew:
             # Continuity places an annotation on the live Grafana dashboard
             try:
                 annot_text = f"[CONTINUITY Auto-Fix]: {candidate_action} - Verified Outcome: {verdict.outcome}"
-                annot_res = await mcp_svc.grafana_create_annotation(
+                annot_res = await _create_annot(
                     text=annot_text,
                     tags=["continuity", "mcp-grafana", "gemini-sre", "autonomous-remediation"]
                 )
@@ -440,7 +453,7 @@ class ContinuityAgentCrew:
             # 1st AD resolves the incident if verified
             if verdict.outcome == "COMMITTED" and grafana_inc_id:
                 try:
-                    await mcp_svc.grafana_resolve_incident(
+                    await _resolve_inc(
                         incident_id=grafana_inc_id,
                         summary=f"Autonomous remediation verified. VPF restabilized to {verdict.verified_vpf_rate}%, buffer restored to {verdict.verified_buffer_health_sec}s."
                     )
