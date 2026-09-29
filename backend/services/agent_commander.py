@@ -260,12 +260,12 @@ class AgentCommander:
 
         # Step 2: Anomaly Confirmed - Dispatch Multi-Agent Cinema Crew
         effective_inc_id = incident_id or state.active_incident_id or f"INC-{int(start_time * 1000)}"
-        failure_key = state.failure_mode.value if state.failure_mode else "DEFAULT"
+        failure_key = failure_mode_override or (state.failure_mode.value if state.failure_mode else "DEFAULT")
         scenario = SCENARIOS.get(failure_key, SCENARIOS.get("DEFAULT", {}))
         scenario_subsystems = scenario.get("affected_subsystems", ["Edge CDN", "Origin Shield"])
         candidate_action = scenario.get("default_action", "SHIFT_TRAFFIC_TO_AKAMAI")
-        promql_query = scenario.get("promql_query", "ott_video_playback_failures_ratio")
-        logql_query = scenario.get("logql_query", '{app="edge-gateway"} |= "error"')
+        promql_query = scenario.get("promql") or scenario.get("promql_query") or "ott_video_playback_failures_ratio"
+        logql_query = scenario.get("logql") or scenario.get("logql_query") or '{app="edge-gateway"} |= "error"'
 
         trace.append(f"[{time.strftime('%H:%M:%S')}] CRITICAL ANOMALY DETECTED: {state.failure_mode.value if state.failure_mode else 'QoS'} threshold breached.")
 
@@ -482,7 +482,7 @@ class AgentCommander:
             closed_loop_verified=is_verified and (gate_status == "PASSED"),
             verified_vpf_rate=verdict.verified_vpf_rate,
             verified_buffer_health_sec=verdict.verified_buffer_health_sec,
-            verified_latency_ms=snapshot.cdn_egress_latency_ms,
+            verified_latency_ms=verify_res.get("cdn_latency_ms", snapshot.cdn_egress_latency_ms) if isinstance(verify_res, dict) else snapshot.cdn_egress_latency_ms,
             verification_status=gate_status,
             verification_source=verdict.verification_source,
             verification_authoritative=verdict.authoritative,
