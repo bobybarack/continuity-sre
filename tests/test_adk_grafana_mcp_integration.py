@@ -211,6 +211,12 @@ async def test_full_lifecycle_scenarios_verified(scenario_injector, expected_act
          patch("services.agent_commander.grafana_resolve_incident", new=AsyncMock(return_value={"status": "resolved"})):
 
         result = await agent_commander.investigate_and_remediate()
+        if result.workflow_status == "SUSPENDED_HITL":
+            from services.hitl_service import hitl_service
+            approve_res = hitl_service.approve_incident(result.incident_id, "Supervisor authorization")
+            assert approve_res["success"] is True
+            result = await agent_commander.investigate_and_remediate()
+
         assert result.workflow_status == "RESOLVED"
         assert result.remediation_status == "SUCCESS"
         assert result.closed_loop_verified is True

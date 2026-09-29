@@ -175,6 +175,11 @@ async def test_e2e_deliberate_failure_pending_escalated():
          patch.object(agent_commander, "client", None):
 
         result = await agent_commander.investigate_and_remediate()
+        if result.workflow_status == "SUSPENDED_HITL":
+            from services.hitl_service import hitl_service
+            approve_res = hitl_service.approve_incident(result.incident_id, "Supervisor authorization")
+            assert approve_res["success"] is True
+            result = await agent_commander.investigate_and_remediate()
 
         # 4. Verify deliberate failure assertions
         assert result.workflow_status == "PENDING_VERIFICATION"
