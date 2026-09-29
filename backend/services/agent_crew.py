@@ -232,15 +232,7 @@ class ContinuityAgentCrew:
         # Step 1: 1st AD (Incident Director & Governance Coordinator)
         # ----------------------------------------------------------------------
         from services.hitl_service import hitl_service
-        from services.mcp_service import (
-            grafana_create_incident,
-            grafana_create_annotation,
-            grafana_resolve_incident,
-            grafana_query_prometheus,
-            grafana_query_loki,
-            continuity_execute_remediation,
-            continuity_verify_closed_loop_recovery
-        )
+        import services.mcp_service as mcp_svc
 
         requires_approval, blast_radius, hitl_reason = hitl_service.evaluate_blast_radius(
             action=candidate_action,
@@ -263,7 +255,7 @@ class ContinuityAgentCrew:
 
         grafana_inc_id = None
         try:
-            inc_res = await grafana_create_incident(
+            inc_res = await mcp_svc.grafana_create_incident(
                 title=f"CONTINUITY: {stream_title} - {initial_alert}",
                 severity=triage.severity,
                 summary=triage.executive_brief
@@ -288,10 +280,10 @@ class ContinuityAgentCrew:
         # Step 2: DIT (Digital Imaging Technician / Observability Scout)
         # ----------------------------------------------------------------------
         mcp_tools_called.extend(["query_prometheus", "grafana_query_prometheus"])
-        prom_res = await grafana_query_prometheus(promql_query)
+        prom_res = await mcp_svc.grafana_query_prometheus(promql_query)
 
         mcp_tools_called.extend(["query_loki_logs", "grafana_query_loki"])
-        loki_res = await grafana_query_loki(logql_query, limit=20)
+        loki_res = await mcp_svc.grafana_query_loki(logql_query, limit=20)
 
         raw_logs: List[str] = []
         if snapshot and getattr(snapshot, "latest_log", None):
@@ -345,7 +337,7 @@ class ContinuityAgentCrew:
         s_cdn = action_params.get("secondary_cdn_pct", 80)
 
         mcp_tools_called.append("continuity_execute_remediation")
-        rem_res = await continuity_execute_remediation(
+        rem_res = await mcp_svc.continuity_execute_remediation(
             action=candidate_action,
             primary_cdn_pct=p_cdn,
             secondary_cdn_pct=s_cdn,
@@ -401,24 +393,34 @@ class ContinuityAgentCrew:
             )
         else:
             mcp_tools_called.append("continuity_verify_closed_loop_recovery")
-            verify_res = await continuity_verify_closed_loop_recovery(
+            verify_res = await mcp_svc.continuity_verify_closed_loop_recovery(
                 transaction_id=tx_id if tx_id != "TX-LOCAL" else None
             )
             proof_data = verify_res.get("recovery_proof") or {}
-            verdict_outcome = verify_res.get("transaction_status") or ("COMMITTED" if verify_res.get("verified") else "ROLLED_BACK")
+            if verify_res.get("status") == "PASSED" and verify_res.get("verified", False):
+                verdict_outcome = "COMMITTED"
+            elif verify_res.get("status") == "FAILED" or verify_res.get("rollback_executed", False):
+                verdict_outcome = "ROLLED_BACK"
+            elif verify_res.get("transaction_status"):
+                verdict_outcome = verify_res.get("transaction_status")
+            else:
+                verdict_outcome = "PENDING"
+
+            v_vpf = verify_res.get("current_vpf_pct", vpf_val)
+            v_buf = verify_res.get("forward_buffer_sec", buf_val)
             esc = transaction_manager.get_escalation(incident_id)
             verdict = VerificationVerdict(
                 incident_id=incident_id,
                 transaction_id=tx_id,
                 outcome=verdict_outcome,
                 health_gates={
-                    "vpf_sla": verify_res.get("current_vpf_pct", 0.0) <= 0.5,
-                    "buffer_health": verify_res.get("forward_buffer_sec", 0.0) >= 20.0
+                    "vpf_sla": v_vpf <= 0.5,
+                    "buffer_health": v_buf >= 20.0
                 },
                 authoritative=verify_res.get("prometheus_authoritative", False),
                 verification_source=verify_res.get("prometheus_source", "local"),
-                verified_vpf_rate=verify_res.get("current_vpf_pct", 0.0),
-                verified_buffer_health_sec=verify_res.get("forward_buffer_sec", 0.0),
+                verified_vpf_rate=v_vpf,
+                verified_buffer_health_sec=v_buf,
                 recovery_proof_digest=proof_data.get("evidence_hash"),
                 escalation_package=esc.model_dump() if esc else None
             )
@@ -426,7 +428,7 @@ class ContinuityAgentCrew:
             # Continuity places an annotation on the live Grafana dashboard
             try:
                 annot_text = f"[CONTINUITY Auto-Fix]: {candidate_action} - Verified Outcome: {verdict.outcome}"
-                annot_res = await grafana_create_annotation(
+                annot_res = await mcp_svc.grafana_create_annotation(
                     text=annot_text,
                     tags=["continuity", "mcp-grafana", "gemini-sre", "autonomous-remediation"]
                 )
@@ -438,7 +440,7 @@ class ContinuityAgentCrew:
             # 1st AD resolves the incident if verified
             if verdict.outcome == "COMMITTED" and grafana_inc_id:
                 try:
-                    await grafana_resolve_incident(
+                    await mcp_svc.grafana_resolve_incident(
                         incident_id=grafana_inc_id,
                         summary=f"Autonomous remediation verified. VPF restabilized to {verdict.verified_vpf_rate}%, buffer restored to {verdict.verified_buffer_health_sec}s."
                     )
