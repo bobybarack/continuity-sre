@@ -45,6 +45,8 @@ if GEMINI_API_KEY:
     os.environ["GOOGLE_API_KEY"] = GEMINI_API_KEY
 
 FALLBACK_MODELS = list(dict.fromkeys([
+    "models/gemini-3.1-flash-lite-preview",
+    "models/gemini-3.1-flash-lite",
     GEMINI_MODEL,
     "models/gemini-3.7-flash",
     "models/gemini-3.6-flash",
