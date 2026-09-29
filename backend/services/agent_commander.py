@@ -307,6 +307,16 @@ class AgentCommander:
         trace.append(f"[{time.strftime('%H:%M:%S')}] [Multi-Agent Cinema Crew] Executing 4-Agent Sequential Pipeline (1st AD -> DIT -> Key Grip -> Continuity)...")
 
         # Step 3: Run the live 4-Agent Cinema SRE Workflow
+        tools_dict = {
+            "grafana_query_prometheus": grafana_query_prometheus,
+            "grafana_query_loki": grafana_query_loki,
+            "grafana_create_incident": grafana_create_incident,
+            "grafana_resolve_incident": grafana_resolve_incident,
+            "grafana_create_annotation": grafana_create_annotation,
+            "continuity_execute_remediation": continuity_execute_remediation,
+            "continuity_verify_closed_loop_recovery": continuity_verify_closed_loop_recovery,
+        }
+
         crew_res = await self.crew.execute_crew_workflow(
             incident_id=effective_inc_id,
             stream_title=STREAM_TITLE,
@@ -317,7 +327,8 @@ class AgentCommander:
             failure_mode_name=failure_key,
             candidate_action=candidate_action,
             action_params={"primary_cdn_pct": 20, "secondary_cdn_pct": 80},
-            snapshot=snapshot
+            snapshot=snapshot,
+            tools=tools_dict
         )
 
         triage: TriagePackage = crew_res["triage"]
