@@ -223,14 +223,25 @@ class ContinuityAgentCrew:
         action_params: Optional[Dict[str, Any]] = None,
         snapshot: Optional[Any] = None
     ) -> Dict[str, Any]:
-        """Executes the sequential 4-agent cinema SRE crew workflow with structured Pydantic handovers."""
+        """Executes the sequential 4-agent cinema SRE crew workflow with structured Pydantic handovers and MCP tool execution."""
         action_params = action_params or {}
         dispatch_records: List[Dict[str, Any]] = []
+        mcp_tools_called: List[str] = []
 
         # ----------------------------------------------------------------------
         # Step 1: 1st AD (Incident Director & Governance Coordinator)
         # ----------------------------------------------------------------------
         from services.hitl_service import hitl_service
+        from services.mcp_service import (
+            grafana_create_incident,
+            grafana_create_annotation,
+            grafana_resolve_incident,
+            grafana_query_prometheus,
+            grafana_query_loki,
+            continuity_execute_remediation,
+            continuity_verify_closed_loop_recovery
+        )
+
         requires_approval, blast_radius, hitl_reason = hitl_service.evaluate_blast_radius(
             action=candidate_action,
             primary_cdn_pct=action_params.get("primary_cdn_pct"),
@@ -249,6 +260,19 @@ class ContinuityAgentCrew:
                 f"HITL approval required: {requires_approval} (blast_radius={blast_radius})."
             )
         )
+
+        grafana_inc_id = None
+        try:
+            inc_res = await grafana_create_incident(
+                title=f"CONTINUITY: {stream_title} - {initial_alert}",
+                severity=triage.severity,
+                summary=triage.executive_brief
+            )
+            grafana_inc_id = getattr(inc_res, "incident_id", None) or (inc_res.get("incident_id") or inc_res.get("id") if isinstance(inc_res, dict) else None)
+            mcp_tools_called.extend(["create_incident", "grafana_create_incident"])
+        except Exception as e:
+            logger.warning(f"[1st AD] Failed to create Grafana incident: {e}")
+
         dispatch_records.append({
             "role": "1st AD",
             "name": self.first_ad.name,
@@ -263,8 +287,10 @@ class ContinuityAgentCrew:
         # ----------------------------------------------------------------------
         # Step 2: DIT (Digital Imaging Technician / Observability Scout)
         # ----------------------------------------------------------------------
-        from services.mcp_service import grafana_query_prometheus, grafana_query_loki
+        mcp_tools_called.extend(["query_prometheus", "grafana_query_prometheus"])
         prom_res = await grafana_query_prometheus(promql_query)
+
+        mcp_tools_called.extend(["query_loki_logs", "grafana_query_loki"])
         loki_res = await grafana_query_loki(logql_query, limit=20)
 
         raw_logs: List[str] = []
@@ -308,7 +334,6 @@ class ContinuityAgentCrew:
         # Step 3: Key Grip (Infrastructure Rigger / Transactional Actuator)
         # ----------------------------------------------------------------------
         from services.checkpoint_service import checkpoint_service
-        from services.mcp_service import continuity_execute_remediation
         latest_chk = checkpoint_service.get_latest_checkpoint_by_incident(incident_id)
         is_already_approved = False
         if latest_chk and latest_chk.get("status") == "RESUMED":
@@ -319,6 +344,7 @@ class ContinuityAgentCrew:
         p_cdn = action_params.get("primary_cdn_pct", 20)
         s_cdn = action_params.get("secondary_cdn_pct", 80)
 
+        mcp_tools_called.append("continuity_execute_remediation")
         rem_res = await continuity_execute_remediation(
             action=candidate_action,
             primary_cdn_pct=p_cdn,
@@ -357,7 +383,9 @@ class ContinuityAgentCrew:
         # ----------------------------------------------------------------------
         # Step 4: Continuity (Quality Gate / Verification & Rollback Authority)
         # ----------------------------------------------------------------------
-        from services.mcp_service import continuity_verify_closed_loop_recovery
+        verify_res: Dict[str, Any] = {}
+        annotation_id = None
+
         if exec_status == "PENDING_APPROVAL":
             verdict = VerificationVerdict(
                 incident_id=incident_id,
@@ -372,6 +400,7 @@ class ContinuityAgentCrew:
                 escalation_package=None
             )
         else:
+            mcp_tools_called.append("continuity_verify_closed_loop_recovery")
             verify_res = await continuity_verify_closed_loop_recovery(
                 transaction_id=tx_id if tx_id != "TX-LOCAL" else None
             )
@@ -394,6 +423,29 @@ class ContinuityAgentCrew:
                 escalation_package=esc.model_dump() if esc else None
             )
 
+            # Continuity places an annotation on the live Grafana dashboard
+            try:
+                annot_text = f"[CONTINUITY Auto-Fix]: {candidate_action} - Verified Outcome: {verdict.outcome}"
+                annot_res = await grafana_create_annotation(
+                    text=annot_text,
+                    tags=["continuity", "mcp-grafana", "gemini-sre", "autonomous-remediation"]
+                )
+                annotation_id = getattr(annot_res, "id", None) or (annot_res.get("id") if isinstance(annot_res, dict) else None)
+                mcp_tools_called.extend(["create_annotation", "grafana_create_annotation"])
+            except Exception as e:
+                logger.warning(f"[Continuity] Failed to create Grafana annotation: {e}")
+
+            # 1st AD resolves the incident if verified
+            if verdict.outcome == "COMMITTED" and grafana_inc_id:
+                try:
+                    await grafana_resolve_incident(
+                        incident_id=grafana_inc_id,
+                        summary=f"Autonomous remediation verified. VPF restabilized to {verdict.verified_vpf_rate}%, buffer restored to {verdict.verified_buffer_health_sec}s."
+                    )
+                    mcp_tools_called.extend(["update_incident", "grafana_resolve_incident"])
+                except Exception as e:
+                    logger.warning(f"[1st AD] Failed to resolve Grafana incident: {e}")
+
         dispatch_records.append({
             "role": "Continuity",
             "name": self.continuity.name,
@@ -410,7 +462,12 @@ class ContinuityAgentCrew:
             "evidence": evidence,
             "remediation": remediation_intent,
             "verdict": verdict,
-            "dispatch_records": dispatch_records
+            "dispatch_records": dispatch_records,
+            "mcp_tools_executed": list(dict.fromkeys(mcp_tools_called)),
+            "remediation_res": rem_res,
+            "verify_res": verify_res,
+            "grafana_incident_id": grafana_inc_id,
+            "annotation_id": annotation_id
         }
 
 
