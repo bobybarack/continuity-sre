@@ -45,11 +45,10 @@ if GEMINI_API_KEY:
     os.environ["GOOGLE_API_KEY"] = GEMINI_API_KEY
 
 FALLBACK_MODELS = list(dict.fromkeys([
-    "models/gemini-flash-lite-latest",
     GEMINI_MODEL,
-    "models/gemini-flash-latest",
     "models/gemini-3.7-flash",
-    "models/gemini-2.5-flash-lite",
+    "models/gemini-3.6-flash",
+    "models/gemini-3.5-flash",
 ]))
 
 class InvestigationResult(BaseModel):
@@ -93,7 +92,13 @@ class InvestigationResult(BaseModel):
     diagnosis_claims: List[Dict[str, Any]] = Field(default_factory=list)
     crew_dispatch: List[Dict[str, Any]] = Field(default_factory=list)
 
-from services.agent_crew import continuity_crew
+from services.agent_crew import (
+    continuity_crew,
+    TriagePackage,
+    EvidencePackage,
+    RemediationIntent,
+    VerificationVerdict
+)
 
 class AgentCommander:
     def __init__(self):
@@ -253,307 +258,178 @@ class AgentCommander:
             self._record_result(result)
             return result
 
-        # Step 2: Anomaly Confirmed - Query Loki Logs via official Grafana MCP Tool
-        mcp_tools_called.extend(["query_loki_logs", "grafana_query_loki"])
+        # Step 2: Anomaly Confirmed - Dispatch Multi-Agent Cinema Crew
+        effective_inc_id = incident_id or state.active_incident_id or f"INC-{int(start_time * 1000)}"
+        failure_key = state.failure_mode.value if state.failure_mode else "DEFAULT"
+        scenario = SCENARIOS.get(failure_key, SCENARIOS.get("DEFAULT", {}))
+        scenario_subsystems = scenario.get("affected_subsystems", ["Edge CDN", "Origin Shield"])
+        candidate_action = scenario.get("default_action", "SHIFT_TRAFFIC_TO_AKAMAI")
+        promql_query = scenario.get("promql_query", "ott_video_playback_failures_ratio")
+        logql_query = scenario.get("logql_query", '{app="edge-gateway"} |= "error"')
+
         trace.append(f"[{time.strftime('%H:%M:%S')}] CRITICAL ANOMALY DETECTED: {state.failure_mode.value if state.failure_mode else 'QoS'} threshold breached.")
-        trace.append(f"[{time.strftime('%H:%M:%S')}] ADK McpToolset [query_loki_logs]: Querying error logs via Loki proxy ({logql_query})...")
-        loki_res = await grafana_query_loki(logql_query, limit=20)
-        sanitized_edge_log, was_flagged, injection_cat = security_guard.sanitize_log_line(snapshot.latest_log)
-        if was_flagged:
-            trace.append(f"[{time.strftime('%H:%M:%S')}] [Security Guard] Adversarial log injection intercepted: category={injection_cat}")
-        trace.append(f"[{time.strftime('%H:%M:%S')}] Loki Log Isolated: \"{sanitized_edge_log}\"")
 
-        prompt = f"""
-You are Continuity, the Lead Autonomous SRE AI Incident Commander for a tier-1 Hollywood OTT streaming platform.
-Analyze the live incident telemetry ingested via official Grafana Cloud MCP tools and execute autonomous remediation:
-
-STREAM METADATA:
-- Title: {STREAM_TITLE}
-- Active Viewers: {snapshot.active_viewers:,}
-- Active Chaos Mode: {state.current_mode}
-- Affected Region: {state.affected_region}
-
-OBSERVABILITY TELEMETRY (Prometheus & Loki via Grafana MCP):
-- Video Playback Failures (VPF): {snapshot.video_playback_failures_pct}% (Baseline SLA: < 0.5%)
-- CDN Egress Latency: {snapshot.cdn_egress_latency_ms}ms (Baseline: 45ms)
-- DRM Handshake Duration: {snapshot.drm_handshake_ms}ms (Baseline: 120ms)
-- Buffer Health: {snapshot.buffer_health_sec}s
-- Delivered Bitrate: {snapshot.avg_bitrate_mbps} Mbps
-- Recent Edge Log: "{sanitized_edge_log}"
-
-RAW GRAFANA CLOUD MCP RESPONSES:
-- Prometheus PromQL Query Response ({promql_query}):
-{json.dumps(prom_res.model_dump() if hasattr(prom_res, "model_dump") else prom_res, indent=2)}
-
-- Loki LogQL Query Response ({logql_query}):
-{json.dumps(loki_res.model_dump() if hasattr(loki_res, "model_dump") else loki_res, indent=2)}
-
-AVAILABLE TOOLS:
-- continuity_execute_remediation: Shift traffic or failover key cluster.
-- create_annotation / grafana_create_annotation: Drop annotation pin on live Grafana dashboard.
-- create_incident / grafana_create_incident: Open incident in Grafana IRM.
-- continuity_verify_closed_loop_recovery: Verify closed-loop recovery.
-
-Call the necessary MCP tools to remediate this critical stream degradation.
-"""
-
-        decision = None
-        remediation_res = None
-        remediation_action = None
-        incident_res = None
-        grafana_incident_id = None
-        annotation_resp = None
-        annotation_id = None
-        verify_res = None
+        # Consult Gemini for high-level Executive RCA if client is configured
         decision_rca = None
-
-        # Execute Gemini reasoning if client is configured
         if self.client:
-            dynamic_gemini_tools = await get_gemini_tools()
-
             for model in FALLBACK_MODELS:
                 try:
+                    consult_prompt = (
+                        f"You are the Lead Incident Commander for {STREAM_TITLE}. "
+                        f"Telemetry Alert: {failure_key} degradation across SLA gates. "
+                        f"Subsystems: {scenario_subsystems}. Candidate Action: {candidate_action}. "
+                        f"Provide a concise root cause analysis (1-2 sentences)."
+                    )
                     if hasattr(self.client, "aio") and hasattr(self.client.aio, "models"):
                         response = await asyncio.wait_for(
                             self.client.aio.models.generate_content(
                                 model=model,
-                                contents=prompt,
-                                config=types.GenerateContentConfig(
-                                    tools=dynamic_gemini_tools,
-                                    tool_config=types.ToolConfig(
-                                        function_calling_config=types.FunctionCallingConfig(
-                                            mode=types.FunctionCallingConfigMode.AUTO
-                                        )
-                                    ),
-                                    temperature=0.2
-                                )
+                                contents=consult_prompt,
+                                config=types.GenerateContentConfig(temperature=0.2)
                             ),
-                            timeout=9.0
+                            timeout=5.0
                         )
                     else:
-                        def _sync_generate(m=model):
+                        def _sync_gen(m=model):
                             return self.client.models.generate_content(
                                 model=m,
-                                contents=prompt,
-                                config=types.GenerateContentConfig(
-                                    tools=dynamic_gemini_tools,
-                                    tool_config=types.ToolConfig(
-                                        function_calling_config=types.FunctionCallingConfig(
-                                            mode=types.FunctionCallingConfigMode.AUTO
-                                        )
-                                    ),
-                                    temperature=0.2
-                                )
+                                contents=consult_prompt,
+                                config=types.GenerateContentConfig(temperature=0.2)
                             )
-                        response = await asyncio.wait_for(asyncio.to_thread(_sync_generate), timeout=9.0)
-                    trace.append(f"[{time.strftime('%H:%M:%S')}] Gemini Model [{model}] multi-step reasoning completed successfully.")
-
-                    if response.function_calls:
-                        for fc in response.function_calls:
-                            tool_name = fc.name
-                            tool_args = fc.args or {}
-                            mcp_tools_called.append(tool_name)
-                            trace.append(f"[{time.strftime('%H:%M:%S')}] Gemini Autonomous Tool Call [{tool_name}]: {json.dumps(tool_args)}")
-                            tool_result = await dispatch_mcp_tool(tool_name, tool_args)
-                            trace.append(f"[{time.strftime('%H:%M:%S')}] Tool [{tool_name}] Result: {str(tool_result)[:120]}")
-
-                            if tool_name == "continuity_execute_remediation":
-                                remediation_res = tool_result
-                                remediation_action = tool_args.get("action", "SHIFT_TRAFFIC_TO_AKAMAI")
-                                decision_rca = tool_args.get("reason")
-                            elif tool_name in ("create_incident", "grafana_create_incident"):
-                                incident_res = tool_result
-                                grafana_incident_id = getattr(tool_result, "incident_id", None) or (tool_result.get("incident_id") or tool_result.get("id") if isinstance(tool_result, dict) else None)
-                            elif tool_name in ("create_annotation", "grafana_create_annotation"):
-                                annotation_resp = tool_result
-                                annotation_id = getattr(tool_result, "id", None) or (tool_result.get("id") if isinstance(tool_result, dict) else None)
-                            elif tool_name == "continuity_verify_closed_loop_recovery":
-                                verify_res = tool_result
-
+                        response = await asyncio.wait_for(asyncio.to_thread(_sync_gen), timeout=5.0)
                     if response.text:
-                        try:
-                            decision = json.loads(response.text)
-                        except Exception:
-                            pass
-
+                        decision_rca = response.text.strip()
+                        trace.append(f"[{time.strftime('%H:%M:%S')}] Gemini [{model}] Root Cause Analysis: {decision_rca}")
                     break
                 except Exception as e:
-                    logger.warning(f"Model {model} tool calling attempt failed: {e}. Trying fallback...")
+                    logger.warning(f"Commander LLM consultation ({model}) bypassed: {e}")
 
-        # Grounded audience SLA impact calculated from active viewers and measured VPF failure rate
+        trace.append(f"[{time.strftime('%H:%M:%S')}] [Multi-Agent Cinema Crew] Executing 4-Agent Sequential Pipeline (1st AD -> DIT -> Key Grip -> Continuity)...")
+
+        # Step 3: Run the live 4-Agent Cinema SRE Workflow
+        crew_res = await self.crew.execute_crew_workflow(
+            incident_id=effective_inc_id,
+            stream_title=STREAM_TITLE,
+            initial_alert=f"{failure_key} degradation across SLA gates",
+            affected_subsystems=scenario_subsystems,
+            promql_query=promql_query,
+            logql_query=logql_query,
+            failure_mode_name=failure_key,
+            candidate_action=candidate_action,
+            action_params={"primary_cdn_pct": 20, "secondary_cdn_pct": 80},
+            snapshot=snapshot
+        )
+
+        triage: TriagePackage = crew_res["triage"]
+        evidence: EvidencePackage = crew_res["evidence"]
+        remediation: RemediationIntent = crew_res["remediation"]
+        verdict: VerificationVerdict = crew_res["verdict"]
+        crew_records = crew_res["dispatch_records"]
+        mcp_tools_called.extend(crew_res.get("mcp_tools_executed", []))
+        rem_res = crew_res.get("remediation_res") or {}
+        verify_res = crew_res.get("verify_res") or {}
+        grafana_incident_id = crew_res.get("grafana_incident_id")
+        annotation_id = crew_res.get("annotation_id")
+
+        trace.append(f"[{time.strftime('%H:%M:%S')}] [1st AD - {self.crew.first_ad.name}] Triage Handover (TriagePackage): incident_id={triage.incident_id}, severity={triage.severity}, hitl_required={triage.hitl_required}")
+        if grafana_incident_id:
+            trace.append(f"[{time.strftime('%H:%M:%S')}] [1st AD] Grafana IRM Incident opened: {grafana_incident_id}")
+
+        trace.append(f"[{time.strftime('%H:%M:%S')}] [DIT - {self.crew.dit.name}] Observability Evidence Handover (EvidencePackage): {evidence.failure_hypothesis} (Citations: {', '.join(evidence.evidence_citations)})")
+        if evidence.sanitized_logs:
+            trace.append(f"[{time.strftime('%H:%M:%S')}] [DIT] Isolated edge log: \"{evidence.sanitized_logs[0]}\"")
+        if evidence.flagged_security_injections > 0:
+            trace.append(f"[{time.strftime('%H:%M:%S')}] [Security Guard] Adversarial log injection intercepted: flagged_injections={evidence.flagged_security_injections}")
+
+        trace.append(f"[{time.strftime('%H:%M:%S')}] [Key Grip - {self.crew.key_grip.name}] Transactional Remediation Handover (RemediationIntent): action={remediation.action_name}, tx_id={remediation.transaction_id}, status={remediation.execution_status}")
+
+        trace.append(f"[{time.strftime('%H:%M:%S')}] [Continuity - {self.crew.continuity.name}] Recovery Verification Verdict (VerificationVerdict): outcome={verdict.outcome}, authoritative={verdict.authoritative}, source={verdict.verification_source}, verified_vpf={verdict.verified_vpf_rate}%")
+
+        # Step 4: Evaluate Verification Outcome and MTTR
+        elapsed = round(time.time() - start_time, 2)
+        is_verified = (verdict.outcome == "COMMITTED")
+        is_hitl_pending = (remediation.execution_status == "PENDING_APPROVAL")
+        rollback_happened = (verdict.outcome == "ROLLED_BACK")
+
         impacted_audience = int(snapshot.active_viewers * (snapshot.video_playback_failures_pct / 100.0))
         grounded_impact_str = f"SLA Impact Mitigated: ~{impacted_audience:,} stream sessions protected (VPF: {snapshot.video_playback_failures_pct:.2f}%)"
 
-        if not decision:
-            if not remediation_action:
-                remediation_action = scenario["default_action"]
-                decision_rca = f"Degradation in {', '.join(scenario_subsystems)} identified via {sanitized_edge_log}"
-
-            decision = {
-                "severity": "CRITICAL" if state.failure_mode != FailureMode.ISP_PEERING_DROP else "WARNING",
-                "root_cause_analysis": decision_rca or f"Degradation detected via {sanitized_edge_log}",
-                "affected_subsystems": scenario_subsystems,
-                "remediation_action": remediation_action,
-                "estimated_subscriber_loss_prevented": grounded_impact_str,
-                "executive_summary": f"Autonomous remediation policy '{remediation_action}' executed via official Grafana MCP tools."
-            }
-
-        if not remediation_action:
-            remediation_action = decision.get("remediation_action", scenario["default_action"])
-
-        trace.append(f"[{time.strftime('%H:%M:%S')}] Gemini Root Cause Analysis: {decision.get('root_cause_analysis')}")
-
-        # Step 3: Apply Autonomous Remediation via MCP Tool if not yet applied
-        if not remediation_res:
-            mcp_tools_called.append("continuity_execute_remediation")
-            trace.append(f"[{time.strftime('%H:%M:%S')}] MCP Tool [continuity_execute_remediation]: Executing policy '{remediation_action}'...")
-            remediation_res = await continuity_execute_remediation(
-                action=remediation_action,
-                primary_cdn_pct=20,
-                secondary_cdn_pct=80,
-                reason=decision.get("root_cause_analysis", "Autonomous failover")
-            )
-        if remediation_action == "FAILOVER_DRM_KEY_CLUSTER":
-            trace.append(f"[{time.strftime('%H:%M:%S')}] Failover Applied: DRM Key Cluster switched to {remediation_res.get('active_drm_cluster', 'secondary')}.")
-        elif remediation_action == "REROUTE_BGP_TRANSIT":
-            trace.append(f"[{time.strftime('%H:%M:%S')}] Reroute Applied: Transit route shifted to {remediation_res.get('active_transit_route', 'secondary')}.")
-        else:
-            trace.append(
-                f"[{time.strftime('%H:%M:%S')}] Failover Applied: Primary CDN egress throttled to {remediation_res.get('primary_cdn_traffic_pct', 20)}%, "
-                f"Secondary CDN egress scaled to {remediation_res.get('secondary_cdn_traffic_pct', 80)}%."
-            )
-
-        # Step 4: Open Incident in Grafana Cloud IRM via MCP Tool if not yet opened
-        if not incident_res:
-            mcp_tools_called.extend(["create_incident", "grafana_create_incident"])
-            incident_res = await grafana_create_incident(
-                title=f"Premiere Streaming Incident: {remediation_action}",
-                severity=decision.get("severity", "CRITICAL"),
-                summary=decision.get("executive_summary", "Autonomous remediation executed.")
-            )
-            grafana_incident_id = getattr(incident_res, "incident_id", None) or (incident_res.get("incident_id") or incident_res.get("id") if isinstance(incident_res, dict) else None)
-            trace.append(f"[{time.strftime('%H:%M:%S')}] ADK McpToolset [create_incident]: Opened Grafana IRM incident {grafana_incident_id}.")
-
-        # Step 5: Write visual annotation to Grafana live dashboard via MCP Tool if not yet written
-        if not annotation_resp:
-            mcp_tools_called.extend(["create_annotation", "grafana_create_annotation"])
-            annotation_text = f"[CONTINUITY MCP Auto-Fix]: {remediation_action} - {decision.get('root_cause_analysis')}"
-            trace.append(f"[{time.strftime('%H:%M:%S')}] ADK McpToolset [create_annotation]: Placing vertical timestamp pin on live dashboard...")
-            annotation_resp = await grafana_create_annotation(
-                text=annotation_text,
-                tags=["continuity", "mcp-grafana", "gemini-sre", "autonomous-remediation"]
-            )
-            annotation_id = getattr(annotation_resp, "id", None) or (annotation_resp.get("id") if isinstance(annotation_resp, dict) else None)
-
-        # Step 6: Closed-Loop Verification Gate (Falsifiable Proof of Recovery)
-        if not verify_res:
-            mcp_tools_called.append("continuity_verify_closed_loop_recovery")
-            trace.append(f"[{time.strftime('%H:%M:%S')}] CONTINUITY Gate [continuity_verify_closed_loop_recovery]: Executing closed-loop verification check...")
-            verify_res = await continuity_verify_closed_loop_recovery()
-
-        is_verified = verify_res.get("verified", False) if isinstance(verify_res, dict) else False
-        gate_status = verify_res.get("status", "PENDING") if isinstance(verify_res, dict) else "PENDING"
-        elapsed = round(time.time() - start_time, 2)
-
-        # Single source of truth: extract verified QoE metrics and source semantics directly from verify_res
-        verified_vpf = verify_res.get("current_vpf_pct", snapshot.video_playback_failures_pct) if isinstance(verify_res, dict) else snapshot.video_playback_failures_pct
-        verified_buffer = verify_res.get("forward_buffer_sec", snapshot.buffer_health_sec) if isinstance(verify_res, dict) else snapshot.buffer_health_sec
-        verified_latency = verify_res.get("cdn_latency_ms", snapshot.cdn_egress_latency_ms) if isinstance(verify_res, dict) else snapshot.cdn_egress_latency_ms
-        verify_source = verify_res.get("prometheus_source", "none") if isinstance(verify_res, dict) else "none"
-        is_authoritative = verify_res.get("prometheus_authoritative", False) if isinstance(verify_res, dict) else False
-
-        tx_id = remediation_res.get("transaction_id") if isinstance(remediation_res, dict) else None
-        idempotency_key = remediation_res.get("idempotency_key") if isinstance(remediation_res, dict) else None
-        rollback_action = remediation_res.get("rollback_action") if isinstance(remediation_res, dict) else None
-        proof_data = verify_res.get("recovery_proof") if isinstance(verify_res, dict) else None
-        rollback_happened = verify_res.get("rollback_executed", False) if isinstance(verify_res, dict) else False
-
-        effective_inc_id = incident_id or state.active_incident_id or grafana_incident_id or f"INC-{int(time.time())}"
-        escalation_obj = transaction_manager.get_escalation(effective_inc_id)
-        escalation_data = escalation_obj.model_dump() if escalation_obj else None
-
-        if is_verified and gate_status == "PASSED":
+        if is_verified:
             chaos_manager.mark_verified_recovered(verify_res if isinstance(verify_res, dict) else {})
             mttr_value = elapsed
             workflow_status = "RESOLVED"
             remediation_status = "SUCCESS"
             rollback_status = "NONE"
-
-            # Synchronize Grafana IRM incident lifecycle: resolve incident only after verification passes
-            if grafana_incident_id:
-                try:
-                    await grafana_resolve_incident(
-                        incident_id=grafana_incident_id,
-                        summary=f"Autonomous remediation verified. VPF restabilized to {verified_vpf}%, buffer restored to {verified_buffer}s."
-                    )
-                    mcp_tools_called.extend(["update_incident", "grafana_resolve_incident"])
-                    trace.append(f"[{time.strftime('%H:%M:%S')}] Grafana IRM Incident {grafana_incident_id} marked RESOLVED via McpToolset [update_incident].")
-                except Exception as e:
-                    logger.warning(f"Failed to resolve Grafana incident {grafana_incident_id}: {e}")
-
+            gate_status = "PASSED"
             trace.append(
-                f"[{time.strftime('%H:%M:%S')}] CLOSED-LOOP VERIFIED: VPF dropped from {snapshot.video_playback_failures_pct}% to {verified_vpf}%. "
-                f"Forward buffer restored to {verified_buffer}s. Verification Gate: PASSED (Source: {verify_source}, Authoritative: {is_authoritative})."
+                f"[{time.strftime('%H:%M:%S')}] CLOSED-LOOP VERIFIED: VPF dropped from {snapshot.video_playback_failures_pct}% to {verdict.verified_vpf_rate}%. "
+                f"Forward buffer restored to {verdict.verified_buffer_health_sec}s. Verification Gate: PASSED (Source: {verdict.verification_source}, Authoritative: {verdict.authoritative})."
             )
             trace.append(f"[{time.strftime('%H:%M:%S')}] Incident Resolved in {elapsed}s. MTTR: {elapsed}s. Stream QoE restabilized to 4K UHD.")
-            exec_summary = decision.get("executive_summary", "Incident resolved autonomously.")
+            exec_summary = f"Autonomous remediation policy '{remediation.action_name}' verified by Continuity quality gate. VPF restabilized to {verdict.verified_vpf_rate}%."
+        elif is_hitl_pending:
+            mttr_value = None
+            workflow_status = "SUSPENDED_HITL"
+            remediation_status = "PENDING_APPROVAL"
+            rollback_status = "NONE"
+            gate_status = "SUSPENDED"
+            trace.append(f"[{time.strftime('%H:%M:%S')}] ACTION SUSPENDED: High blast-radius action requires human supervisor approval. Checkpoint created.")
+            exec_summary = f"Remediation policy '{remediation.action_name}' suspended. Pending supervisor approval."
         else:
             chaos_manager.mark_recovery_failed("Closed-loop verification pending or incomplete", details=verify_res if isinstance(verify_res, dict) else {})
             mttr_value = None
             if rollback_happened:
+                gate_status = "FAILED"
                 workflow_status = "ESCALATED"
                 remediation_status = "ROLLED_BACK"
                 rollback_status = "EXECUTED"
-                trace.append(f"[{time.strftime('%H:%M:%S')}] ROLLBACK EXECUTED: Reverted via {rollback_action or 'safe snapshot'}. Escalation package assembled.")
+                trace.append(f"[{time.strftime('%H:%M:%S')}] ROLLBACK EXECUTED: Reverted via {remediation.rollback_action}. Escalation package assembled.")
+                exec_summary = f"Remediation failed verification gates; rollback executed via {remediation.rollback_action}."
             else:
+                gate_status = "PENDING"
                 workflow_status = "PENDING_VERIFICATION"
                 remediation_status = "PENDING_CONVERGENCE"
                 rollback_status = "PENDING"
+                trace.append(
+                    f"[{time.strftime('%H:%M:%S')}] CLOSED-LOOP VERIFICATION PENDING: Stream QoE metrics have not yet crossed recovery SLA threshold. "
+                    f"VPF: {verdict.verified_vpf_rate}% (Target <= 0.5%), Buffer: {verdict.verified_buffer_health_sec}s (Target >= 20s). "
+                    f"Verification Gate: PENDING (Source: {verdict.verification_source})."
+                )
+                trace.append(f"[{time.strftime('%H:%M:%S')}] Closed-loop verification pending at {elapsed}s. Awaiting telemetry convergence; incident not marked resolved.")
+                exec_summary = f"Autonomous remediation applied; closed-loop recovery verification is PENDING (VPF={verdict.verified_vpf_rate}%, Buffer={verdict.verified_buffer_health_sec}s). Incident not marked resolved."
 
-            # Do NOT resolve Grafana IRM incident while verification is PENDING or FAILED
-            if grafana_incident_id:
-                trace.append(f"[{time.strftime('%H:%M:%S')}] Grafana IRM Incident {grafana_incident_id} remains ACTIVE (Verification Gate: PENDING/ESCALATED).")
-
-            trace.append(
-                f"[{time.strftime('%H:%M:%S')}] CLOSED-LOOP VERIFICATION PENDING: Stream QoE metrics have not yet crossed recovery SLA threshold. "
-                f"VPF: {verified_vpf}% (Target <= 0.5%), Buffer: {verified_buffer}s (Target >= 20s). "
-                f"Verification Gate: PENDING (Source: {verify_source})."
-            )
-            trace.append(f"[{time.strftime('%H:%M:%S')}] Closed-loop verification pending at {elapsed}s. Awaiting telemetry convergence; incident not marked resolved.")
-            exec_summary = f"Autonomous remediation applied; closed-loop recovery verification is PENDING/ESCALATED (VPF={verified_vpf}%, Buffer={verified_buffer}s). Incident not marked resolved."
-
-        # Phase 9: Structured Evidence-Addressed Diagnosis
+        # Step 5: Structured Evidence-Addressed Diagnosis
         diagnosis_claims_data: List[Dict[str, Any]] = []
         try:
             ev_list = [
                 EvidenceReference(
                     query_type="promql",
                     query=promql_query,
-                    target_metric="ott_video_playback_failures_ratio" if failure_key in (FailureMode.CDN_OUTAGE.value, FailureMode.SECONDARY_PATH_DEGRADED.value) else ("ott_drm_handshake_ms" if failure_key == FailureMode.DRM_TIMEOUT.value else "ott_stream_bitrate_mbps"),
-                    observed_value=snapshot.video_playback_failures_pct if failure_key in (FailureMode.CDN_OUTAGE.value, FailureMode.SECONDARY_PATH_DEGRADED.value) else (snapshot.drm_handshake_ms if failure_key == FailureMode.DRM_TIMEOUT.value else snapshot.avg_bitrate_mbps),
-                    threshold="> 1.0%" if failure_key in (FailureMode.CDN_OUTAGE.value, FailureMode.SECONDARY_PATH_DEGRADED.value) else ("> 500.0ms" if failure_key == FailureMode.DRM_TIMEOUT.value else "< 10.0 Mbps"),
+                    target_metric="ott_video_playback_failures_ratio",
+                    observed_value=evidence.promql_metrics.get("video_playback_failures_pct", snapshot.video_playback_failures_pct),
+                    threshold="> 1.0%",
                     status="BREACHED" if is_anomaly else "NORMAL"
                 ),
                 EvidenceReference(
                     query_type="logql",
                     query=logql_query,
                     target_metric="edge_log_stream",
-                    observed_value=sanitized_edge_log,
+                    observed_value=evidence.sanitized_logs[0] if evidence.sanitized_logs else "Log query returned empty",
                     threshold="Upstream/transit failure pattern",
-                    status="BREACHED" if any(w in sanitized_edge_log for w in ["502", "Timeout", "loss", "refused"]) else "NORMAL"
+                    status="BREACHED" if any(w in str(evidence.sanitized_logs) for w in ["502", "Timeout", "loss", "refused"]) else "NORMAL"
                 )
             ]
             claim_obj = DiagnosisClaim(
-                subsystem=scenario_subsystems[0] if scenario_subsystems else "Edge CDN",
-                claim=decision.get("root_cause_analysis", "Service degradation identified via telemetry correlation"),
+                subsystem=triage.affected_subsystems[0] if triage.affected_subsystems else "Edge CDN",
+                claim=decision_rca or evidence.failure_hypothesis,
                 evidence=ev_list,
-                confidence=0.98 if is_anomaly else 0.50
+                confidence=evidence.confidence
             )
             diagnosis_claims_data.append(claim_obj.model_dump())
         except Exception as e:
             logger.warning(f"Error constructing diagnosis claims: {e}")
 
-        # Phase 8: Record Gemini latency
+        # Step 6: Record Gemini latency metric
         try:
             PROM_AGENT_GEMINI_LATENCY.labels(
                 model=self.model_name,
@@ -561,101 +437,6 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             ).observe(time.time() - start_time)
         except Exception:
             pass
-
-        # Phase 10: Multi-Agent Crew Structured Dispatch Handover
-        crew_records: List[Dict[str, Any]] = []
-        try:
-            is_hitl_pending = (remediation_res.get("status") == "PENDING_APPROVAL") if isinstance(remediation_res, dict) else False
-            crew_records = [
-                {
-                    "role": "1st AD",
-                    "name": self.crew.first_ad.name,
-                    "domain": "Incident Coordination & Executive Governance",
-                    "phase": "TRIAGE",
-                    "handover_schema": "TriagePackage",
-                    "handover_data": {
-                        "incident_id": effective_inc_id,
-                        "stream_title": STREAM_TITLE,
-                        "initial_alert": f"{failure_key} degradation across SLA gates",
-                        "severity": decision.get("severity", "CRITICAL"),
-                        "affected_subsystems": scenario_subsystems,
-                        "hitl_required": is_hitl_pending,
-                        "executive_brief": f"1st AD Triage: {decision.get('root_cause_analysis', 'Incident triaged.')}"
-                    },
-                    "timestamp": start_time + 0.1,
-                    "status": "COMPLETED"
-                },
-                {
-                    "role": "DIT",
-                    "name": self.crew.dit.name,
-                    "domain": "Observability & Metric/Log Correlation",
-                    "phase": "EVIDENCE_CORRELATION",
-                    "handover_schema": "EvidencePackage",
-                    "handover_data": {
-                        "incident_id": effective_inc_id,
-                        "promql_metrics": {
-                            "video_playback_failures_pct": snapshot.video_playback_failures_pct,
-                            "cdn_egress_latency_ms": snapshot.cdn_egress_latency_ms,
-                            "drm_handshake_ms": snapshot.drm_handshake_ms,
-                            "buffer_health_sec": snapshot.buffer_health_sec
-                        },
-                        "sanitized_logs": [sanitized_edge_log],
-                        "flagged_security_injections": security_guard.get_security_metrics().get("flagged_injections", 0),
-                        "failure_hypothesis": decision.get("root_cause_analysis", "QoS degradation"),
-                        "confidence": 0.96,
-                        "evidence_citations": [promql_query, logql_query]
-                    },
-                    "timestamp": start_time + 0.3,
-                    "status": "COMPLETED"
-                },
-                {
-                    "role": "Key Grip",
-                    "name": self.crew.key_grip.name,
-                    "domain": "Transactional Infrastructure Remediation",
-                    "phase": "TRANSACTION_EXECUTION",
-                    "handover_schema": "RemediationIntent",
-                    "handover_data": {
-                        "incident_id": effective_inc_id,
-                        "action_name": remediation_action or "NONE",
-                        "target_subsystem": scenario_subsystems[0] if scenario_subsystems else "Edge CDN",
-                        "transaction_id": tx_id or "NONE",
-                        "idempotency_key": idempotency_key or "",
-                        "rollback_action": rollback_action or "NONE",
-                        "execution_status": "SUSPENDED_FOR_APPROVAL" if is_hitl_pending else ("ROLLED_BACK" if rollback_happened else "APPLIED"),
-                        "blast_radius": "HIGH" if is_hitl_pending else "LOW",
-                        "traffic_shift_details": remediation_res or {}
-                    },
-                    "timestamp": start_time + 0.5,
-                    "status": "SUSPENDED" if is_hitl_pending else "COMPLETED"
-                },
-                {
-                    "role": "Continuity",
-                    "name": self.crew.continuity.name,
-                    "domain": "Recovery Verification & Rollback Authority",
-                    "phase": "VERIFICATION_GATE",
-                    "handover_schema": "VerificationVerdict",
-                    "handover_data": {
-                        "incident_id": effective_inc_id,
-                        "transaction_id": tx_id or "NONE",
-                        "outcome": "SUSPENDED_FOR_APPROVAL" if is_hitl_pending else ("COMMITTED" if (is_verified and gate_status == "PASSED") else "ROLLED_BACK"),
-                        "health_gates": {
-                            "vpf_sla": verified_vpf <= 0.5,
-                            "buffer_health": verified_buffer >= 20.0
-                        },
-                        "authoritative": is_authoritative,
-                        "verification_source": verify_source or "Grafana Cloud Prometheus",
-                        "verified_vpf_rate": verified_vpf,
-                        "verified_buffer_health_sec": verified_buffer,
-                        "recovery_proof_digest": proof_data.get("evidence_hash") if isinstance(proof_data, dict) else None,
-                        "escalation_package": escalation_data
-                    },
-                    "timestamp": time.time(),
-                    "status": "COMPLETED" if (is_verified and gate_status == "PASSED") or rollback_happened else ("SUSPENDED" if is_hitl_pending else "PENDING")
-                }
-            ]
-        except Exception as e:
-            logger.warning(f"Failed to generate structured crew dispatch: {e}")
-            crew_records = self.crew.get_agent_specs()
 
         result = InvestigationResult(
             timestamp=time.time(),
@@ -666,40 +447,40 @@ Call the necessary MCP tools to remediate this critical stream degradation.
             vpf_rate=snapshot.video_playback_failures_pct,
             cdn_latency_ms=snapshot.cdn_egress_latency_ms,
             drm_handshake_ms=snapshot.drm_handshake_ms,
-            severity=decision.get("severity", "CRITICAL"),
-            root_cause_analysis=decision.get("root_cause_analysis", "Edge transit congestion"),
-            affected_subsystems=decision.get("affected_subsystems", ["Edge CDN"]),
-            autonomous_action_taken=remediation_action,
-            remediation_action=remediation_action,
+            severity=triage.severity,
+            root_cause_analysis=decision_rca or evidence.failure_hypothesis,
+            affected_subsystems=triage.affected_subsystems,
+            autonomous_action_taken=remediation.action_name,
+            remediation_action=remediation.action_name,
             remediation_status=remediation_status,
             workflow_status=workflow_status,
             traffic_shift_details={
-                "primary_cdn": remediation_res.get("primary_cdn", "Fastly Edge"),
-                "primary_cdn_pct": remediation_res.get("primary_cdn_traffic_pct", 20),
-                "secondary_cdn": remediation_res.get("secondary_cdn", "Akamai Edge"),
-                "secondary_cdn_pct": remediation_res.get("secondary_cdn_traffic_pct", 80)
+                "primary_cdn": rem_res.get("primary_cdn", "Fastly Edge"),
+                "primary_cdn_pct": rem_res.get("primary_cdn_traffic_pct", 20),
+                "secondary_cdn": rem_res.get("secondary_cdn", "Akamai Edge"),
+                "secondary_cdn_pct": rem_res.get("secondary_cdn_traffic_pct", 80)
             },
             annotation_id=annotation_id,
             grafana_incident_id=grafana_incident_id,
             workflow_elapsed_seconds=elapsed,
             mttr_seconds=mttr_value,
-            estimated_subscriber_loss_prevented=decision.get("estimated_subscriber_loss_prevented", grounded_impact_str),
+            estimated_subscriber_loss_prevented=grounded_impact_str,
             executive_summary=exec_summary,
             reasoning_trace=trace,
             mcp_tools_executed=list(dict.fromkeys(mcp_tools_called)),
             closed_loop_verified=is_verified and (gate_status == "PASSED"),
-            verified_vpf_rate=verified_vpf,
-            verified_buffer_health_sec=verified_buffer,
-            verified_latency_ms=verified_latency,
+            verified_vpf_rate=verdict.verified_vpf_rate,
+            verified_buffer_health_sec=verdict.verified_buffer_health_sec,
+            verified_latency_ms=snapshot.cdn_egress_latency_ms,
             verification_status=gate_status,
-            verification_source=verify_source,
-            verification_authoritative=is_authoritative,
-            remediation_transaction_id=tx_id,
-            idempotency_key=idempotency_key,
-            rollback_action=rollback_action,
+            verification_source=verdict.verification_source,
+            verification_authoritative=verdict.authoritative,
+            remediation_transaction_id=remediation.transaction_id,
+            idempotency_key=remediation.idempotency_key,
+            rollback_action=remediation.rollback_action,
             rollback_status=rollback_status,
-            recovery_proof=proof_data,
-            escalation_package=escalation_data,
+            recovery_proof=verify_res.get("recovery_proof") if isinstance(verify_res, dict) else None,
+            escalation_package=verdict.escalation_package,
             diagnosis_claims=diagnosis_claims_data,
             crew_dispatch=crew_records
         )
