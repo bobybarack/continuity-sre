@@ -93,6 +93,13 @@ class InvestigationResult(BaseModel):
     escalation_package: Optional[Dict[str, Any]] = None
     diagnosis_claims: List[Dict[str, Any]] = Field(default_factory=list)
     crew_dispatch: List[Dict[str, Any]] = Field(default_factory=list)
+    gemini_model_used: Optional[str] = None
+    gemini_consultation_status: str = "NOT_ATTEMPTED"  # "SUCCESS", "UNAVAILABLE", "ERROR", "NOT_CONFIGURED"
+    gemini_evidence_supplied: Optional[Dict[str, Any]] = None
+    gemini_raw_response: Optional[str] = None
+    gemini_response_metadata: Optional[Dict[str, Any]] = None
+    gemini_diagnosis: Optional[str] = None
+    mcp_query_evidence: Dict[str, Any] = Field(default_factory=dict)
 
 from services.agent_crew import (
     continuity_crew,
@@ -260,7 +267,7 @@ class AgentCommander:
             self._record_result(result)
             return result
 
-        # Step 2: Anomaly Confirmed - Dispatch Multi-Agent Cinema Crew
+        # Step 2: Anomaly Confirmed - Gather Observability Evidence & Consult Gemini
         effective_inc_id = incident_id or state.active_incident_id or f"INC-{int(start_time * 1000)}"
         failure_key = failure_mode_override or (state.failure_mode.value if state.failure_mode else "DEFAULT")
         scenario = SCENARIOS.get(failure_key, SCENARIOS.get("DEFAULT", {}))
@@ -269,19 +276,97 @@ class AgentCommander:
         promql_query = scenario.get("promql") or scenario.get("promql_query") or "ott_video_playback_failures_ratio"
         logql_query = scenario.get("logql") or scenario.get("logql_query") or '{app="edge-gateway"} |= "error"'
 
-        trace.append(f"[{time.strftime('%H:%M:%S')}] CRITICAL ANOMALY DETECTED: {state.failure_mode.value if state.failure_mode else 'QoS'} threshold breached.")
+        trace.append(f"[{time.strftime('%H:%M:%S')}] CRITICAL ANOMALY DETECTED: QoS threshold breached.")
 
-        # Consult Gemini for high-level Executive RCA if client is configured
+        # Query Loki error logs via official Grafana MCP
+        mcp_tools_called.extend(["query_loki_logs", "grafana_query_loki"])
+        trace.append(f"[{time.strftime('%H:%M:%S')}] ADK McpToolset [query_loki_logs]: Executing LogQL ({logql_query}) against Grafana Cloud Loki...")
+        try:
+            loki_res = await grafana_query_loki(logql_query, limit=10)
+        except Exception as e:
+            logger.warning(f"Official MCP query_loki failed: {e}")
+            loki_res = None
+
+        raw_logs: List[str] = []
+        if snapshot and getattr(snapshot, "latest_log", None):
+            raw_logs.append(snapshot.latest_log)
+        if loki_res and hasattr(loki_res, "lines") and isinstance(loki_res.lines, list):
+            raw_logs.extend(loki_res.lines)
+        sanitized_logs = security_guard.sanitize_log_lines(raw_logs)
+
+        # Assemble MCP Query Evidence
+        mcp_evidence = {
+            "prometheus": {
+                "query": promql_query,
+                "status": getattr(prom_res, "status", "unknown") if prom_res else "unknown",
+                "source": getattr(prom_res, "source", "unknown") if prom_res else "unknown",
+                "metric_value": getattr(prom_res, "metric_value", None) if prom_res else None,
+            },
+            "loki": {
+                "query": logql_query,
+                "status": getattr(loki_res, "status", "unknown") if loki_res else "unknown",
+                "source": getattr(loki_res, "source", "unknown") if loki_res else "unknown",
+                "lines_count": len(getattr(loki_res, "lines", [])) if loki_res else 0,
+                "sanitized_sample": sanitized_logs[:3]
+            }
+        }
+
+        # Structure evidence-first payload for Gemini (Strictly NO scenario label or candidate action passed!)
+        gemini_evidence_supplied = {
+            "incident_id": effective_inc_id,
+            "telemetry": {
+                "video_playback_failures_pct": snapshot.video_playback_failures_pct,
+                "cdn_egress_latency_ms": snapshot.cdn_egress_latency_ms,
+                "drm_handshake_ms": snapshot.drm_handshake_ms,
+                "buffer_health_sec": snapshot.buffer_health_sec,
+                "avg_bitrate_mbps": snapshot.avg_bitrate_mbps,
+                "active_viewers": snapshot.active_viewers,
+                "primary_traffic_pct": snapshot.primary_traffic_pct,
+                "secondary_traffic_pct": snapshot.secondary_traffic_pct,
+                "active_transit_route": getattr(state, "active_transit_route", "ASN-3356-Direct"),
+            },
+            "promql_metric": {
+                "query": promql_query,
+                "value": getattr(prom_res, "metric_value", None) if prom_res else None,
+                "source": getattr(prom_res, "source", "official_mcp") if prom_res else "official_mcp",
+            },
+            "edge_logs": sanitized_logs[:5]
+        }
+
+        formatted_logs = "\n".join(f"- {log}" for log in sanitized_logs[:5]) if sanitized_logs else "No explicit error lines in current buffer."
+
+        consult_prompt = (
+            f"You are the Lead Autonomous SRE Incident Commander for {STREAM_TITLE}.\n"
+            f"Telemetry and log anomalies have breached production streaming SLA thresholds.\n\n"
+            f"LIVE OBSERVABILITY TELEMETRY:\n"
+            f"- Video Playback Failures (VPF): {snapshot.video_playback_failures_pct:.2f}% (Critical SLA threshold > 1.0%)\n"
+            f"- CDN Egress Latency: {snapshot.cdn_egress_latency_ms:.1f} ms (Normal < 120 ms)\n"
+            f"- DRM License Handshake Latency: {snapshot.drm_handshake_ms:.1f} ms (Normal < 100 ms)\n"
+            f"- Forward Buffer Health: {snapshot.buffer_health_sec:.1f} s (Target >= 20 s)\n"
+            f"- Average Bitrate: {snapshot.avg_bitrate_mbps:.1f} Mbps (Target >= 15 Mbps)\n"
+            f"- Active Viewer Sessions: {snapshot.active_viewers:,}\n"
+            f"- Traffic Distribution: Primary CDN {snapshot.primary_traffic_pct}%, Secondary CDN {snapshot.secondary_traffic_pct}%\n"
+            f"- Active Transit Route: {getattr(state, 'active_transit_route', 'ASN-3356-Direct')}\n"
+            f"- Prometheus MCP Metric ({promql_query}): {getattr(prom_res, 'metric_value', 'N/A') if prom_res else 'N/A'}\n\n"
+            f"INGESTED LOG EVENTS:\n"
+            f"{formatted_logs}\n\n"
+            f"Analyze the above observability evidence to determine:\n"
+            f"1. Evidence-Based Root Cause: Explain what technical failure is causing the stream degradation.\n"
+            f"2. Failing Subsystem: Identify the specific failing component.\n"
+            f"3. Recommended Action: Recommend the safest immediate mitigation.\n"
+            f"Keep your diagnosis grounded strictly in the provided metrics and logs."
+        )
+
+        gemini_model_used = None
+        gemini_status = "NOT_CONFIGURED" if not self.client else "NOT_ATTEMPTED"
+        gemini_raw_resp = None
+        gemini_resp_meta = None
         decision_rca = None
+        last_error = None
+
         if self.client:
             for model in FALLBACK_MODELS:
                 try:
-                    consult_prompt = (
-                        f"You are the Lead Incident Commander for {STREAM_TITLE}. "
-                        f"Telemetry Alert: {failure_key} degradation across SLA gates. "
-                        f"Subsystems: {scenario_subsystems}. Candidate Action: {candidate_action}. "
-                        f"Provide a concise root cause analysis (1-2 sentences)."
-                    )
                     if hasattr(self.client, "aio") and hasattr(self.client.aio, "models"):
                         response = await asyncio.wait_for(
                             self.client.aio.models.generate_content(
@@ -289,7 +374,7 @@ class AgentCommander:
                                 contents=consult_prompt,
                                 config=types.GenerateContentConfig(temperature=0.2)
                             ),
-                            timeout=5.0
+                            timeout=7.0
                         )
                     else:
                         def _sync_gen(m=model):
@@ -298,13 +383,29 @@ class AgentCommander:
                                 contents=consult_prompt,
                                 config=types.GenerateContentConfig(temperature=0.2)
                             )
-                        response = await asyncio.wait_for(asyncio.to_thread(_sync_gen), timeout=5.0)
-                    if response.text:
+                        response = await asyncio.wait_for(asyncio.to_thread(_sync_gen), timeout=7.0)
+
+                    if response and response.text:
                         decision_rca = response.text.strip()
-                        trace.append(f"[{time.strftime('%H:%M:%S')}] Gemini [{model}] Root Cause Analysis: {decision_rca}")
-                    break
+                        gemini_model_used = model
+                        gemini_status = "SUCCESS"
+                        gemini_raw_resp = response.text
+                        meta = {}
+                        if hasattr(response, "usage_metadata") and response.usage_metadata:
+                            meta["prompt_tokens"] = getattr(response.usage_metadata, "prompt_token_count", None)
+                            meta["candidates_tokens"] = getattr(response.usage_metadata, "candidates_token_count", None)
+                            meta["total_tokens"] = getattr(response.usage_metadata, "total_token_count", None)
+                        gemini_resp_meta = meta
+                        trace.append(f"[{time.strftime('%H:%M:%S')}] Gemini [{model}] Evidence-Based Diagnosis: {decision_rca[:120]}...")
+                        break
                 except Exception as e:
-                    logger.warning(f"Commander LLM consultation ({model}) bypassed: {e}")
+                    last_error = str(e)
+                    logger.warning(f"Commander LLM consultation ({model}) failed/timed out: {e}")
+
+            if gemini_status != "SUCCESS":
+                gemini_status = "UNAVAILABLE"
+                gemini_resp_meta = {"error": last_error or "All fallback models timed out or exhausted"}
+                trace.append(f"[{time.strftime('%H:%M:%S')}] Gemini consultation UNAVAILABLE ({last_error}). Operating with deterministic DIT hypothesis.")
 
         trace.append(f"[{time.strftime('%H:%M:%S')}] [Multi-Agent Cinema Crew] Executing 4-Agent Sequential Pipeline (1st AD -> DIT -> Key Grip -> Continuity)...")
 
@@ -495,7 +596,14 @@ class AgentCommander:
             recovery_proof=verify_res.get("recovery_proof") if isinstance(verify_res, dict) else None,
             escalation_package=verdict.escalation_package,
             diagnosis_claims=diagnosis_claims_data,
-            crew_dispatch=crew_records
+            crew_dispatch=crew_records,
+            gemini_model_used=gemini_model_used,
+            gemini_consultation_status=gemini_status,
+            gemini_evidence_supplied=gemini_evidence_supplied,
+            gemini_raw_response=gemini_raw_resp,
+            gemini_response_metadata=gemini_resp_meta,
+            gemini_diagnosis=decision_rca,
+            mcp_query_evidence=mcp_evidence
         )
 
         self._record_result(result)
